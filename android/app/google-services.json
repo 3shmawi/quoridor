@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "829516799814",
+    "project_id": "quoridor-290f6",
+    "storage_bucket": "quoridor-290f6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829516799814:android:34b8ce29b4e71c12e88f47",
+        "android_client_info": {
+          "package_name": "com.MoRe_H.quoridor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDt67wUePyZdiEZUMeaVNAnTEFR9_i1_pM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
