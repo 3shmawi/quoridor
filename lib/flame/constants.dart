@@ -5,7 +5,7 @@ class GameConstants {
   static const int maxWallsPerPlayer = 10;
 
   // Cell dimensions for rendering
-  static const double cellSize = 50.0;
+  static const double cellSize = 40.0;
   static const double wallThickness = 4.0;
   static const double wallLength = cellSize * 2 + wallThickness;
 

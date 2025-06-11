@@ -142,6 +142,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       drawer: Drawer(
+        width: 350,
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
@@ -153,100 +154,115 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               ),
             ],
           ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                // Menu Header
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primary,
-                        Theme.of(context).colorScheme.secondary,
-                      ],
-                    ),
+          child: Column(
+            children: [
+              // Menu Header
+              DrawerHeader(
+                padding: EdgeInsets.zero,
+                margin: EdgeInsets.zero,
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('assets/icons/logo.png'),
+                    fit: BoxFit.cover,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.games,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Game Menu',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                child: SizedBox(
+                  height: double.infinity,
+                  width: double.infinity,
+                ),
+              ),
+
+              // Menu Items
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Builder(
+                    builder: (context) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildMenuSection('Game Controls', [
+                            _buildMenuItem(
+                              Icons.refresh,
+                              'New Game',
+                              'Start a fresh game',
+                              _newGame,
+                            ),
+                            _buildMenuItem(
+                              Icons.save,
+                              'Save Game',
+                              'Save current progress',
+                              _saveGame,
+                            ),
+                            if (_game.isInitialized)
+                              _buildMenuItem(
+                                Icons.people,
+                                'Toggle Player Mode',
+                                _game.gameState.player2.isAI
+                                    ? 'Switch to 2 players'
+                                    : 'Switch to AI',
+                                _togglePlayerMode,
+                              ),
+                          ]),
+
+                          const SizedBox(height: 24),
+
+                          _buildMenuSection('Display Options', [
+                            _buildSwitchItem(
+                              Icons.visibility,
+                              'Show Valid Moves',
+                              'Highlight possible moves',
+                              _showValidMoves,
+                              _toggleValidMoves,
+                            ),
+                          ]),
+
+                          const SizedBox(height: 24),
+
+                          _buildMenuSection('AI Difficulty', [
+                            _buildDifficultyItem(AIDifficulty.easy),
+                            _buildDifficultyItem(AIDifficulty.medium),
+                            _buildDifficultyItem(AIDifficulty.hard),
+                          ]),
+                        ],
+                      );
+                    },
                   ),
                 ),
-
-                // Menu Items
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    child: Builder(
-                      builder: (context) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildMenuSection('Game Controls', [
-                              _buildMenuItem(
-                                Icons.refresh,
-                                'New Game',
-                                'Start a fresh game',
-                                _newGame,
-                              ),
-                              _buildMenuItem(
-                                Icons.save,
-                                'Save Game',
-                                'Save current progress',
-                                _saveGame,
-                              ),
-                              if (_game.isInitialized)
-                                _buildMenuItem(
-                                  Icons.people,
-                                  'Toggle Player Mode',
-                                  _game.gameState.player2.isAI
-                                      ? 'Switch to 2 players'
-                                      : 'Switch to AI',
-                                  _togglePlayerMode,
-                                ),
-                            ]),
-
-                            const SizedBox(height: 24),
-
-                            _buildMenuSection('Display Options', [
-                              _buildSwitchItem(
-                                Icons.visibility,
-                                'Show Valid Moves',
-                                'Highlight possible moves',
-                                _showValidMoves,
-                                _toggleValidMoves,
-                              ),
-                            ]),
-
-                            const SizedBox(height: 24),
-
-                            _buildMenuSection('AI Difficulty', [
-                              _buildDifficultyItem(AIDifficulty.easy),
-                              _buildDifficultyItem(AIDifficulty.medium),
-                              _buildDifficultyItem(AIDifficulty.hard),
-                            ]),
-                          ],
-                        );
-                      },
+              ),
+              Text.rich(
+                textDirection: TextDirection.ltr,
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: "@copyWrite",
+                      style: TextStyle(fontSize: 12, color: Colors.grey[400]),
                     ),
-                  ),
+                    TextSpan(text: " "),
+                    TextSpan(
+                      text: "MO",
+                      style: TextStyle(color: Colors.cyan),
+                    ),
+                    TextSpan(
+                      text: "RE",
+                      style: TextStyle(color: Theme.of(context).dividerColor),
+                    ),
+                    TextSpan(
+                      text: " H",
+                      style: TextStyle(color: Colors.cyan),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Text(
+                "ASHMAWY",
+                style: TextStyle(color: Theme.of(context).dividerColor),
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
         ),
       ),

@@ -22,7 +22,7 @@ class BoardComponent extends PositionComponent {
 
   static const double _cellSize = GameConstants.cellSize;
   static const double _wallThickness = GameConstants.wallThickness;
-  static const double _boardPadding = 50.0;
+  static const double _boardPadding = 20.0;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
@@ -88,6 +88,12 @@ class BoardComponent extends PositionComponent {
     } else if (tappedWall != null) {
       _handleWallTap(tappedWall);
     }
+    forceRedraw();
+  }
+
+  void forceRedraw() {
+    position += Vector2(0.001, 0); // 🔥 triggers a redraw
+    position -= Vector2(0.001, 0);
   }
 
   void _handlePositionTap(Position position) {

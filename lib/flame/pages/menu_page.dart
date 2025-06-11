@@ -157,12 +157,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           width: 120,
           height: 120,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primary,
-                Theme.of(context).colorScheme.secondary,
-              ],
+            image: DecorationImage(
+              image: AssetImage('assets/icons/logo.png'),
+              fit: BoxFit.cover,
             ),
+
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
@@ -171,11 +170,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 offset: const Offset(0, 10),
               ),
             ],
-          ),
-          child: Icon(
-            Icons.grid_4x4,
-            size: 60,
-            color: Theme.of(context).colorScheme.onPrimary,
           ),
         ),
 

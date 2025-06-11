@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
@@ -93,11 +94,13 @@ class QuoridorGame extends FlameGame
       ),
     );
     _player2Info.position = Vector2(size.x - 50, size.y / 2);
-    _player2Info.anchor = Anchor.centerRight;
+    _player2Info.anchor = Anchor.bottomRight;
     add(_player2Info);
   }
 
-  void _updateUI() {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  void _updateUI() async {
     // Update status text
     if (_gameState!.isGameOver) {
       _statusText.text = '${_gameState!.winner} Wins!';
@@ -108,6 +111,7 @@ class QuoridorGame extends FlameGame
           fontWeight: FontWeight.bold,
         ),
       );
+      await _audioPlayer.play(AssetSource("sounds/win.wav"));
     } else {
       _statusText.text = '${_gameState!.currentPlayer.name}\'s Turn';
       _statusText.textRenderer = TextPaint(
@@ -235,6 +239,12 @@ class QuoridorGame extends FlameGame
     _boardComponent.showValidMoves = show;
   }
 
+  @override
+  void onRemove() {
+    _audioPlayer.dispose();
+    super.onRemove();
+  }
+
   void togglePlayerMode() {
     // Switch between AI and human player 2
     final newGameState = GameState(
@@ -291,7 +301,6 @@ class QuoridorGame extends FlameGame
     }
   }
 
-  @override
   bool onHover(PointerHoverEvent event) {
     if (!_isInitialized) return false;
 
@@ -317,7 +326,10 @@ class QuoridorGame extends FlameGame
   }
 
   bool get isGameOver => gameState.isGameOver;
+
   String? get winner => gameState.winner;
+
   int get currentPlayerId => gameState.currentPlayerId;
+
   bool get isInitialized => _isInitialized;
 }
