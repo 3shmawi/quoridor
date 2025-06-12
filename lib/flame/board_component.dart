@@ -1,6 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:quoridor/theme.dart';
 
 import '../flame/constants.dart';
 import '../flame/models/game_state.dart';
@@ -22,7 +23,8 @@ class BoardComponent extends PositionComponent {
 
   static const double _cellSize = GameConstants.cellSize;
   static const double _wallThickness = GameConstants.wallThickness;
-  static const double _boardPadding = 20.0;
+  static const double _boardPadding = GameConstants.boardPadding;
+  static const double cellSpacing = GameConstants.cellSpacing;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
@@ -58,14 +60,12 @@ class BoardComponent extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    _drawBackground(canvas);
     _drawGrid(canvas);
     _drawValidMoves(canvas);
-    _drawWalls(canvas);
     _drawPreviewWall(canvas);
     _drawPawns(canvas);
     _drawSelection(canvas);
-    _drawGoalLines(canvas);
+    _drawWalls(canvas);
   }
 
   void _triggerFeedback({String? soundKey}) async {
@@ -88,12 +88,6 @@ class BoardComponent extends PositionComponent {
     } else if (tappedWall != null) {
       _handleWallTap(tappedWall);
     }
-    forceRedraw();
-  }
-
-  void forceRedraw() {
-    position += Vector2(0.001, 0); // 🔥 triggers a redraw
-    position -= Vector2(0.001, 0);
   }
 
   void _handlePositionTap(Position position) {
@@ -169,23 +163,31 @@ class BoardComponent extends PositionComponent {
 
   void _drawGrid(Canvas canvas) {
     final lightPaint = Paint()
-      ..color = const Color(GameConstants.lightCellColor)
+      ..color = isDarkModeNotifier.value
+          ? const Color(0xFF2C3E50) // Dark mode light cell
+          : const Color(GameConstants.lightCellColor)
       ..style = PaintingStyle.fill;
 
     final darkPaint = Paint()
-      ..color = const Color(GameConstants.darkCellColor)
+      ..color = isDarkModeNotifier.value
+          ? const Color(0xFF1A2530) // Dark mode dark cell
+          : const Color(GameConstants.darkCellColor)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = const Color(0xFFB0BEC5)
+      ..color = isDarkModeNotifier.value
+          ? const Color(0xFF34495E) // Dark mode border
+          : const Color(0xFFB0BEC5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
+
+    final cellSpacing = 4.0; // Space between cells
 
     for (int row = 0; row < GameConstants.boardSize; row++) {
       for (int col = 0; col < GameConstants.boardSize; col++) {
         final rect = Rect.fromLTWH(
-          _boardPadding + col * _cellSize,
-          _boardPadding + row * _cellSize,
+          _boardPadding + col * (_cellSize + cellSpacing),
+          _boardPadding + row * (_cellSize + cellSpacing),
           _cellSize,
           _cellSize,
         );
@@ -305,6 +307,7 @@ class BoardComponent extends PositionComponent {
   }
 
   void _drawPawns(Canvas canvas) {
+    // Draw pawns using their actual positions from game state
     _drawPawn(canvas, _gameState.player1.position, 1);
     _drawPawn(canvas, _gameState.player2.position, 2);
   }
@@ -319,7 +322,7 @@ class BoardComponent extends PositionComponent {
         : const Color(GameConstants.player2Color);
 
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.2)
+      ..color = Colors.black.withOpacity(0.2)
       ..style = PaintingStyle.fill;
 
     final pawnPaint = Paint()
@@ -327,12 +330,12 @@ class BoardComponent extends PositionComponent {
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = Colors.white
+      ..color = isDarkModeNotifier.value ? Colors.white70 : Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.3)
+      ..color = Colors.white.withOpacity(0.3)
       ..style = PaintingStyle.fill;
 
     // Draw shadow
@@ -369,8 +372,8 @@ class BoardComponent extends PositionComponent {
     final textPainter = TextPainter(
       text: TextSpan(
         text: playerId.toString(),
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: isDarkModeNotifier.value ? Colors.white70 : Colors.white,
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),
@@ -410,57 +413,75 @@ class BoardComponent extends PositionComponent {
 
   void _drawGoalLines(Canvas canvas) {
     final player1GoalPaint = Paint()
-      ..color = const Color(GameConstants.player1Color).withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill;
+      ..color = const Color(GameConstants.player1Color).withOpacity(0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = GameConstants.goalLineThickness;
 
     final player2GoalPaint = Paint()
-      ..color = const Color(GameConstants.player2Color).withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill;
+      ..color = const Color(GameConstants.player2Color).withOpacity(0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = GameConstants.goalLineThickness;
 
     // Player 1 goal (bottom row)
-    canvas.drawRect(
-      Rect.fromLTWH(
-        _boardPadding,
-        _boardPadding + (GameConstants.boardSize - 1) * _cellSize,
-        GameConstants.boardSize * _cellSize,
-        _cellSize,
-      ),
+    final p1StartX = _boardPadding;
+    final p1EndX =
+        _boardPadding +
+        (GameConstants.boardSize - 1) *
+            (_cellSize + GameConstants.cellSpacing) +
+        _cellSize;
+    final p1Y =
+        _boardPadding +
+        (GameConstants.boardSize - 1) *
+            (_cellSize + GameConstants.cellSpacing) +
+        _cellSize;
+
+    canvas.drawLine(
+      Offset(p1StartX, p1Y),
+      Offset(p1EndX, p1Y),
       player1GoalPaint,
     );
 
     // Player 2 goal (top row)
-    canvas.drawRect(
-      Rect.fromLTWH(
-        _boardPadding,
-        _boardPadding,
-        GameConstants.boardSize * _cellSize,
-        _cellSize,
-      ),
+    final p2StartX = _boardPadding;
+    final p2EndX =
+        _boardPadding +
+        (GameConstants.boardSize - 1) *
+            (_cellSize + GameConstants.cellSpacing) +
+        _cellSize;
+    final p2Y = _boardPadding;
+
+    canvas.drawLine(
+      Offset(p2StartX, p2Y),
+      Offset(p2EndX, p2Y),
       player2GoalPaint,
     );
   }
 
   Offset _getCellCenter(Position position) {
     return Offset(
-      _boardPadding + position.col * _cellSize + _cellSize / 2,
-      _boardPadding + position.row * _cellSize + _cellSize / 2,
+      _boardPadding + position.col * (_cellSize + cellSpacing) + _cellSize / 2,
+      _boardPadding + position.row * (_cellSize + cellSpacing) + _cellSize / 2,
     );
   }
 
   Rect _getWallRect(Wall wall) {
     if (wall.orientation == WallOrientation.horizontal) {
       return Rect.fromLTWH(
-        _boardPadding + wall.position.col * _cellSize,
-        _boardPadding + wall.position.row * _cellSize - _wallThickness / 2,
-        _cellSize * 2,
+        _boardPadding + wall.position.col * (_cellSize + cellSpacing),
+        _boardPadding +
+            wall.position.row * (_cellSize + cellSpacing) -
+            _wallThickness / 2,
+        _cellSize * 2 + cellSpacing,
         _wallThickness,
       );
     } else {
       return Rect.fromLTWH(
-        _boardPadding + wall.position.col * _cellSize - _wallThickness / 2,
-        _boardPadding + wall.position.row * _cellSize,
+        _boardPadding +
+            wall.position.col * (_cellSize + cellSpacing) -
+            _wallThickness / 2,
+        _boardPadding + wall.position.row * (_cellSize + cellSpacing),
         _wallThickness,
-        _cellSize * 2,
+        _cellSize * 2 + cellSpacing,
       );
     }
   }
@@ -471,8 +492,8 @@ class BoardComponent extends PositionComponent {
 
     if (localX < 0 || localY < 0) return null;
 
-    final col = (localX / _cellSize).floor();
-    final row = (localY / _cellSize).floor();
+    final col = (localX / (_cellSize + cellSpacing)).floor();
+    final row = (localY / (_cellSize + cellSpacing)).floor();
 
     print('Calculated position - row: $row, col: $col'); // Debug log
 
@@ -492,11 +513,11 @@ class BoardComponent extends PositionComponent {
 
     if (localX < 0 || localY < 0) return null;
 
-    final cellCol = (localX / _cellSize).floor();
-    final cellRow = (localY / _cellSize).floor();
+    final cellCol = (localX / (_cellSize + cellSpacing)).floor();
+    final cellRow = (localY / (_cellSize + cellSpacing)).floor();
 
-    final cellX = localX % _cellSize;
-    final cellY = localY % _cellSize;
+    final cellX = localX % (_cellSize + cellSpacing);
+    final cellY = localY % (_cellSize + cellSpacing);
 
     // Check if click is near cell edge for wall placement
     const edgeThreshold =

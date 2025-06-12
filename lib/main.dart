@@ -18,13 +18,18 @@ class QuoridorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Quoridor - Strategic Board Game',
-      theme: lightTheme,
-      darkTheme: darkTheme,
-      themeMode: ThemeMode.system,
-      home: const MenuPage(),
-      debugShowCheckedModeBanner: false,
+    return ValueListenableBuilder(
+      valueListenable: isDarkModeNotifier,
+      builder: (context, value, child) {
+        return MaterialApp(
+          title: 'Quoridor - Strategic Board Game',
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: value ? ThemeMode.dark : ThemeMode.light,
+          home: const MenuPage(),
+          debugShowCheckedModeBanner: false,
+        );
+      },
     );
   }
 }

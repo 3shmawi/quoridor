@@ -1,5 +1,4 @@
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
@@ -11,20 +10,75 @@ import '../models/game_state.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
 
+class PlayerInfoWidget extends StatelessWidget {
+  final int playerId;
+  final String name;
+  final int wallsRemaining;
+  final bool isCurrentPlayer;
+  final bool isAI;
+
+  const PlayerInfoWidget({
+    super.key,
+    required this.playerId,
+    required this.name,
+    required this.wallsRemaining,
+    required this.isCurrentPlayer,
+    required this.isAI,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = playerId == 1 ? Colors.deepPurple : Colors.teal;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
+        ),
+        border: Border.all(color: color.withOpacity(0.3), width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                isAI ? "🤖 AI" : name,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: color,
+                ),
+              ),
+              if (isCurrentPlayer) const Spacer(),
+              if (isCurrentPlayer)
+                CircleAvatar(radius: 6, backgroundColor: color),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Walls: $wallsRemaining',
+            style: TextStyle(color: color.withOpacity(0.8)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final isInitializedProvider = ValueNotifier(false);
+
 class QuoridorGame extends FlameGame
     with TapCallbacks, HasKeyboardHandlerComponents, HoverCallbacks {
   GameState? _gameState;
   late BoardComponent _boardComponent;
-  late TextComponent _statusText;
-  late TextComponent _player1Info;
-  late TextComponent _player2Info;
   bool _isInitialized = false;
 
   Function(GameState)? onGameStateChanged;
   Function(String)? onGameMessage;
-
-  @override
-  Color backgroundColor() => const Color(0xFFF1F4F8);
 
   @override
   Future<void> onLoad() async {
@@ -37,101 +91,24 @@ class QuoridorGame extends FlameGame
     _boardComponent.onWallPlaceAttempted = _handleWallPlaceAttempt;
 
     // Position board in center
-    _boardComponent.position = Vector2(
-      (size.x - _boardComponent.size.x) / 2,
-      (size.y - _boardComponent.size.y) / 2,
-    );
-
+    _boardComponent.position = Vector2(0, 0);
     add(_boardComponent);
 
-    // Add UI components
-    _createUIComponents();
     _updateUI();
 
     _isInitialized = true;
   }
 
-  void _createUIComponents() {
-    // Status text at top
-    _statusText = TextComponent(
-      text: 'Player 1\'s Turn',
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Color(0xFF15161E),
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-    _statusText.position = Vector2(size.x / 2, 50);
-    _statusText.anchor = Anchor.center;
-    add(_statusText);
-
-    // Player 1 info (left side)
-    _player1Info = TextComponent(
-      text: 'Player 1\nWalls: 10',
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Color(GameConstants.player1Color),
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-    _player1Info.position = Vector2(50, size.y / 2);
-    _player1Info.anchor = Anchor.centerLeft;
-    add(_player1Info);
-
-    // Player 2 info (right side)
-    _player2Info = TextComponent(
-      text: 'AI Player\nWalls: 10',
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Color(GameConstants.player2Color),
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-    _player2Info.position = Vector2(size.x - 50, size.y / 2);
-    _player2Info.anchor = Anchor.bottomRight;
-    add(_player2Info);
-  }
-
   final AudioPlayer _audioPlayer = AudioPlayer();
+  @override
+  Color backgroundColor() => Colors.transparent;
 
   void _updateUI() async {
-    // Update status text
     if (_gameState!.isGameOver) {
-      _statusText.text = '${_gameState!.winner} Wins!';
-      _statusText.textRenderer = TextPaint(
-        style: const TextStyle(
-          color: Color(0xFF6F61EF),
-          fontSize: 28,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-      await _audioPlayer.play(AssetSource("sounds/win.wav"));
-    } else {
-      _statusText.text = '${_gameState!.currentPlayer.name}\'s Turn';
-      _statusText.textRenderer = TextPaint(
-        style: TextStyle(
-          color: Color(
-            _gameState!.currentPlayerId == 1
-                ? GameConstants.player1Color
-                : GameConstants.player2Color,
-          ),
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-    }
+      onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
 
-    // Update player info
-    _player1Info.text =
-        '${_gameState!.player1.name}\nWalls: ${_gameState!.player1.wallsRemaining}';
-    _player2Info.text =
-        '${_gameState!.player2.name}\nWalls: ${_gameState!.player2.wallsRemaining}';
+      await _audioPlayer.play(AssetSource("sounds/win.wav"));
+    }
   }
 
   void updateGameState(GameState newGameState) {
@@ -287,18 +264,10 @@ class QuoridorGame extends FlameGame
 
     if (!_isInitialized) return;
 
-    // Re-center board
-    if (hasLayout) {
-      _boardComponent.position = Vector2(
-        (size.x - _boardComponent.size.x) / 2,
-        (size.y - _boardComponent.size.y) / 2,
-      );
-
-      // Update UI positions
-      _statusText.position = Vector2(size.x / 2, 50);
-      _player1Info.position = Vector2(50, size.y / 2);
-      _player2Info.position = Vector2(size.x - 50, size.y / 2);
-    }
+    _boardComponent.position = Vector2(
+      (size.x - _boardComponent.size.x) / 2,
+      40,
+    );
   }
 
   bool onHover(PointerHoverEvent event) {

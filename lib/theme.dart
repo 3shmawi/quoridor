@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+final isDarkModeNotifier = ValueNotifier(true);
+
 class AppTheme {
   // Color palette
   static const Color primaryColor = Color(0xFF6366F1);

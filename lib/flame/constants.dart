@@ -5,8 +5,11 @@ class GameConstants {
   static const int maxWallsPerPlayer = 10;
 
   // Cell dimensions for rendering
-  static const double cellSize = 40.0;
-  static const double wallThickness = 4.0;
+  static const double cellSize = 30.0;
+  static const double cellSpacing = 4.0;
+  static const double boardPadding = 10.0;
+  static const double goalLineThickness = 4.0;
+  static const double wallThickness = 6.0;
   static const double wallLength = cellSize * 2 + wallThickness;
 
   // Board colors
@@ -18,12 +21,12 @@ class GameConstants {
   static const int validMoveColor = 0xFFEE8B60;
 
   // Player starting positions
-  static const Position player1Start = Position(0, 4);
-  static const Position player2Start = Position(8, 4);
+  static const Position player1Start = Position(8, 4);
+  static const Position player2Start = Position(0, 4);
 
   // Goal rows
-  static const int player1Goal = 8;
-  static const int player2Goal = 0;
+  static const int player1Goal = 0;
+  static const int player2Goal = 8;
 }
 
 class Position {
