@@ -1,5 +1,7 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:confetti/confetti.dart';
+import 'dart:math' show pi;
 
 import '../../flame/game/quoridor_game.dart';
 import '../../flame/models/game_state.dart';
@@ -19,6 +21,7 @@ class GamePage extends StatefulWidget {
 class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   late QuoridorGame _game;
   late AnimationController _messageController;
+  late ConfettiController _confettiController;
 
   String _currentMessage = '';
   bool _showMessage = false;
@@ -33,6 +36,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _messageController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
+    );
+
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
     );
 
     // Show game mode selection after the widget is built
@@ -50,6 +57,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _game.onGameStateChanged = _handleGameStateChanged;
     _game.onGameMessage = _showGameMessage;
+    _game.onGameWon = _showConfetti;
     isInitializedProvider.value = _game.isInitialized;
   }
 
@@ -62,6 +70,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _messageController.dispose();
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -92,6 +101,70 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         }
       });
     });
+  }
+
+  void _showConfetti() {
+    _confettiController.play();
+    // Show replay dialog after confetti animation
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _showReplayDialog();
+      }
+    });
+  }
+
+  void _showReplayDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.emoji_events,
+              color: Theme.of(context).colorScheme.primary,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            const Text('Game Over!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${_game.gameState.winner} wins!',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Would you like to play again?',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Not Now'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _newGame();
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('Play Again'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _newGame() {
@@ -303,6 +376,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        automaticallyImplyLeading: false,
+        title: _buildTopActionBar(),
+      ),
       drawer: Drawer(
         child: Container(
           decoration: BoxDecoration(
@@ -435,142 +513,185 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           ),
         ),
       ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                spacing: 20,
-                children: [
-                  _buildTopActionBar(),
-                  Expanded(
-                    child: GameWidget<QuoridorGame>.controlled(
-                      gameFactory: () => _game,
-                    ),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              spacing: 20,
+              children: [
+                Expanded(
+                  child: GameWidget<QuoridorGame>.controlled(
+                    gameFactory: () => _game,
                   ),
-                  ValueListenableBuilder(
-                    valueListenable: isInitializedProvider,
-                    builder: (context, value, child) {
-                      if (!value) return const SizedBox.shrink();
-                      return Row(
-                        spacing: 16,
-                        children: [
-                          Expanded(
-                            child: PlayerInfoWidget(
-                              playerId: 1,
-                              name: 'Player 1',
-                              wallsRemaining:
-                                  _game.gameState.player1.wallsRemaining,
-                              isCurrentPlayer:
-                                  _game.gameState.currentPlayer.id == 1,
-                              isAI: false,
-                            ),
+                ),
+                ValueListenableBuilder(
+                  valueListenable: isInitializedProvider,
+                  builder: (context, value, child) {
+                    if (!value) return const SizedBox.shrink();
+                    return Row(
+                      spacing: 16,
+                      children: [
+                        Expanded(
+                          child: PlayerInfoWidget(
+                            playerId: 1,
+                            name: 'Player 1',
+                            wallsRemaining:
+                                _game.gameState.player1.wallsRemaining,
+                            isCurrentPlayer:
+                                _game.gameState.currentPlayer.id == 1,
+                            isAI: false,
                           ),
-                          Expanded(
-                            child: PlayerInfoWidget(
-                              playerId: 2,
-                              name: 'Player 2',
-                              wallsRemaining:
-                                  _game.gameState.player2.wallsRemaining,
-                              isCurrentPlayer:
-                                  _game.gameState.currentPlayer.id == 2,
-                              isAI: _game.gameState.player2.isAI,
-                            ),
+                        ),
+                        Expanded(
+                          child: PlayerInfoWidget(
+                            playerId: 2,
+                            name: 'Player 2',
+                            wallsRemaining:
+                                _game.gameState.player2.wallsRemaining,
+                            isCurrentPlayer:
+                                _game.gameState.currentPlayer.id == 2,
+                            isAI: _game.gameState.player2.isAI,
                           ),
-                        ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
+                if (_showMessage)
+                  AnimatedBuilder(
+                    animation: _messageController,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _messageController.value,
+                        child: _buildMessageToast(),
                       );
                     },
                   ),
-                ],
-              ),
+              ],
             ),
-
-            if (_showMessage)
-              AnimatedBuilder(
-                animation: _messageController,
-                builder: (context, child) {
-                  return Positioned(
-                    bottom: 20,
-                    left: 20,
-                    right: 20,
-                    child: Opacity(
-                      opacity: _messageController.value,
-                      child: _buildMessageToast(),
-                    ),
-                  );
-                },
-              ),
-          ],
-        ),
+          ),
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirection: pi / 2,
+              maxBlastForce: 5,
+              minBlastForce: 2,
+              emissionFrequency: 0.05,
+              numberOfParticles: 50,
+              gravity: 0.1,
+              shouldLoop: false,
+              colors: const [
+                Colors.green,
+                Colors.blue,
+                Colors.pink,
+                Colors.orange,
+                Colors.purple,
+                Colors.yellow,
+              ],
+            ),
+          ),
+          // Bottom Right Confetti
+          Align(
+            alignment: Alignment.bottomRight,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirection: -pi / 4,
+              maxBlastForce: 5,
+              minBlastForce: 2,
+              emissionFrequency: 0.05,
+              numberOfParticles: 50,
+              gravity: 0.1,
+              shouldLoop: false,
+              colors: const [
+                Colors.green,
+                Colors.blue,
+                Colors.pink,
+                Colors.orange,
+                Colors.purple,
+                Colors.yellow,
+              ],
+            ),
+          ),
+          // Bottom Left Confetti
+          Align(
+            alignment: Alignment.bottomLeft,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirection: -3 * pi / 4,
+              maxBlastForce: 5,
+              minBlastForce: 2,
+              emissionFrequency: 0.05,
+              numberOfParticles: 50,
+              gravity: 0.1,
+              shouldLoop: false,
+              colors: const [
+                Colors.green,
+                Colors.blue,
+                Colors.pink,
+                Colors.orange,
+                Colors.purple,
+                Colors.yellow,
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildTopActionBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Menu Button
-          Builder(
-            builder: (context) {
-              return IconButton(
-                onPressed: Scaffold.of(context).openDrawer,
-                icon: Icon(
-                  Icons.menu,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                style: IconButton.styleFrom(
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withOpacity(0.1),
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(width: 16),
-
-          // Game Title
-          Expanded(
-            child: Text(
-              'Quoridor',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+    return Row(
+      children: [
+        // Menu Button
+        Builder(
+          builder: (context) {
+            return IconButton(
+              onPressed: Scaffold.of(context).openDrawer,
+              icon: Icon(
+                Icons.menu,
                 color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.bold,
               ),
-            ),
-          ),
+              style: IconButton.styleFrom(
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withOpacity(0.1),
+                foregroundColor: Theme.of(context).colorScheme.primary,
+              ),
+            );
+          },
+        ),
 
-          // Game Info Button
-          IconButton(
-            onPressed: _showGameInfo,
-            icon: Icon(
-              Icons.info_outline,
+        const SizedBox(width: 16),
+
+        // Game Title
+        Expanded(
+          child: Text(
+            'Quoridor Game',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
-            ),
-            style: IconButton.styleFrom(
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.secondary.withOpacity(0.1),
-              foregroundColor: Theme.of(context).colorScheme.secondary,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ],
-      ),
+        ),
+
+        // Game Info Button
+        IconButton(
+          onPressed: _showGameInfo,
+          icon: Icon(
+            Icons.info_outline,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          style: IconButton.styleFrom(
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.secondary.withOpacity(0.1),
+            foregroundColor: Theme.of(context).colorScheme.secondary,
+          ),
+        ),
+      ],
     );
   }
 

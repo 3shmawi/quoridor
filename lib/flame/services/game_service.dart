@@ -155,8 +155,38 @@ class GameService {
       }
     }
 
-    // Check if wall would block all paths
-    return !Pathfinding.wouldWallBlockAllPaths(gameState, wall);
+    // Create temporary game state with the wall
+    final tempGameState = _createTempGameStateWithWall(gameState, wall);
+
+    // Check if both players still have valid paths
+    final player1Path = Pathfinding.findShortestPath(
+      tempGameState,
+      tempGameState.player1.position,
+      tempGameState.player1.goalRow,
+    );
+
+    final player2Path = Pathfinding.findShortestPath(
+      tempGameState,
+      tempGameState.player2.position,
+      tempGameState.player2.goalRow,
+    );
+
+    // Wall is valid if both players still have a path to their goal
+    return player1Path != null && player2Path != null;
+  }
+
+  static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
+    return GameState(
+      gameId: original.gameId,
+      player1: original.player1,
+      player2: original.player2,
+      walls: [...original.walls, wall],
+      currentPlayerId: original.currentPlayerId,
+      status: original.status,
+      createdAt: original.createdAt,
+      updatedAt: original.updatedAt,
+      moveHistory: List.from(original.moveHistory),
+    );
   }
 
   static List<Wall> _getValidWallPlacements(GameState gameState) {

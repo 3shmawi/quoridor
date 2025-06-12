@@ -79,6 +79,7 @@ class QuoridorGame extends FlameGame
 
   Function(GameState)? onGameStateChanged;
   Function(String)? onGameMessage;
+  VoidCallback? onGameWon;
 
   @override
   Future<void> onLoad() async {
@@ -106,7 +107,7 @@ class QuoridorGame extends FlameGame
   void _updateUI() async {
     if (_gameState!.isGameOver) {
       onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
-
+      onGameWon?.call();
       await _audioPlayer.play(AssetSource("sounds/win.wav"));
     }
   }
@@ -264,9 +265,16 @@ class QuoridorGame extends FlameGame
 
     if (!_isInitialized) return;
 
+    // Set a specific size for the BoardComponent
+    _boardComponent.size = Vector2(
+      size.x,
+      size.y,
+    ); // Example size, adjust as needed
+
+    // Center the BoardComponent
     _boardComponent.position = Vector2(
       (size.x - _boardComponent.size.x) / 2,
-      40,
+      (size.y - _boardComponent.size.y) / 2,
     );
   }
 

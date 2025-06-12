@@ -5,6 +5,7 @@ import 'package:quoridor/theme.dart';
 
 import '../flame/constants.dart';
 import '../flame/models/game_state.dart';
+import 'wall_component.dart';
 
 class BoardComponent extends PositionComponent {
   GameState _gameState;
@@ -20,6 +21,8 @@ class BoardComponent extends PositionComponent {
   Position? _hoverPosition;
   Wall? _previewWall;
   Wall? _lastTappedWall;
+
+  late final WallComponent _wallComponent;
 
   static const double _cellSize = GameConstants.cellSize;
   static const double _wallThickness = GameConstants.wallThickness;
@@ -37,10 +40,10 @@ class BoardComponent extends PositionComponent {
   };
 
   BoardComponent(this._gameState) {
-    size = Vector2(
-      GameConstants.boardSize * _cellSize + _boardPadding * 2,
-      GameConstants.boardSize * _cellSize + _boardPadding * 2,
-    );
+    size = Vector2(300, 300);
+
+    _wallComponent = WallComponent(_gameState);
+    add(_wallComponent);
   }
 
   @override
@@ -56,16 +59,16 @@ class BoardComponent extends PositionComponent {
     _hoverPosition = null;
     _previewWall = null;
     _lastTappedWall = null;
+    _wallComponent.gameState = newGameState;
   }
 
   @override
   void render(Canvas canvas) {
     _drawGrid(canvas);
     _drawValidMoves(canvas);
-    _drawPreviewWall(canvas);
     _drawPawns(canvas);
     _drawSelection(canvas);
-    _drawWalls(canvas);
+    _drawGoalLines(canvas);
   }
 
   void _triggerFeedback({String? soundKey}) async {
@@ -80,85 +83,168 @@ class BoardComponent extends PositionComponent {
 
   void handleTap(Vector2 position) {
     final offset = Offset(position.x, position.y);
-    final tappedPosition = _getPositionFromOffset(offset);
-    final tappedWall = _getWallFromOffset(offset);
+    final cellPosition = _getPositionFromOffset(offset);
+    final wall = _getWallFromOffset(offset);
 
-    if (tappedPosition != null) {
-      _handlePositionTap(tappedPosition);
-    } else if (tappedWall != null) {
-      _handleWallTap(tappedWall);
+    print('Tap detected at screen position: (${position.x}, ${position.y})');
+    print('Converted to board offset: (${offset.dx}, ${offset.dy})');
+
+    // If a player is selected, prioritize movement
+    if (_selectedPawn != null) {
+      if (cellPosition != null) {
+        print('Player selected, checking move:');
+        print(
+          '- Selected pawn position: row=${_selectedPawn!.row}, col=${_selectedPawn!.col}',
+        );
+        print(
+          '- Target position: row=${cellPosition.row}, col=${cellPosition.col}',
+        );
+        print('- Is valid move: ${_validMoves.contains(cellPosition)}');
+
+        if (_validMoves.contains(cellPosition)) {
+          print('- Moving to valid position');
+          onMoveAttempted?.call(cellPosition);
+          _triggerFeedback(
+            soundKey: _gameState.currentPlayer.id == 1 ? 'move_p1' : 'move_p2',
+          );
+          _selectedPawn = null;
+          _validMoves.clear();
+          return;
+        } else {
+          print('- Invalid move, clearing selection');
+          _selectedPawn = null;
+          _validMoves.clear();
+          return;
+        }
+      }
+    }
+
+    // If no player is selected, check for player selection first
+    if (cellPosition != null) {
+      final currentPlayerPosition = _gameState.currentPlayer.position;
+      final otherPlayerPosition = _gameState.otherPlayer.position;
+
+      print('Cell tap detected:');
+      print(
+        '- Cell position: row=${cellPosition.row}, col=${cellPosition.col}',
+      );
+      print(
+        '- Current player position: row=${currentPlayerPosition.row}, col=${currentPlayerPosition.col}',
+      );
+      print(
+        '- Other player position: row=${otherPlayerPosition.row}, col=${otherPlayerPosition.col}',
+      );
+
+      // Check if we're tapping on either player
+      if (cellPosition == currentPlayerPosition ||
+          cellPosition == otherPlayerPosition) {
+        print('- Tapped on player at position');
+        _handlePositionTap(cellPosition);
+        return;
+      }
+    }
+
+    // If we're not selecting a player or moving, check for wall placement
+    if (wall != null) {
+      print('Wall tap detected:');
+      print(
+        '- Wall position: row=${wall.position.row}, col=${wall.position.col}',
+      );
+      print('- Wall orientation: ${wall.orientation}');
+      _handleWallTap(wall);
+    } else if (cellPosition != null) {
+      // If we're tapping on a cell (not a player), handle as a move
+      print('Cell tap detected (not a player):');
+      print(
+        '- Cell position: row=${cellPosition.row}, col=${cellPosition.col}',
+      );
+      print(
+        '- Is valid move: ${_gameState.getValidMoves(_gameState.currentPlayer.position).contains(cellPosition)}',
+      );
+      print('- Current player: ${_gameState.currentPlayer.id}');
+      print('- Walls remaining: ${_gameState.currentPlayer.wallsRemaining}');
+
+      _handlePositionTap(cellPosition);
     }
   }
 
   void _handlePositionTap(Position position) {
-    _previewWall = null;
-    _lastTappedWall = null;
-
     final currentPlayerPosition = _gameState.currentPlayer.position;
     final playerId = _gameState.currentPlayer.id;
 
+    print('Position tap handling:');
+    print(
+      '- Current player position: row=${currentPlayerPosition.row}, col=${currentPlayerPosition.col}',
+    );
+    print('- Selected position: row=${position.row}, col=${position.col}');
+    print('- Is current player position: ${position == currentPlayerPosition}');
+    print('- Is already selected: ${_selectedPawn == position}');
+
+    // Clear wall preview when tapping on a position
+    _previewWall = null;
+    _lastTappedWall = null;
+    _wallComponent.previewWall = null;
+
     if (position == currentPlayerPosition) {
       if (_selectedPawn == position) {
+        print('- Deselecting current player');
         _selectedPawn = null;
         _validMoves.clear();
       } else {
+        print('- Selecting current player');
         _selectedPawn = position;
         _validMoves = _gameState.getValidMoves(position);
+        print('- Valid moves: ${_validMoves.length}');
       }
-    } else if (_selectedPawn != null && _validMoves.contains(position)) {
-      onMoveAttempted?.call(position);
-      _triggerFeedback(soundKey: playerId == 1 ? 'move_p1' : 'move_p2');
-      _selectedPawn = null;
-      _validMoves.clear();
-    } else {
-      _selectedPawn = null;
-      _validMoves.clear();
     }
   }
 
   void _handleWallTap(Wall wall) {
     final playerId = _gameState.currentPlayer.id;
 
+    print('Wall tap handling:');
+    print('- Current player: $playerId');
+    print('- Walls remaining: ${_gameState.currentPlayer.wallsRemaining}');
+    print(
+      '- Wall position: row=${wall.position.row}, col=${wall.position.col}',
+    );
+    print('- Wall orientation: ${wall.orientation}');
+
     if (_previewWall == null || _previewWall != wall) {
       _previewWall = wall;
       _lastTappedWall = wall;
+      _wallComponent.previewWall = wall;
+      _wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
+      print('- Preview wall set');
     } else if (_previewWall == wall && _lastTappedWall == wall) {
       if (_gameState.currentPlayer.hasWallsRemaining) {
+        print('- Attempting to place wall');
         onWallPlaceAttempted?.call(wall);
         _triggerFeedback(soundKey: playerId == 1 ? 'wall_p1' : 'wall_p2');
         _previewWall = null;
         _lastTappedWall = null;
+        _wallComponent.previewWall = null;
+      } else {
+        print('- Cannot place wall: No walls remaining');
       }
     } else {
+      print('- Clearing wall preview');
       _previewWall = null;
       _lastTappedWall = null;
+      _wallComponent.previewWall = null;
     }
   }
 
   void handleHover(Vector2 position) {
     final offset = Offset(position.x, position.y);
     _hoverPosition = _getPositionFromOffset(offset);
-    _previewWall = _getWallFromOffset(offset);
-  }
-
-  void playWinSound() {
-    _triggerFeedback(soundKey: 'win');
-  }
-
-  // _draw and helper methods remain unchanged
-
-  void _drawBackground(Canvas canvas) {
-    final paint = Paint()
-      ..color = const Color(0xFFF1F4F8)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-        const Radius.circular(12),
-      ),
-      paint,
-    );
+    final wall = _getWallFromOffset(offset);
+    if (wall != null) {
+      _wallComponent.previewWall = wall;
+      _wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
+    } else {
+      _wallComponent.previewWall = null;
+    }
   }
 
   void _drawGrid(Canvas canvas) {
@@ -212,172 +298,124 @@ class BoardComponent extends PositionComponent {
     if (!showValidMoves || _validMoves.isEmpty) return;
 
     final paint = Paint()
-      ..color = const Color(GameConstants.validMoveColor).withValues(alpha: 0.6)
+      ..color = const Color(GameConstants.validMoveColor).withOpacity(0.3)
       ..style = PaintingStyle.fill;
-
-    final borderPaint = Paint()
-      ..color = const Color(GameConstants.validMoveColor)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
 
     for (final position in _validMoves) {
-      final center = _getCellCenter(position);
-
-      canvas.drawCircle(center, _cellSize * 0.3, paint);
-      canvas.drawCircle(center, _cellSize * 0.3, borderPaint);
-    }
-  }
-
-  void _drawWalls(Canvas canvas) {
-    final wallPaint = Paint()
-      ..color = const Color(GameConstants.wallColor)
-      ..style = PaintingStyle.fill;
-
-    final shadowPaint = Paint()
-      ..color = const Color(GameConstants.wallColor).withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill;
-
-    for (final wall in _gameState.walls) {
-      final rect = _getWallRect(wall);
-
-      // Draw shadow
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect.translate(2, 2), const Radius.circular(2)),
-        shadowPaint,
+      final rect = Rect.fromLTWH(
+        _boardPadding + position.col * (_cellSize + cellSpacing),
+        _boardPadding + position.row * (_cellSize + cellSpacing),
+        _cellSize,
+        _cellSize,
       );
 
-      // Draw wall
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-        wallPaint,
+        RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+        paint,
       );
     }
-  }
-
-  void _drawPreviewWall(Canvas canvas) {
-    if (_previewWall == null) return;
-
-    final isValid = _gameState.currentPlayer.hasWallsRemaining;
-    final rect = _getWallRect(_previewWall!);
-
-    // Draw glow effect
-    final glowPaint = Paint()
-      ..color = isValid
-          ? const Color(0xFF00C853).withValues(alpha: 0.4) // green glow
-          : const Color(0xFFFF0000).withValues(alpha: 0.4) // red glow
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.inflate(4), const Radius.circular(4)),
-      glowPaint,
-    );
-
-    // Shadow
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.translate(2, 2), const Radius.circular(2)),
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.2)
-        ..style = PaintingStyle.fill,
-    );
-
-    // Preview wall fill
-    final previewPaint = Paint()
-      ..color = isValid
-          ? const Color(GameConstants.wallColor).withValues(alpha: 0.5)
-          : const Color(0xFFFF0000).withValues(alpha: 0.5)
-      ..style = PaintingStyle.fill;
-
-    final borderPaint = Paint()
-      ..color = isValid
-          ? const Color(GameConstants.wallColor)
-          : const Color(0xFFFF0000)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeJoin = StrokeJoin.round;
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-      previewPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-      borderPaint,
-    );
   }
 
   void _drawPawns(Canvas canvas) {
-    // Draw pawns using their actual positions from game state
-    _drawPawn(canvas, _gameState.player1.position, 1);
-    _drawPawn(canvas, _gameState.player2.position, 2);
+    // Draw player 1
+    _drawPawn(
+      canvas,
+      _gameState.player1.position,
+      const Color(GameConstants.player1Color),
+      _gameState.player1.id == _gameState.currentPlayerId,
+      _selectedPawn == _gameState.player1.position,
+    );
+
+    // Draw player 2
+    _drawPawn(
+      canvas,
+      _gameState.player2.position,
+      const Color(GameConstants.player2Color),
+      _gameState.player2.id == _gameState.currentPlayerId,
+      _selectedPawn == _gameState.player2.position,
+    );
   }
 
-  void _drawPawn(Canvas canvas, Position position, int playerId) {
+  void _drawPawn(
+    Canvas canvas,
+    Position position,
+    Color color,
+    bool isCurrentPlayer,
+    bool isSelected,
+  ) {
     final center = _getCellCenter(position);
-    final isSelected = _selectedPawn == position;
-    final radius = _cellSize * 0.35;
-
-    final color = playerId == 1
-        ? const Color(GameConstants.player1Color)
-        : const Color(GameConstants.player2Color);
-
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.2)
-      ..style = PaintingStyle.fill;
-
-    final pawnPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final borderPaint = Paint()
-      ..color = isDarkModeNotifier.value ? Colors.white70 : Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    final highlightPaint = Paint()
-      ..color = Colors.white.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
+    final radius = _cellSize * 0.4;
 
     // Draw shadow
     canvas.drawCircle(
       Offset(center.dx + 2, center.dy + 2),
       radius,
-      shadowPaint,
+      Paint()
+        ..color = Colors.black.withOpacity(0.3)
+        ..style = PaintingStyle.fill,
     );
 
-    // Draw pawn base
-    canvas.drawCircle(center, radius, pawnPaint);
+    // Draw pawn
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.fill,
+    );
 
-    // Draw white border
-    canvas.drawCircle(center, radius, borderPaint);
-
-    // Draw highlight if selected
-    if (isSelected) {
-      final selectionPaint = Paint()
-        ..color = const Color(GameConstants.validMoveColor)
+    // Draw border
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = isCurrentPlayer ? Colors.white : Colors.black.withOpacity(0.3)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4.0;
+        ..strokeWidth = 2.0,
+    );
 
-      canvas.drawCircle(center, radius + 6, selectionPaint);
+    // Draw highlight for current player
+    if (isCurrentPlayer) {
+      canvas.drawCircle(
+        center,
+        radius + 4,
+        Paint()
+          ..color = color.withOpacity(0.3)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0,
+      );
     }
 
-    // Draw inner highlight
-    canvas.drawCircle(
-      Offset(center.dx - radius * 0.3, center.dy - radius * 0.3),
-      radius * 0.2,
-      highlightPaint,
-    );
+    // Draw selection highlight
+    if (isSelected) {
+      canvas.drawCircle(
+        center,
+        radius + 6,
+        Paint()
+          ..color = const Color(GameConstants.validMoveColor)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.0,
+      );
+    }
 
     // Draw player number
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: playerId.toString(),
-        style: TextStyle(
-          color: isDarkModeNotifier.value ? Colors.white70 : Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
+    final playerNumber = position == _gameState.player1.position ? '1' : '2';
+    final textStyle = TextStyle(
+      color: Colors.white,
+      fontSize: radius * 1.2,
+      fontWeight: FontWeight.bold,
+      shadows: [
+        Shadow(
+          color: Colors.black.withOpacity(0.5),
+          offset: const Offset(1, 1),
+          blurRadius: 2,
         ),
-      ),
+      ],
+    );
+
+    final textSpan = TextSpan(text: playerNumber, style: textStyle);
+    final textPainter = TextPainter(
+      text: textSpan,
       textDirection: TextDirection.ltr,
     );
 
@@ -392,23 +430,23 @@ class BoardComponent extends PositionComponent {
   }
 
   void _drawSelection(Canvas canvas) {
-    if (_hoverPosition == null) return;
+    if (_selectedPawn != null) {
+      final paint = Paint()
+        ..color = const Color(GameConstants.validMoveColor).withOpacity(0.3)
+        ..style = PaintingStyle.fill;
 
-    final hoverPaint = Paint()
-      ..color = const Color(GameConstants.validMoveColor).withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill;
+      final rect = Rect.fromLTWH(
+        _boardPadding + _selectedPawn!.col * (_cellSize + cellSpacing),
+        _boardPadding + _selectedPawn!.row * (_cellSize + cellSpacing),
+        _cellSize,
+        _cellSize,
+      );
 
-    final rect = Rect.fromLTWH(
-      _boardPadding + _hoverPosition!.col * _cellSize,
-      _boardPadding + _hoverPosition!.row * _cellSize,
-      _cellSize,
-      _cellSize,
-    );
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-      hoverPaint,
-    );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+        paint,
+      );
+    }
   }
 
   void _drawGoalLines(Canvas canvas) {
@@ -464,47 +502,28 @@ class BoardComponent extends PositionComponent {
     );
   }
 
-  Rect _getWallRect(Wall wall) {
-    if (wall.orientation == WallOrientation.horizontal) {
-      return Rect.fromLTWH(
-        _boardPadding + wall.position.col * (_cellSize + cellSpacing),
-        _boardPadding +
-            wall.position.row * (_cellSize + cellSpacing) -
-            _wallThickness / 2,
-        _cellSize * 2 + cellSpacing,
-        _wallThickness,
-      );
-    } else {
-      return Rect.fromLTWH(
-        _boardPadding +
-            wall.position.col * (_cellSize + cellSpacing) -
-            _wallThickness / 2,
-        _boardPadding + wall.position.row * (_cellSize + cellSpacing),
-        _wallThickness,
-        _cellSize * 2 + cellSpacing,
-      );
-    }
-  }
-
   Position? _getPositionFromOffset(Offset offset) {
     final localX = offset.dx - _boardPadding;
     final localY = offset.dy - _boardPadding;
 
     if (localX < 0 || localY < 0) return null;
 
-    final col = (localX / (_cellSize + cellSpacing)).floor();
-    final row = (localY / (_cellSize + cellSpacing)).floor();
+    final cellCol = (localX / (_cellSize + cellSpacing)).floor();
+    final cellRow = (localY / (_cellSize + cellSpacing)).floor();
 
-    print('Calculated position - row: $row, col: $col'); // Debug log
+    print('Cell position calculation:');
+    print('- Local coordinates: ($localX, $localY)');
+    print('- Cell size: $_cellSize');
+    print('- Cell spacing: $cellSpacing');
+    print('- Calculated cell: row=$cellRow, col=$cellCol');
 
-    if (row < 0 ||
-        row >= GameConstants.boardSize ||
-        col < 0 ||
-        col >= GameConstants.boardSize) {
-      return null;
+    if (cellRow >= 0 &&
+        cellRow < GameConstants.boardSize &&
+        cellCol >= 0 &&
+        cellCol < GameConstants.boardSize) {
+      return Position(cellRow, cellCol);
     }
-
-    return Position(row, col);
+    return null;
   }
 
   Wall? _getWallFromOffset(Offset offset) {
@@ -519,39 +538,39 @@ class BoardComponent extends PositionComponent {
     final cellX = localX % (_cellSize + cellSpacing);
     final cellY = localY % (_cellSize + cellSpacing);
 
-    // Check if click is near cell edge for wall placement
-    const edgeThreshold =
-        _cellSize * 0.6; // Increased threshold for easier wall placement
+    // Increased threshold for easier wall placement
+    const edgeThreshold = 0.4; // 40% of cell size for wall placement
+    final threshold = _cellSize * edgeThreshold;
 
-    print(
-      'Wall placement check - cellX: $cellX, cellY: $cellY, threshold: $edgeThreshold',
-    ); // Debug log
+    print('Wall position calculation:');
+    print('- Local coordinates: ($localX, $localY)');
+    print('- Cell coordinates: ($cellX, $cellY)');
+    print('- Cell position: row=$cellRow, col=$cellCol');
+    print('- Edge threshold: $threshold');
 
     // Check horizontal walls
-    if (cellY < edgeThreshold && cellRow > 0) {
+    if (cellY < threshold && cellRow > 0) {
       print(
-        'Horizontal wall above at row: ${cellRow}, col: $cellCol',
-      ); // Debug log
+        '- Detected horizontal wall above at row: ${cellRow}, col: $cellCol',
+      );
       return Wall(Position(cellRow, cellCol), WallOrientation.horizontal);
-    } else if (cellY > _cellSize - edgeThreshold &&
+    } else if (cellY > _cellSize - threshold &&
         cellRow < GameConstants.boardSize - 1) {
       print(
-        'Horizontal wall below at row: ${cellRow + 1}, col: $cellCol',
-      ); // Debug log
+        '- Detected horizontal wall below at row: ${cellRow + 1}, col: $cellCol',
+      );
       return Wall(Position(cellRow + 1, cellCol), WallOrientation.horizontal);
     }
 
     // Check vertical walls
-    if (cellX < edgeThreshold && cellCol > 0) {
-      print(
-        'Vertical wall left at row: $cellRow, col: ${cellCol}',
-      ); // Debug log
+    if (cellX < threshold && cellCol > 0) {
+      print('- Detected vertical wall left at row: $cellRow, col: ${cellCol}');
       return Wall(Position(cellRow, cellCol), WallOrientation.vertical);
-    } else if (cellX > _cellSize - edgeThreshold &&
+    } else if (cellX > _cellSize - threshold &&
         cellCol < GameConstants.boardSize - 1) {
       print(
-        'Vertical wall right at row: $cellRow, col: ${cellCol + 1}',
-      ); // Debug log
+        '- Detected vertical wall right at row: $cellRow, col: ${cellCol + 1}',
+      );
       return Wall(Position(cellRow, cellCol + 1), WallOrientation.vertical);
     }
 

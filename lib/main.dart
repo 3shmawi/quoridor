@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:quoridor/flame/pages/game_page.dart';
 import 'package:quoridor/theme.dart';
 
 import 'firebase_options.dart';
@@ -26,7 +27,7 @@ class QuoridorApp extends StatelessWidget {
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: value ? ThemeMode.dark : ThemeMode.light,
-          home: const MenuPage(),
+          home: const GamePage(),
           debugShowCheckedModeBanner: false,
         );
       },
