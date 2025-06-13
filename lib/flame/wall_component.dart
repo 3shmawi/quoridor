@@ -2,6 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:quoridor/flame/constants.dart';
 import 'package:quoridor/flame/models/game_state.dart';
+import 'package:quoridor/theme.dart';
 
 class WallComponent extends PositionComponent {
   GameState gameState;
@@ -25,11 +26,15 @@ class WallComponent extends PositionComponent {
 
   void _drawWalls(Canvas canvas) {
     final wallPaint = Paint()
-      ..color = const Color(GameConstants.wallColor)
+      ..color = isDarkModeNotifier.value
+          ? Colors.white
+          : const Color(GameConstants.wallColor)
       ..style = PaintingStyle.fill;
 
     final shadowPaint = Paint()
-      ..color = const Color(GameConstants.wallColor).withOpacity(0.3)
+      ..color = isDarkModeNotifier.value
+          ? Colors.white.withValues(alpha: 0.3)
+          : const Color(GameConstants.wallColor).withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
 
     for (final wall in gameState.walls) {
@@ -57,8 +62,8 @@ class WallComponent extends PositionComponent {
     // Draw glow effect
     final glowPaint = Paint()
       ..color = isValid
-          ? const Color(0xFF00C853).withOpacity(0.4) // green glow
-          : const Color(0xFFFF0000).withOpacity(0.4) // red glow
+          ? const Color(0xFF00C853).withValues(alpha: 0.4) // green glow
+          : const Color(0xFFFF0000).withValues(alpha: 0.4) // red glow
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
       ..style = PaintingStyle.fill;
 
@@ -71,20 +76,24 @@ class WallComponent extends PositionComponent {
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect.translate(2, 2), const Radius.circular(2)),
       Paint()
-        ..color = Colors.black.withOpacity(0.2)
+        ..color = Colors.black.withValues(alpha: 0.2)
         ..style = PaintingStyle.fill,
     );
 
     // Preview wall fill
     final previewPaint = Paint()
       ..color = isValid
-          ? const Color(GameConstants.wallColor).withOpacity(0.5)
-          : const Color(0xFFFF0000).withOpacity(0.5)
+          ? (isDarkModeNotifier.value
+                ? Colors.white.withValues(alpha: 0.5)
+                : const Color(GameConstants.wallColor).withValues(alpha: 0.5))
+          : const Color(0xFFFF0000).withValues(alpha: 0.5)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
       ..color = isValid
-          ? const Color(GameConstants.wallColor)
+          ? (isDarkModeNotifier.value
+                ? Colors.white
+                : const Color(GameConstants.wallColor))
           : const Color(0xFFFF0000)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0

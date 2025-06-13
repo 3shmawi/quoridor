@@ -1,26 +1,35 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:quoridor/flame/game/quoridor_game.dart';
 import 'package:quoridor/theme.dart';
 
 import '../flame/constants.dart';
 import '../flame/models/game_state.dart';
 import 'wall_component.dart';
 
-class BoardComponent extends PositionComponent {
+class BoardComponent extends PositionComponent
+    with HasGameReference<QuoridorGame> {
   GameState _gameState;
   bool showValidMoves = true;
   bool enableSound = true;
   bool enableVibration = true;
+  WallOrientation _wallOrientation = WallOrientation.horizontal;
 
   Function(Position)? onMoveAttempted;
   Function(Wall)? onWallPlaceAttempted;
+  Function(Position)? onWallTapped;
 
   Position? _selectedPawn;
   List<Position> _validMoves = [];
   Position? _hoverPosition;
   Wall? _previewWall;
   Wall? _lastTappedWall;
+  Wall? get previewWall => _previewWall;
+  set previewWall(Wall? wall) {
+    _previewWall = wall;
+    _wallComponent.previewWall = wall;
+  }
 
   late final WallComponent _wallComponent;
 
@@ -40,7 +49,9 @@ class BoardComponent extends PositionComponent {
   };
 
   BoardComponent(this._gameState) {
-    size = Vector2(300, 300);
+    if (game.isInitialized) {
+      size = game.size;
+    }
 
     _wallComponent = WallComponent(_gameState);
     add(_wallComponent);
@@ -211,15 +222,20 @@ class BoardComponent extends PositionComponent {
     print('- Wall orientation: ${wall.orientation}');
 
     if (_previewWall == null || _previewWall != wall) {
-      _previewWall = wall;
+      _previewWall = Wall(wall.position, _wallOrientation);
       _lastTappedWall = wall;
-      _wallComponent.previewWall = wall;
+      _wallComponent.previewWall = _previewWall;
       _wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
       print('- Preview wall set');
+
+      // Notify game page about the last tapped wall position
+      if (onWallTapped != null) {
+        onWallTapped!(wall.position);
+      }
     } else if (_previewWall == wall && _lastTappedWall == wall) {
       if (_gameState.currentPlayer.hasWallsRemaining) {
         print('- Attempting to place wall');
-        onWallPlaceAttempted?.call(wall);
+        onWallPlaceAttempted?.call(_previewWall!);
         _triggerFeedback(soundKey: playerId == 1 ? 'wall_p1' : 'wall_p2');
         _previewWall = null;
         _lastTappedWall = null;
@@ -575,5 +591,13 @@ class BoardComponent extends PositionComponent {
     }
 
     return null;
+  }
+
+  void setWallOrientation(WallOrientation orientation) {
+    _wallOrientation = orientation;
+    if (_previewWall != null) {
+      _previewWall = Wall(_previewWall!.position, orientation);
+      _wallComponent.previewWall = _previewWall;
+    }
   }
 }

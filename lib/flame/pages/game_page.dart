@@ -1,17 +1,31 @@
-import 'package:flame/game.dart';
-import 'package:flutter/material.dart';
-import 'package:confetti/confetti.dart';
 import 'dart:math' show pi;
 
-import '../../flame/game/quoridor_game.dart';
-import '../../flame/models/game_state.dart';
-import '../../flame/services/ai_service.dart';
-import '../../flame/services/firebase_service.dart';
-import '../../theme.dart';
+import 'package:confetti/confetti.dart';
+import 'package:flame/game.dart';
+import 'package:flutter/material.dart';
 
+import '../../theme.dart';
+import '../constants.dart';
+import '../game/quoridor_game.dart';
+import '../models/game_state.dart';
+import '../services/firebase_service.dart';
+import '../widgets/game/game_app_bar.dart';
+import '../widgets/game/game_drawer.dart';
+import '../widgets/game/game_info_dialog.dart';
+import '../widgets/game/game_message_toast.dart';
+import '../widgets/game/game_mode_selection.dart';
+import '../widgets/game/player_info_widget.dart';
+import '../widgets/game/wall_controls.dart';
+
+/// The main game page that hosts the Quoridor game.
+///
+/// This page manages the game state, UI components, and user interactions.
+/// It provides a complete game interface with controls, menus, and game board.
 class GamePage extends StatefulWidget {
+  /// The initial game state to load, if any
   final GameState? initialGameState;
 
+  /// Creates a new instance of [GamePage].
   const GamePage({super.key, this.initialGameState});
 
   @override
@@ -19,32 +33,29 @@ class GamePage extends StatefulWidget {
 }
 
 class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
-  late QuoridorGame _game;
   late AnimationController _messageController;
   late ConfettiController _confettiController;
+  WallOrientation _selectedWallOrientation = WallOrientation.horizontal;
+  bool _showValidMoves = true;
 
   String _currentMessage = '';
   bool _showMessage = false;
-  bool _showValidMoves = true;
-  AIDifficulty _currentDifficulty = AIDifficulty.medium;
+  Position? _wallPreviewPosition;
+  late QuoridorGame _game;
 
   @override
   void initState() {
     _initializeGame();
     super.initState();
-
     _messageController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-
     _confettiController = ConfettiController(
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 5),
     );
-
-    // Show game mode selection after the widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showGameModeSelection();
+      _showGameModeSelection(context);
     });
   }
 
@@ -157,7 +168,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           FilledButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
-              _newGame();
+              _game.newGame();
             },
             icon: const Icon(Icons.refresh),
             label: const Text('Play Again'),
@@ -167,44 +178,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
   }
 
-  void _newGame() {
-    _game.newGame();
-    _showGameMessage('New game started!');
-    closeMenu();
-  }
-
-  void _toggleValidMoves() {
-    setState(() {
-      _showValidMoves = !_showValidMoves;
-    });
-    _game.showValidMoves(_showValidMoves);
-    _showGameMessage(
-      _showValidMoves ? 'Valid moves shown' : 'Valid moves hidden',
-    );
-    closeMenu();
-  }
-
-  void _changeDifficulty(AIDifficulty difficulty) {
-    setState(() {
-      _currentDifficulty = difficulty;
-    });
-    _game.setDifficulty(difficulty);
-    _showGameMessage('Difficulty: ${difficulty.name}');
-  }
-
-  void _togglePlayerMode() {
-    _game.togglePlayerMode();
-    closeMenu();
-  }
-
-  Future<void> _saveGame() async {
+  Future<void> _saveGame(BuildContext context) async {
+    if (!_game.isInitialized) return;
     final user = FirebaseService.currentUser;
     if (user == null) {
       _showGameMessage('Please sign in to save game');
       closeMenu();
       return;
     }
-
     final gameId = await FirebaseService.saveGame(_game.gameState);
     if (gameId != null) {
       _showGameMessage('Game saved successfully!');
@@ -214,358 +195,200 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     closeMenu();
   }
 
-  void _showGameInfo() {
-    showDialog(context: context, builder: (context) => _buildGameInfoDialog());
+  void _showGameInfo(BuildContext context) {
+    showDialog(context: context, builder: (context) => const GameInfoDialog());
   }
 
-  void _showGameModeSelection() {
+  void _showGameModeSelection(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.4,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 12,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Title
-            Text(
-              'Choose Game Mode',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 32),
-            // Mode selection cards
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                shrinkWrap: true,
-                children: [
-                  _buildModeCard(
-                    icon: Icons.computer,
-                    title: 'Play vs AI',
-                    subtitle: 'Challenge our intelligent AI opponent',
-                    onTap: () {
-                      if (!_game.gameState.player2.isAI) {
-                        _game.togglePlayerMode();
-                      } else {
-                        _game.updateGameState(_game.gameState);
-                      }
-                      Navigator.pop(context);
-                      _showGameMessage('Playing against AI');
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildModeCard(
-                    icon: Icons.people,
-                    title: 'Two Players',
-                    subtitle: 'Play with a friend on the same device',
-                    onTap: () {
-                      if (_game.gameState.player2.isAI) {
-                        _game.togglePlayerMode();
-                      } else {
-                        _game.updateGameState(_game.gameState);
-                      }
-                      Navigator.pop(context);
-                      _showGameMessage('Two player mode activated');
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      builder: (bottomSheetContext) => GameModeSelection(
+        onAIModeSelected: () {
+          if (!_game.gameState.player2.isAI) {
+            _game.togglePlayerMode();
+          } else {
+            _game.updateGameState(_game.gameState);
+          }
+          Navigator.pop(context);
+          _showGameMessage('Playing against AI');
+        },
+        onTwoPlayerModeSelected: () {
+          if (_game.gameState.player2.isAI) {
+            _game.togglePlayerMode();
+          } else {
+            _game.updateGameState(_game.gameState);
+          }
+          Navigator.pop(context);
+          _showGameMessage('Two player mode activated');
+        },
       ),
     );
   }
 
-  Widget _buildModeCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  void _moveWallPreview(BuildContext context, Position? newPosition) {
+    if (newPosition == null) return;
+    setState(() {
+      _wallPreviewPosition = newPosition;
+    });
+
+    if (_wallPreviewPosition != null) {
+      final wall = Wall(_wallPreviewPosition!, _selectedWallOrientation);
+      _game.boardComponent.previewWall = wall;
+    }
+  }
+
+  void _confirmWallPlacement(BuildContext context) {
+    if (_wallPreviewPosition == null) return;
+
+    final wall = Wall(_wallPreviewPosition!, _selectedWallOrientation);
+    _game.boardComponent.onWallPlaceAttempted?.call(wall);
+    setState(() {
+      _wallPreviewPosition = null;
+    });
+    _game.boardComponent.previewWall = null;
+  }
+
+  void _handleWallMovement(BuildContext context, String direction) {
+    if (_wallPreviewPosition == null) {
+      _wallPreviewPosition = Position(4, 4);
+      _moveWallPreview(context, _wallPreviewPosition);
+      return;
+    }
+    Position? newPosition;
+    switch (direction) {
+      case 'up':
+        if (_wallPreviewPosition!.row > 0) {
+          newPosition = Position(
+            _wallPreviewPosition!.row - 1,
+            _wallPreviewPosition!.col,
+          );
+        }
+        break;
+      case 'down':
+        if (_wallPreviewPosition!.row < GameConstants.boardSize - 1) {
+          newPosition = Position(
+            _wallPreviewPosition!.row + 1,
+            _wallPreviewPosition!.col,
+          );
+        }
+        break;
+      case 'left':
+        if (_wallPreviewPosition!.col > 0) {
+          newPosition = Position(
+            _wallPreviewPosition!.row,
+            _wallPreviewPosition!.col - 1,
+          );
+        }
+        break;
+      case 'right':
+        if (_wallPreviewPosition!.col < GameConstants.boardSize - 1) {
+          newPosition = Position(
+            _wallPreviewPosition!.row,
+            _wallPreviewPosition!.col + 1,
+          );
+        }
+        break;
+    }
+    if (newPosition != null) {
+      _moveWallPreview(context, newPosition);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        automaticallyImplyLeading: false,
-        title: _buildTopActionBar(),
-      ),
-      drawer: Drawer(
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 12,
-                offset: const Offset(2, 0),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Menu Header
-              DrawerHeader(
-                padding: EdgeInsets.zero,
-                margin: EdgeInsets.zero,
-                curve: Curves.easeInOut,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/icons/logo.png'),
-                    fit: BoxFit.cover,
-                  ),
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                child: SizedBox(
-                  height: double.infinity,
-                  width: double.infinity,
-                ),
-              ),
-
-              // Menu Items
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Builder(
-                    builder: (context) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildMenuSection('Game Controls', [
-                            _buildMenuItem(
-                              Icons.refresh,
-                              'New Game',
-                              'Start a fresh game',
-                              _newGame,
-                            ),
-                            _buildMenuItem(
-                              Icons.save,
-                              'Save Game',
-                              'Save current progress',
-                              _saveGame,
-                            ),
-                            if (_game.isInitialized)
-                              _buildMenuItem(
-                                Icons.people,
-                                'Toggle Player Mode',
-                                _game.gameState.player2.isAI
-                                    ? 'Switch to 2 players'
-                                    : 'Switch to AI',
-                                _togglePlayerMode,
-                              ),
-                          ]),
-
-                          const SizedBox(height: 24),
-
-                          _buildMenuSection('Display Options', [
-                            _buildSwitchItem(
-                              Icons.visibility,
-                              'Show Valid Moves',
-                              'Highlight possible moves',
-                              _showValidMoves,
-                              _toggleValidMoves,
-                            ),
-                            _buildSwitchItem(
-                              Icons.dark_mode,
-                              'Dark Mode',
-                              'Toggle dark mode',
-                              isDarkModeNotifier.value,
-                              () => isDarkModeNotifier.value =
-                                  !isDarkModeNotifier.value,
-                            ),
-                          ]),
-
-                          const SizedBox(height: 24),
-
-                          _buildMenuSection('AI Difficulty', [
-                            _buildDifficultyItem(AIDifficulty.easy),
-                            _buildDifficultyItem(AIDifficulty.medium),
-                            _buildDifficultyItem(AIDifficulty.hard),
-                          ]),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-              Text.rich(
-                textDirection: TextDirection.ltr,
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "@copyWrite",
-                      style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                    ),
-                    TextSpan(text: " "),
-                    TextSpan(
-                      text: "MO",
-                      style: TextStyle(color: Colors.cyan),
-                    ),
-                    TextSpan(
-                      text: "RE",
-                      style: TextStyle(color: Theme.of(context).dividerColor),
-                    ),
-                    TextSpan(
-                      text: " H",
-                      style: TextStyle(color: Colors.cyan),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                "ASHMAWY",
-                style: TextStyle(color: Theme.of(context).dividerColor),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
+      appBar: GameAppBar(onGameInfoPressed: () => _showGameInfo(context)),
+      drawer: _game.isInitialized
+          ? GameDrawer(
+              onNewGame: _game.newGame,
+              onSaveGame: () => _saveGame(context),
+              onTogglePlayerMode: _game.togglePlayerMode,
+              onToggleValidMoves: () {
+                setState(() {
+                  _showValidMoves = !_showValidMoves;
+                });
+                _game.showValidMoves(_showValidMoves);
+                _showGameMessage(
+                  _showValidMoves ? 'Valid moves shown' : 'Valid moves hidden',
+                );
+                closeMenu();
+              },
+              onToggleDarkMode: () =>
+                  isDarkModeNotifier.value = !isDarkModeNotifier.value,
+              showValidMoves: _showValidMoves,
+              isDarkMode: isDarkModeNotifier.value,
+              isPlayer2AI: _game.gameState.player2.isAI,
+            )
+          : null,
       body: Stack(
         children: [
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
-              spacing: 20,
               children: [
                 Expanded(
                   child: GameWidget<QuoridorGame>.controlled(
                     gameFactory: () => _game,
                   ),
                 ),
-                ValueListenableBuilder(
-                  valueListenable: isInitializedProvider,
-                  builder: (context, value, child) {
-                    if (!value) return const SizedBox.shrink();
-                    return Row(
-                      spacing: 16,
-                      children: [
-                        Expanded(
-                          child: PlayerInfoWidget(
-                            playerId: 1,
-                            name: 'Player 1',
-                            wallsRemaining:
-                                _game.gameState.player1.wallsRemaining,
-                            isCurrentPlayer:
-                                _game.gameState.currentPlayer.id == 1,
-                            isAI: false,
-                          ),
+                if (_game.isInitialized)
+                  Column(
+                    children: [
+                      if (_game.gameState.currentPlayer.hasWallsRemaining)
+                        WallControls(
+                          orientation: _selectedWallOrientation,
+                          onOrientationChanged: (orientation) {
+                            setState(() {
+                              _selectedWallOrientation = orientation;
+                            });
+                            _game.setWallOrientation(orientation);
+                            if (_wallPreviewPosition != null) {
+                              _moveWallPreview(context, _wallPreviewPosition);
+                            }
+                          },
+                          onWallMovement: (dir) =>
+                              _handleWallMovement(context, dir),
+                          onWallPlacementConfirmed: () =>
+                              _confirmWallPlacement(context),
                         ),
-                        Expanded(
-                          child: PlayerInfoWidget(
-                            playerId: 2,
-                            name: 'Player 2',
-                            wallsRemaining:
-                                _game.gameState.player2.wallsRemaining,
-                            isCurrentPlayer:
-                                _game.gameState.currentPlayer.id == 2,
-                            isAI: _game.gameState.player2.isAI,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: PlayerInfoWidget(
+                              playerId: 1,
+                              name: 'Player 1',
+                              wallsRemaining:
+                                  _game.gameState.player1.wallsRemaining,
+                              isCurrentPlayer:
+                                  _game.gameState.currentPlayer.id == 1,
+                              isAI: false,
+                            ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-
+                          Expanded(
+                            child: PlayerInfoWidget(
+                              playerId: 2,
+                              name: 'Player 2',
+                              wallsRemaining:
+                                  _game.gameState.player2.wallsRemaining,
+                              isCurrentPlayer:
+                                  _game.gameState.currentPlayer.id == 2,
+                              isAI: _game.gameState.player2.isAI,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 if (_showMessage)
                   AnimatedBuilder(
                     animation: _messageController,
                     builder: (context, child) {
-                      return Opacity(
+                      return GameMessageToast(
+                        message: _currentMessage,
                         opacity: _messageController.value,
-                        child: _buildMessageToast(),
                       );
                     },
                   ),
@@ -593,7 +416,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-          // Bottom Right Confetti
           Align(
             alignment: Alignment.bottomRight,
             child: ConfettiWidget(
@@ -615,7 +437,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-          // Bottom Left Confetti
           Align(
             alignment: Alignment.bottomLeft,
             child: ConfettiWidget(
@@ -637,338 +458,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTopActionBar() {
-    return Row(
-      children: [
-        // Menu Button
-        Builder(
-          builder: (context) {
-            return IconButton(
-              onPressed: Scaffold.of(context).openDrawer,
-              icon: Icon(
-                Icons.menu,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              style: IconButton.styleFrom(
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.primary.withOpacity(0.1),
-                foregroundColor: Theme.of(context).colorScheme.primary,
-              ),
-            );
-          },
-        ),
-
-        const SizedBox(width: 16),
-
-        // Game Title
-        Expanded(
-          child: Text(
-            'Quoridor Game',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-
-        // Game Info Button
-        IconButton(
-          onPressed: _showGameInfo,
-          icon: Icon(
-            Icons.info_outline,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          style: IconButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.secondary.withOpacity(0.1),
-            foregroundColor: Theme.of(context).colorScheme.secondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMenuSection(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: Theme.of(context).colorScheme.primary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ...children,
-      ],
-    );
-  }
-
-  Widget _buildMenuItem(
-    IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
-  ) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-        ),
-      ),
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-          ),
-        ),
-        trailing: Icon(
-          Icons.arrow_forward_ios,
-          size: 16,
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSwitchItem(
-    IconData icon,
-    String title,
-    String subtitle,
-    bool value,
-    VoidCallback onChanged,
-  ) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-        ),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-          ),
-        ),
-        trailing: Switch(
-          value: value,
-          onChanged: (_) => onChanged(),
-          activeColor: Theme.of(context).colorScheme.primary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDifficultyItem(AIDifficulty difficulty) {
-    final isSelected = _currentDifficulty == difficulty;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: isSelected
-          ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-          : Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.outline.withOpacity(0.2),
-        ),
-      ),
-      child: ListTile(
-        onTap: () => _changeDifficulty(difficulty),
-        leading: Icon(
-          _getDifficultyIcon(difficulty),
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-        ),
-        title: Text(
-          difficulty.name.toUpperCase(),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        subtitle: Text(
-          _getDifficultyDescription(difficulty),
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-          ),
-        ),
-        trailing: isSelected
-            ? Icon(
-                Icons.check_circle,
-                color: Theme.of(context).colorScheme.primary,
-              )
-            : null,
-      ),
-    );
-  }
-
-  IconData _getDifficultyIcon(AIDifficulty difficulty) {
-    switch (difficulty) {
-      case AIDifficulty.easy:
-        return Icons.sentiment_satisfied;
-      case AIDifficulty.medium:
-        return Icons.sentiment_neutral;
-      case AIDifficulty.hard:
-        return Icons.sentiment_very_dissatisfied;
-    }
-  }
-
-  String _getDifficultyDescription(AIDifficulty difficulty) {
-    switch (difficulty) {
-      case AIDifficulty.easy:
-        return 'Beginner-friendly AI';
-      case AIDifficulty.medium:
-        return 'Balanced challenge';
-      case AIDifficulty.hard:
-        return 'Expert-level AI';
-    }
-  }
-
-  Widget _buildMessageToast() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.info,
-            color: Theme.of(context).colorScheme.onPrimary,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _currentMessage,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onPrimary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGameInfoDialog() {
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.info, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 8),
-          Expanded(child: const Text('How to Play Quoridor')),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildInfoSection(
-              '🎯 Objective',
-              'Be the first player to reach the opposite side of the board.',
-            ),
-            _buildInfoSection(
-              '🎮 Your Turn',
-              'On each turn, either:\n• Move your pawn one space\n• Place a wall to block your opponent',
-            ),
-            _buildInfoSection(
-              '🚶 Movement',
-              'Move up, down, left, or right. Jump over your opponent if they\'re in your way.',
-            ),
-            _buildInfoSection(
-              '🧱 Walls',
-              'Each player has 10 walls. Place them strategically but don\'t completely block your opponent\'s path.',
-            ),
-            _buildInfoSection(
-              '🏆 Winning',
-              'Player 1 (purple) wins by reaching the bottom row.\nPlayer 2 (teal) wins by reaching the top row.',
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Got it!'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoSection(String title, String content) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            content,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
+          // if (_isAIThinking)
+          //   Container(
+          //     color: Colors.black.withValues(alpha: 0.3),
+          //     child: const Center(child: CircularProgressIndicator()),
+          //   ),
         ],
       ),
     );

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:http/http.dart' as http;
 
 import '../../flame/constants.dart';
@@ -10,7 +11,8 @@ import '../../flame/models/game_state.dart';
 enum AIDifficulty { easy, medium, hard }
 
 class AIService {
-  static const String _apiKey = 'EM0CslaVtzEsqKb6wNCk-4628bc90f1fb9205d2d0abf780b59f878985d392ff52eca5dc175fe755fa7352';
+  static const String _apiKey =
+      'EM0CslaVtzEsqKb6wNCk-4628bc90f1fb9205d2d0abf780b59f878985d392ff52eca5dc175fe755fa7352';
   static const String _apiUrl = 'https://api.openai.com/v1/chat/completions';
 
   // Generate AI move using OpenAI strategy analysis
@@ -144,7 +146,11 @@ Provide your recommendation as a JSON object.
 ''';
   }
 
-  static GameMove? _executeAIMove(GameState gameState, AIStrategy strategy) {
+  static Future<GameMove?> _executeAIMove(
+    GameState gameState,
+    AIStrategy strategy,
+  ) async {
+    final audioPlayer = AudioPlayer();
     final currentPlayer = gameState.currentPlayer;
 
     if (strategy.moveType == 'pawn') {
@@ -155,6 +161,7 @@ Provide your recommendation as a JSON object.
       final validMoves = gameState.getValidMoves(currentPlayer.position);
 
       if (validMoves.contains(newPosition)) {
+        await audioPlayer.play(AssetSource("sounds/move_player2.wav"));
         return GameMove.pawnMove(newPosition, currentPlayer.id);
       }
     } else if (strategy.moveType == 'wall' && currentPlayer.hasWallsRemaining) {
@@ -166,6 +173,7 @@ Provide your recommendation as a JSON object.
       );
 
       if (!Pathfinding.wouldWallBlockAllPaths(gameState, wall)) {
+        await audioPlayer.play(AssetSource("sounds/wall_player2.wav"));
         return GameMove.wallPlace(wall, currentPlayer.id);
       }
     }
@@ -181,7 +189,7 @@ Provide your recommendation as a JSON object.
     final pathLengths = Pathfinding.calculatePathLengths(gameState);
 
     // Basic AI logic based on difficulty
-    switch (difficulty) {
+    switch (AIDifficulty.hard) {
       case AIDifficulty.easy:
         return _getEasyMove(gameState);
       case AIDifficulty.medium:

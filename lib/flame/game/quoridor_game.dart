@@ -10,65 +10,6 @@ import '../models/game_state.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
 
-class PlayerInfoWidget extends StatelessWidget {
-  final int playerId;
-  final String name;
-  final int wallsRemaining;
-  final bool isCurrentPlayer;
-  final bool isAI;
-
-  const PlayerInfoWidget({
-    super.key,
-    required this.playerId,
-    required this.name,
-    required this.wallsRemaining,
-    required this.isCurrentPlayer,
-    required this.isAI,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = playerId == 1 ? Colors.deepPurple : Colors.teal;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
-        ),
-        border: Border.all(color: color.withOpacity(0.3), width: 2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                isAI ? "🤖 AI" : name,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: color,
-                ),
-              ),
-              if (isCurrentPlayer) const Spacer(),
-              if (isCurrentPlayer)
-                CircleAvatar(radius: 6, backgroundColor: color),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Walls: $wallsRemaining',
-            style: TextStyle(color: color.withOpacity(0.8)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 final isInitializedProvider = ValueNotifier(false);
 
 class QuoridorGame extends FlameGame
@@ -76,10 +17,12 @@ class QuoridorGame extends FlameGame
   GameState? _gameState;
   late BoardComponent _boardComponent;
   bool _isInitialized = false;
+  WallOrientation _wallOrientation = WallOrientation.horizontal;
 
   Function(GameState)? onGameStateChanged;
   Function(String)? onGameMessage;
   VoidCallback? onGameWon;
+  Function(Position)? onWallTapped;
 
   @override
   Future<void> onLoad() async {
@@ -90,6 +33,7 @@ class QuoridorGame extends FlameGame
     _boardComponent = BoardComponent(_gameState!);
     _boardComponent.onMoveAttempted = _handleMoveAttempt;
     _boardComponent.onWallPlaceAttempted = _handleWallPlaceAttempt;
+    _boardComponent.onWallTapped = onWallTapped;
 
     // Position board in center
     _boardComponent.position = Vector2(0, 0);
@@ -100,11 +44,14 @@ class QuoridorGame extends FlameGame
     _isInitialized = true;
   }
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
   @override
   Color backgroundColor() => Colors.transparent;
 
+  final _audioPlayer = AudioPlayer();
+
   void _updateUI() async {
+    if (_gameState == null) return;
+
     if (_gameState!.isGameOver) {
       onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
       onGameWon?.call();
@@ -125,7 +72,13 @@ class QuoridorGame extends FlameGame
     onGameStateChanged?.call(_gameState!);
   }
 
+  Future<void> executeAIMove() async {
+    await _executeAIMove();
+  }
+
   Future<void> _executeAIMove() async {
+    if (_gameState == null) return;
+
     // Add delay for better UX
     await Future.delayed(const Duration(milliseconds: 800));
 
@@ -145,6 +98,8 @@ class QuoridorGame extends FlameGame
   }
 
   void _handleMoveAttempt(Position newPosition) {
+    if (_gameState == null) return;
+
     if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
       onGameMessage?.call('It\'s not your turn!');
       return;
@@ -161,6 +116,8 @@ class QuoridorGame extends FlameGame
   }
 
   void _handleWallPlaceAttempt(Wall wall) {
+    if (_gameState == null) return;
+
     if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
       onGameMessage?.call('It\'s not your turn!');
       return;
@@ -202,15 +159,9 @@ class QuoridorGame extends FlameGame
     }
   }
 
-  // Game control methods
-  void newGame() {
-    updateGameState(GameStateFactory.createNewGame());
-    onGameMessage?.call('New game started!');
-  }
-
-  void setDifficulty(AIDifficulty difficulty) {
-    // This could be used to adjust AI behavior in future moves
-    onGameMessage?.call('Difficulty set to ${difficulty.name}');
+  void setWallOrientation(WallOrientation orientation) {
+    _wallOrientation = orientation;
+    _boardComponent.setWallOrientation(orientation);
   }
 
   void showValidMoves(bool show) {
@@ -224,7 +175,8 @@ class QuoridorGame extends FlameGame
   }
 
   void togglePlayerMode() {
-    // Switch between AI and human player 2
+    if (_gameState == null) return;
+
     final newGameState = GameState(
       gameId: _gameState!.gameId,
       player1: _gameState!.player1,
@@ -236,14 +188,27 @@ class QuoridorGame extends FlameGame
       updatedAt: DateTime.now(),
       moveHistory: _gameState!.moveHistory,
     );
-
     updateGameState(newGameState);
-    onGameMessage?.call(
-      newGameState.player2.isAI
-          ? 'Switched to AI opponent'
-          : 'Switched to human opponent',
-    );
   }
+
+  void newGame() {
+    _gameState = GameStateFactory.createNewGame();
+    _boardComponent.updateGameState(_gameState!);
+    _updateUI();
+  }
+
+  bool get isInitialized => _isInitialized;
+
+  GameState get gameState {
+    if (!_isInitialized || _gameState == null) {
+      throw StateError(
+        'Game state has not been initialized yet. Please wait for the game to load.',
+      );
+    }
+    return _gameState!;
+  }
+
+  BoardComponent get boardComponent => _boardComponent;
 
   // Input handling
   @override
@@ -266,10 +231,7 @@ class QuoridorGame extends FlameGame
     if (!_isInitialized) return;
 
     // Set a specific size for the BoardComponent
-    _boardComponent.size = Vector2(
-      size.x,
-      size.y,
-    ); // Example size, adjust as needed
+    _boardComponent.size = size; // Example size, adjust as needed
 
     // Center the BoardComponent
     _boardComponent.position = Vector2(
@@ -293,20 +255,9 @@ class QuoridorGame extends FlameGame
   }
 
   // Getters for external access
-  GameState get gameState {
-    if (!_isInitialized || _gameState == null) {
-      throw StateError(
-        'Game state has not been initialized yet. Please wait for the game to load.',
-      );
-    }
-    return _gameState!;
-  }
-
   bool get isGameOver => gameState.isGameOver;
 
   String? get winner => gameState.winner;
 
   int get currentPlayerId => gameState.currentPlayerId;
-
-  bool get isInitialized => _isInitialized;
 }
