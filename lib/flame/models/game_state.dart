@@ -94,7 +94,6 @@ class GameState {
     if (wall.orientation == WallOrientation.horizontal) {
       // Horizontal wall blocks vertical movement
       if (from.col == to.col) {
-        final minRow = from.row < to.row ? from.row : to.row;
         final maxRow = from.row < to.row ? to.row : from.row;
 
         return wallRow == maxRow &&
@@ -104,7 +103,6 @@ class GameState {
     } else {
       // Vertical wall blocks horizontal movement
       if (from.row == to.row) {
-        final minCol = from.col < to.col ? from.col : to.col;
         final maxCol = from.col < to.col ? to.col : from.col;
 
         return wallCol == maxCol &&
@@ -220,7 +218,7 @@ class GameStateFactory {
   static GameState createNewGame({
     String? gameId,
     String player1Name = 'Player 1',
-    String player2Name = 'AI',
+    String player2Name = 'Player 2',
     bool player2IsAI = true,
   }) {
     gameId ??= 'game_${DateTime.now().millisecondsSinceEpoch}';

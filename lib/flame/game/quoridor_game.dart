@@ -1,73 +1,14 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../board_component.dart';
+import '/flame/services/sounds.dart';
+import '../components/board_component.dart';
 import '../constants.dart';
 import '../models/game_state.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
-
-class PlayerInfoWidget extends StatelessWidget {
-  final int playerId;
-  final String name;
-  final int wallsRemaining;
-  final bool isCurrentPlayer;
-  final bool isAI;
-
-  const PlayerInfoWidget({
-    super.key,
-    required this.playerId,
-    required this.name,
-    required this.wallsRemaining,
-    required this.isCurrentPlayer,
-    required this.isAI,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = playerId == 1 ? Colors.deepPurple : Colors.teal;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
-        ),
-        border: Border.all(color: color.withOpacity(0.3), width: 2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                isAI ? "🤖 AI" : name,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: color,
-                ),
-              ),
-              if (isCurrentPlayer) const Spacer(),
-              if (isCurrentPlayer)
-                CircleAvatar(radius: 6, backgroundColor: color),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Walls: $wallsRemaining',
-            style: TextStyle(color: color.withOpacity(0.8)),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 final isInitializedProvider = ValueNotifier(false);
 
@@ -81,26 +22,21 @@ class QuoridorGame extends FlameGame
   Function(String)? onGameMessage;
   VoidCallback? onGameWon;
 
-  @override
-  Future<void> onLoad() async {
-    // Initialize game state
+  QuoridorGame() : super() {
     _gameState = GameStateFactory.createNewGame();
-
-    // Create board component
     _boardComponent = BoardComponent(_gameState!);
     _boardComponent.onMoveAttempted = _handleMoveAttempt;
     _boardComponent.onWallPlaceAttempted = _handleWallPlaceAttempt;
-
-    // Position board in center
-    _boardComponent.position = Vector2(0, 0);
     add(_boardComponent);
-
     _updateUI();
-
     _isInitialized = true;
   }
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  @override
+  Future<void> onLoad() async {
+    await GameSounds.preload();
+  }
+
   @override
   Color backgroundColor() => Colors.transparent;
 
@@ -108,7 +44,7 @@ class QuoridorGame extends FlameGame
     if (_gameState!.isGameOver) {
       onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
       onGameWon?.call();
-      await _audioPlayer.play(AssetSource("sounds/win.wav"));
+      GameSounds.triggerFeedback(soundKey: 'win');
     }
   }
 
@@ -217,12 +153,6 @@ class QuoridorGame extends FlameGame
     _boardComponent.showValidMoves = show;
   }
 
-  @override
-  void onRemove() {
-    _audioPlayer.dispose();
-    super.onRemove();
-  }
-
   void togglePlayerMode() {
     // Switch between AI and human player 2
     final newGameState = GameState(
@@ -252,7 +182,7 @@ class QuoridorGame extends FlameGame
 
     // Convert screen coordinates to local board coordinates
     final localPosition = event.localPosition - _boardComponent.position;
-    print('Tap detected at: $localPosition'); // Debug log
+    debugPrint('Tap detected at: $localPosition'); // Debug log
 
     // Pass tap to board component
     _boardComponent.handleTap(localPosition);

@@ -1,15 +1,27 @@
 import '../constants.dart';
 import '../models/game_state.dart';
+import 'dart:math' as math;
+import '../services/sounds.dart';
+
+enum GamePhase { early, mid, late }
 
 class PathNode {
   final Position position;
   final int gCost; // Distance from start
-  final int hCost; // Distance to target
+  final double hCost; // Distance to target
   final PathNode? parent;
+  final int
+  alternativePathCount; // Track how many alternative paths we've explored
 
-  PathNode(this.position, this.gCost, this.hCost, [this.parent]);
+  PathNode(
+    this.position,
+    this.gCost,
+    this.hCost, [
+    this.parent,
+    this.alternativePathCount = 0,
+  ]);
 
-  int get fCost => gCost + hCost;
+  double get fCost => gCost + hCost;
 
   @override
   bool operator ==(Object other) {
@@ -33,8 +45,14 @@ class Pathfinding {
     );
     final closedSet = <Position>{};
     final gScores = <Position, int>{};
+    final alternativePaths = <List<Position>>[];
+    final random = math.Random();
 
-    final startNode = PathNode(start, 0, _calculateHeuristic(start, targetRow));
+    final startNode = PathNode(
+      start,
+      0,
+      _calculateHeuristic(start, targetRow, gameState),
+    );
     openSet.add(startNode);
     gScores[start] = 0;
 
@@ -43,13 +61,57 @@ class Pathfinding {
 
       // Check if we reached the target row
       if (currentNode.position.row == targetRow) {
-        return _reconstructPath(currentNode);
+        final path = _reconstructPath(currentNode);
+
+        // Sometimes explore alternative paths even when we found a good one
+        if (random.nextDouble() < 0.3 && alternativePaths.length < 3) {
+          // 30% chance to explore more
+          // Add current path to alternatives
+          alternativePaths.add(path);
+
+          // Continue searching for more paths
+          closedSet.remove(currentNode.position);
+          continue;
+        }
+
+        // Choose between found paths
+        if (alternativePaths.isNotEmpty) {
+          alternativePaths.add(path);
+          // Sometimes choose a longer but more strategic path
+          if (random.nextDouble() < 0.4) {
+            // 40% chance to choose alternative
+            final selectedPath = _selectBestAlternativePath(
+              alternativePaths,
+              gameState,
+            );
+
+            // Play move sound for AI (player 2) if this is a move path
+            if (gameState.currentPlayerId == 2 && selectedPath.isNotEmpty) {
+              GameSounds.triggerFeedback(soundKey: 'move_p2');
+            }
+
+            return selectedPath;
+          }
+        }
+
+        // Play move sound for AI (player 2) if this is a move path
+        if (gameState.currentPlayerId == 2 && path.isNotEmpty) {
+          GameSounds.triggerFeedback(soundKey: 'move_p2');
+        }
+
+        return path;
       }
 
       closedSet.add(currentNode.position);
 
       // Explore neighbors
       final neighbors = gameState.getValidMoves(currentNode.position);
+
+      // Sometimes shuffle neighbors to explore different paths
+      if (random.nextDouble() < 0.2) {
+        // 20% chance to shuffle
+        neighbors.shuffle(random);
+      }
 
       for (final neighborPos in neighbors) {
         if (closedSet.contains(neighborPos)) continue;
@@ -59,12 +121,18 @@ class Pathfinding {
 
         if (existingGScore == null || tentativeGScore < existingGScore) {
           gScores[neighborPos] = tentativeGScore;
-          final hCost = _calculateHeuristic(neighborPos, targetRow);
+          final hCost = _calculateHeuristic(neighborPos, targetRow, gameState);
+
+          // Add some randomness to the heuristic to explore different paths
+          final randomizedHCost =
+              hCost * (0.9 + random.nextDouble() * 0.2); // ±10% variation
+
           final neighborNode = PathNode(
             neighborPos,
             tentativeGScore,
-            hCost,
+            randomizedHCost,
             currentNode,
+            currentNode.alternativePathCount + 1,
           );
 
           openSet.add(neighborNode);
@@ -72,7 +140,62 @@ class Pathfinding {
       }
     }
 
+    // If we have alternative paths but didn't find a direct path, return the best alternative
+    if (alternativePaths.isNotEmpty) {
+      final bestPath = _selectBestAlternativePath(alternativePaths, gameState);
+
+      // Play move sound for AI (player 2) if this is a move path
+      if (gameState.currentPlayerId == 2 && bestPath.isNotEmpty) {
+        GameSounds.triggerFeedback(soundKey: 'move_p2');
+      }
+
+      return bestPath;
+    }
+
     return null; // No path found
+  }
+
+  static List<Position> _selectBestAlternativePath(
+    List<List<Position>> paths,
+    GameState gameState,
+  ) {
+    if (paths.isEmpty) return [];
+
+    // Score each path based on multiple factors
+    final pathScores = paths.map((path) {
+      double score = 0;
+
+      // Prefer paths that maintain distance from opponent
+      final opponentPos = gameState.currentPlayerId == 1
+          ? gameState.player2.position
+          : gameState.player1.position;
+
+      for (final pos in path) {
+        final distance = math.sqrt(
+          math.pow(pos.row - opponentPos.row, 2) +
+              math.pow(pos.col - opponentPos.col, 2),
+        );
+        score += distance;
+      }
+
+      // Prefer paths that stay closer to center
+      final center = GameConstants.boardSize / 2;
+      for (final pos in path) {
+        final distanceFromCenter = math.sqrt(
+          math.pow(pos.row - center, 2) + math.pow(pos.col - center, 2),
+        );
+        score -= distanceFromCenter * 0.5;
+      }
+
+      // Slight penalty for longer paths
+      score -= path.length * 0.2;
+
+      return score;
+    }).toList();
+
+    // Find the path with the highest score
+    final bestScoreIndex = pathScores.indexOf(pathScores.reduce(math.max));
+    return paths[bestScoreIndex];
   }
 
   // Check if a wall placement would block all paths for any player
@@ -113,8 +236,83 @@ class Pathfinding {
     return {1: player1Path?.length ?? 999, 2: player2Path?.length ?? 999};
   }
 
+  // Enhanced heuristic calculation
+  static double _calculateHeuristic(
+    Position position,
+    int targetRow,
+    GameState gameState,
+  ) {
+    // Base Manhattan distance
+    final baseDistance = (position.row - targetRow).abs().toDouble();
+
+    // Consider walls in the path
+    final wallPenalty = _calculateWallPenalty(position, targetRow, gameState);
+
+    // Consider opponent's position (avoid getting too close)
+    final opponentPenalty = _calculateOpponentPenalty(position, gameState);
+
+    // Consider board edges (prefer paths closer to center)
+    final edgePenalty = _calculateEdgePenalty(position);
+
+    return baseDistance + wallPenalty + opponentPenalty + edgePenalty;
+  }
+
+  static double _calculateWallPenalty(
+    Position position,
+    int targetRow,
+    GameState gameState,
+  ) {
+    double penalty = 0;
+    final direction = position.row < targetRow ? 1 : -1;
+
+    // Check for walls in the path to target row
+    for (int row = position.row; row != targetRow; row += direction) {
+      for (final wall in gameState.walls) {
+        if (wall.orientation == WallOrientation.horizontal) {
+          if (wall.position.row == row &&
+              wall.position.col <= position.col &&
+              wall.position.col + 1 >= position.col) {
+            penalty += 2;
+          }
+        }
+      }
+    }
+
+    return penalty;
+  }
+
+  static double _calculateOpponentPenalty(
+    Position position,
+    GameState gameState,
+  ) {
+    final opponentPos = gameState.currentPlayerId == 1
+        ? gameState.player2.position
+        : gameState.player1.position;
+
+    final distance = math.sqrt(
+      math.pow(position.row - opponentPos.row, 2) +
+          math.pow(position.col - opponentPos.col, 2),
+    );
+
+    // Add penalty if too close to opponent
+    return distance < 2 ? 3 : 0;
+  }
+
+  static double _calculateEdgePenalty(Position position) {
+    final center = GameConstants.boardSize / 2;
+    final distanceFromCenter = math.sqrt(
+      math.pow(position.row - center, 2) + math.pow(position.col - center, 2),
+    );
+
+    return distanceFromCenter * 0.2;
+  }
+
   // Find the best wall placement to maximize opponent\'s path
-  static Wall? findBestWallPlacement(GameState gameState, int playerId) {
+  static Wall? findBestWallPlacement(
+    GameState gameState,
+    int playerId, {
+    List<Wall>? recentAIWalls,
+  }) {
     final opponentId = playerId == 1 ? 2 : 1;
     final opponentPos = opponentId == 1
         ? gameState.player1.position
@@ -123,14 +321,18 @@ class Pathfinding {
         ? gameState.player1.goalRow
         : gameState.player2.goalRow;
 
-    Wall? bestWall;
-    int maxPathIncrease = 0;
-
     // Get current opponent path length
     final currentPath = findShortestPath(gameState, opponentPos, opponentGoal);
     final currentLength = currentPath?.length ?? 0;
 
     if (currentLength == 0) return null;
+
+    // Store multiple good wall placements instead of just the best one
+    final goodWalls = <Wall>[];
+    final wallScores = <Wall, double>{};
+    double bestScore = double.negativeInfinity;
+    final random = math.Random();
+    final recentWalls = recentAIWalls ?? [];
 
     // Try all possible wall placements
     for (int row = 0; row < GameConstants.boardSize; row++) {
@@ -142,21 +344,20 @@ class Pathfinding {
         );
 
         if (_isValidWallPlacement(gameState, horizontalWall)) {
-          final tempGameState = _createTempGameStateWithWall(
+          final score = _evaluateWallPlacement(
             gameState,
             horizontalWall,
-          );
-          final newPath = findShortestPath(
-            tempGameState,
             opponentPos,
             opponentGoal,
+            currentLength,
+            recentWalls,
           );
-          final newLength = newPath?.length ?? 999;
-
-          final pathIncrease = newLength - currentLength;
-          if (pathIncrease > maxPathIncrease) {
-            maxPathIncrease = pathIncrease;
-            bestWall = horizontalWall;
+          // Add some randomness to prevent predictable patterns
+          final randomizedScore =
+              score * (0.9 + random.nextDouble() * 0.2); // ±10% variation
+          wallScores[horizontalWall] = randomizedScore;
+          if (randomizedScore > bestScore) {
+            bestScore = randomizedScore;
           }
         }
 
@@ -164,31 +365,285 @@ class Pathfinding {
         final verticalWall = Wall(Position(row, col), WallOrientation.vertical);
 
         if (_isValidWallPlacement(gameState, verticalWall)) {
-          final tempGameState = _createTempGameStateWithWall(
+          final score = _evaluateWallPlacement(
             gameState,
             verticalWall,
-          );
-          final newPath = findShortestPath(
-            tempGameState,
             opponentPos,
             opponentGoal,
+            currentLength,
+            recentWalls,
           );
-          final newLength = newPath?.length ?? 999;
-
-          final pathIncrease = newLength - currentLength;
-          if (pathIncrease > maxPathIncrease) {
-            maxPathIncrease = pathIncrease;
-            bestWall = verticalWall;
+          // Add some randomness to prevent predictable patterns
+          final randomizedScore =
+              score * (0.9 + random.nextDouble() * 0.2); // ±10% variation
+          wallScores[verticalWall] = randomizedScore;
+          if (randomizedScore > bestScore) {
+            bestScore = randomizedScore;
           }
         }
       }
     }
 
-    return bestWall;
+    // Collect walls that are close to the best score
+    final threshold =
+        bestScore * 0.85; // Consider walls within 85% of best score
+    wallScores.forEach((wall, score) {
+      if (score >= threshold) {
+        goodWalls.add(wall);
+      }
+    });
+
+    // If we have multiple good options, choose one based on strategy
+    Wall? selectedWall;
+    if (goodWalls.isNotEmpty) {
+      // Sometimes choose a wall that creates a bottleneck
+      if (random.nextDouble() < 0.3) {
+        // 30% chance
+        final bottleneckWalls = goodWalls
+            .where((wall) => _createsBottleneck(wall, gameState))
+            .toList();
+        if (bottleneckWalls.isNotEmpty) {
+          selectedWall =
+              bottleneckWalls[random.nextInt(bottleneckWalls.length)];
+        }
+      }
+      // Sometimes choose a wall that controls center
+      if (selectedWall == null && random.nextDouble() < 0.3) {
+        // 30% chance
+        final centerWalls = goodWalls
+            .where((wall) => _controlsCenter(wall, gameState))
+            .toList();
+        if (centerWalls.isNotEmpty) {
+          selectedWall = centerWalls[random.nextInt(centerWalls.length)];
+        }
+      }
+      // If no special strategy was chosen, pick randomly from good walls
+      if (selectedWall == null) {
+        selectedWall = goodWalls[random.nextInt(goodWalls.length)];
+      }
+    }
+
+    // Play wall placement sound for AI (player 2)
+    if (selectedWall != null && playerId == 2) {
+      GameSounds.triggerFeedback(soundKey: 'wall_p2');
+    }
+
+    return selectedWall;
   }
 
-  static int _calculateHeuristic(Position position, int targetRow) {
-    return (position.row - targetRow).abs();
+  static double _evaluateWallPlacement(
+    GameState gameState,
+    Wall wall,
+    Position opponentPos,
+    int opponentGoal,
+    int currentPathLength,
+    List<Wall> recentAIWalls,
+  ) {
+    final tempGameState = _createTempGameStateWithWall(gameState, wall);
+    final newPath = findShortestPath(tempGameState, opponentPos, opponentGoal);
+    final newLength = newPath?.length ?? 999;
+    // Base score is the path length increase
+    double score = (newLength - currentPathLength).toDouble();
+    // Penalize repeated wall placements
+    if (recentAIWalls.any(
+      (w) => w.position == wall.position && w.orientation == wall.orientation,
+    )) {
+      score -= 5.0;
+    }
+    // Bonus for walls that force opponent to move away from center
+    final center = GameConstants.boardSize / 2;
+    final distanceFromCenter = math.sqrt(
+      math.pow(opponentPos.row - center, 2) +
+          math.pow(opponentPos.col - center, 2),
+    );
+    score += distanceFromCenter * 0.1;
+
+    // Penalty for walls that are too far from opponent
+    final distanceToOpponent = math.sqrt(
+      math.pow(wall.position.row - opponentPos.row, 2) +
+          math.pow(wall.position.col - opponentPos.col, 2),
+    );
+    score -= distanceToOpponent * 0.2;
+
+    // Bonus for walls that block multiple potential paths
+    score += _calculatePathBlockingScore(wall, gameState);
+
+    // Consider game phase
+    final gamePhase = _calculateGamePhase(gameState);
+    if (gamePhase == GamePhase.early) {
+      // Early game: prefer walls that create long-term advantages
+      score += _evaluateLongTermImpact(wall, gameState) * 0.3;
+    } else if (gamePhase == GamePhase.late) {
+      // Late game: focus more on immediate path blocking
+      score += _evaluateImmediateBlocking(wall, gameState) * 0.4;
+    }
+
+    // Additional strategic considerations
+    if (_createsBottleneck(wall, gameState)) {
+      score += 2.0;
+    }
+
+    if (_controlsCenter(wall, gameState)) {
+      score += 1.5;
+    }
+
+    if (_createsMultiplePaths(wall, gameState)) {
+      score += 1.0;
+    }
+
+    return score;
+  }
+
+  static GamePhase _calculateGamePhase(GameState gameState) {
+    final totalWalls = gameState.walls.length;
+    final maxWalls =
+        GameConstants.maxWallsPerPlayer * 2; // Total walls for both players
+
+    if (totalWalls < maxWalls * 0.3) return GamePhase.early;
+    if (totalWalls < maxWalls * 0.7) return GamePhase.mid;
+    return GamePhase.late;
+  }
+
+  static double _evaluateLongTermImpact(Wall wall, GameState gameState) {
+    double score = 0;
+
+    // Check if wall creates a bottleneck
+    if (_createsBottleneck(wall, gameState)) {
+      score += 2.0;
+    }
+
+    // Check if wall helps control center
+    if (_controlsCenter(wall, gameState)) {
+      score += 1.5;
+    }
+
+    // Check if wall creates multiple paths for self
+    if (_createsMultiplePaths(wall, gameState)) {
+      score += 1.0;
+    }
+
+    return score;
+  }
+
+  static double _evaluateImmediateBlocking(Wall wall, GameState gameState) {
+    double score = 0;
+
+    // Check if wall directly blocks opponent's shortest path
+    if (_blocksShortestPath(wall, gameState)) {
+      score += 3.0;
+    }
+
+    // Check if wall forces opponent to take longer path
+    if (_forcesLongerPath(wall, gameState)) {
+      score += 2.0;
+    }
+
+    return score;
+  }
+
+  static bool _createsBottleneck(Wall wall, GameState gameState) {
+    // Check if wall creates a narrow passage that can be exploited later
+    final surroundingWalls = gameState.walls
+        .where(
+          (w) =>
+              (w.position.row - wall.position.row).abs() <= 1 &&
+              (w.position.col - wall.position.col).abs() <= 1,
+        )
+        .length;
+
+    return surroundingWalls >= 2;
+  }
+
+  static bool _controlsCenter(Wall wall, GameState gameState) {
+    final center = GameConstants.boardSize / 2;
+    final distanceFromCenter = math.sqrt(
+      math.pow(wall.position.row - center, 2) +
+          math.pow(wall.position.col - center, 2),
+    );
+
+    return distanceFromCenter <= 2;
+  }
+
+  static bool _createsMultiplePaths(Wall wall, GameState gameState) {
+    // Check if wall placement creates alternative paths for self
+    final tempGameState = _createTempGameStateWithWall(gameState, wall);
+    final selfPos = gameState.currentPlayerId == 1
+        ? gameState.player1.position
+        : gameState.player2.position;
+    final selfGoal = gameState.currentPlayerId == 1
+        ? gameState.player1.goalRow
+        : gameState.player2.goalRow;
+
+    final paths = _findMultiplePaths(tempGameState, selfPos, selfGoal);
+    return paths.length > 1;
+  }
+
+  static List<List<Position>> _findMultiplePaths(
+    GameState gameState,
+    Position start,
+    int targetRow,
+  ) {
+    final paths = <List<Position>>[];
+    final visited = <Position>{};
+
+    void dfs(Position current, List<Position> currentPath) {
+      if (current.row == targetRow) {
+        paths.add(List.from(currentPath));
+        return;
+      }
+
+      visited.add(current);
+      final neighbors = gameState.getValidMoves(current);
+
+      for (final neighbor in neighbors) {
+        if (!visited.contains(neighbor)) {
+          currentPath.add(neighbor);
+          dfs(neighbor, currentPath);
+          currentPath.removeLast();
+        }
+      }
+
+      visited.remove(current);
+    }
+
+    dfs(start, [start]);
+    return paths;
+  }
+
+  static bool _blocksShortestPath(Wall wall, GameState gameState) {
+    final opponentId = gameState.currentPlayerId == 1 ? 2 : 1;
+    final opponentPos = opponentId == 1
+        ? gameState.player1.position
+        : gameState.player2.position;
+    final opponentGoal = opponentId == 1
+        ? gameState.player1.goalRow
+        : gameState.player2.goalRow;
+
+    final originalPath = findShortestPath(gameState, opponentPos, opponentGoal);
+    final tempGameState = _createTempGameStateWithWall(gameState, wall);
+    final newPath = findShortestPath(tempGameState, opponentPos, opponentGoal);
+
+    return newPath != null &&
+        originalPath != null &&
+        newPath.length > originalPath.length;
+  }
+
+  static bool _forcesLongerPath(Wall wall, GameState gameState) {
+    final opponentId = gameState.currentPlayerId == 1 ? 2 : 1;
+    final opponentPos = opponentId == 1
+        ? gameState.player1.position
+        : gameState.player2.position;
+    final opponentGoal = opponentId == 1
+        ? gameState.player1.goalRow
+        : gameState.player2.goalRow;
+
+    final originalPath = findShortestPath(gameState, opponentPos, opponentGoal);
+    final tempGameState = _createTempGameStateWithWall(gameState, wall);
+    final newPath = findShortestPath(tempGameState, opponentPos, opponentGoal);
+
+    return newPath != null &&
+        originalPath != null &&
+        newPath.length >= originalPath.length + 2;
   }
 
   static List<Position> _reconstructPath(PathNode node) {
@@ -257,6 +712,32 @@ class Pathfinding {
               wall1.position.row == wall2.position.row + 1 ||
               wall1.position.row == wall2.position.row - 1);
     }
+  }
+
+  static double _calculatePathBlockingScore(Wall wall, GameState gameState) {
+    double score = 0;
+
+    // Check how many potential paths this wall blocks
+    for (int row = 0; row < GameConstants.boardSize; row++) {
+      for (int col = 0; col < GameConstants.boardSize; col++) {
+        final pos = Position(row, col);
+        if (wall.orientation == WallOrientation.horizontal) {
+          if (wall.position.row == row &&
+              wall.position.col <= col &&
+              wall.position.col + 1 >= col) {
+            score += 0.5;
+          }
+        } else {
+          if (wall.position.col == col &&
+              wall.position.row <= row &&
+              wall.position.row + 1 >= row) {
+            score += 0.5;
+          }
+        }
+      }
+    }
+
+    return score;
   }
 }
 

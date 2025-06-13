@@ -1,16 +1,17 @@
 // Game constants and configurations for Quoridor game
+
 class GameConstants {
   // Board dimensions
   static const int boardSize = 9;
   static const int maxWallsPerPlayer = 10;
 
   // Cell dimensions for rendering
-  static const double cellSize = 30.0;
+  // static const double cellSize = 40.0;
   static const double cellSpacing = 4.0;
   static const double boardPadding = 10.0;
   static const double goalLineThickness = 4.0;
   static const double wallThickness = 6.0;
-  static const double wallLength = cellSize * 2 + wallThickness;
+  // static const double wallLength = cellSize * 2 + wallThickness;
 
   // Board colors
   static const int lightCellColor = 0xFFF1F4F8;
