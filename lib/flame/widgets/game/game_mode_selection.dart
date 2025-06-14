@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
-
+import 'package:flutter_localization/flutter_localization.dart';
+import '../../services/localizations.dart';
 import '../app/copywrite.dart';
 
 /// A bottom sheet widget for selecting the game mode in Quoridor.
@@ -46,7 +47,7 @@ class GameModeSelection extends StatelessWidget {
           const SizedBox(height: 24),
           // Title
           Text(
-            'Choose Game Mode',
+            AppLocale.chooseGameMode.getString(context),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: Theme.of(context).colorScheme.onSurface,
@@ -62,8 +63,9 @@ class GameModeSelection extends StatelessWidget {
                 _buildModeCard(
                   context,
                   icon: Icons.computer,
-                  title: 'Play vs AI',
-                  subtitle: 'Challenge our intelligent AI opponent',
+                  title: AppLocale.playVsAI.getString(context),
+                  subtitle: AppLocale.challengeOurIntelligentAIOpponent
+                      .getString(context),
                   onTap: () {
                     if (!game.gameState.player2.isAI) {
                       game.togglePlayerMode();
@@ -79,8 +81,10 @@ class GameModeSelection extends StatelessWidget {
                 _buildModeCard(
                   context,
                   icon: Icons.people,
-                  title: 'Two Players',
-                  subtitle: 'Play with a friend on the same device',
+                  title: AppLocale.twoPlayers.getString(context),
+                  subtitle: AppLocale.playWithAFriendOnTheSameDevice.getString(
+                    context,
+                  ),
                   onTap: () {
                     if (game.gameState.player2.isAI) {
                       game.togglePlayerMode();

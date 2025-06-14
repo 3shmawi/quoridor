@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/constants.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
+import 'package:quoridor/flame/services/localizations.dart';
 import 'package:quoridor/flame/widgets/game/game_player_info_widget.dart';
 import 'package:quoridor/flame/widgets/game/game_wall_controls.dart';
 
@@ -46,28 +48,28 @@ class GameSmallScreen extends StatelessWidget {
                       children: [
                         GamePlayerInfoWidget(
                           playerId: 1,
-                          name: 'Player 1',
+                          name: AppLocale.player1.getString(context),
                           wallsRemaining: game.gameState.player1.wallsRemaining,
                           isCurrentPlayer: game.gameState.currentPlayer.id == 1,
                           isAI: false,
                         ),
                         GamePlayerInfoWidget(
                           playerId: 2,
-                          name: 'Player 2',
+                          name: AppLocale.player2.getString(context),
                           wallsRemaining: game.gameState.player2.wallsRemaining,
                           isCurrentPlayer: game.gameState.currentPlayer.id == 2,
                           isAI: game.gameState.player2.isAI,
                         ),
                         GamePlayerInfoWidget(
                           playerId: 2,
-                          name: 'Player 2',
+                          name: AppLocale.player2.getString(context),
                           wallsRemaining: game.gameState.player2.wallsRemaining,
                           isCurrentPlayer: game.gameState.currentPlayer.id == 2,
                           isAI: game.gameState.player2.isAI,
                         ),
                         GamePlayerInfoWidget(
                           playerId: 2,
-                          name: 'Player 2',
+                          name: AppLocale.player2.getString(context),
                           wallsRemaining: game.gameState.player2.wallsRemaining,
                           isCurrentPlayer: game.gameState.currentPlayer.id == 2,
                           isAI: game.gameState.player2.isAI,

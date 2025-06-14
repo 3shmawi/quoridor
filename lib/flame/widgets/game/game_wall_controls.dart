@@ -1,8 +1,10 @@
 import 'dart:math' show pi;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localization/flutter_localization.dart';
 
 import '../../../flame/constants.dart';
+import '../../../flame/services/localizations.dart';
 
 /// A widget for controlling wall placement in the game.
 ///
@@ -39,6 +41,7 @@ class GameWallControls extends StatelessWidget {
       children: [
         const SizedBox(width: 8),
         _buildOrientationButton(context),
+        const Spacer(),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -112,7 +115,11 @@ class GameWallControls extends StatelessWidget {
             ),
           ),
         ),
-        Text(isVertical ? "VERTICAL" : "HORIZONTAL"),
+        Text(
+          isVertical
+              ? AppLocale.vertical.getString(context)
+              : AppLocale.horizontal.getString(context),
+        ),
       ],
     );
   }

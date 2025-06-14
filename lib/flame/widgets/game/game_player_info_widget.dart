@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localization/flutter_localization.dart';
+import '../../services/localizations.dart';
 
 /// A widget that displays information about a player in the game.
 ///
@@ -91,7 +93,7 @@ class GamePlayerInfoWidget extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '$wallsRemaining walls left',
+                  '$wallsRemaining ${AppLocale.wallsLeft.getString(context)}',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(
                       context,

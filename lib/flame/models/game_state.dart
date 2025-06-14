@@ -1,3 +1,5 @@
+import 'package:quoridor/flame/services/ai_service.dart';
+
 import '../../flame/constants.dart';
 import 'player.dart';
 
@@ -8,9 +10,11 @@ class GameState {
   final List<Wall> walls;
   int currentPlayerId;
   GameStatus status;
+  AIDifficulty aiDifficulty;
   final DateTime createdAt;
   DateTime updatedAt;
   final List<GameMove> moveHistory;
+  bool showValidMoves;
 
   GameState({
     required this.gameId,
@@ -19,8 +23,10 @@ class GameState {
     List<Wall>? walls,
     this.currentPlayerId = 1,
     this.status = GameStatus.playing,
+    this.aiDifficulty = AIDifficulty.medium,
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.showValidMoves = true,
     List<GameMove>? moveHistory,
   }) : walls = walls ?? [],
        createdAt = createdAt ?? DateTime.now(),
@@ -28,9 +34,32 @@ class GameState {
        moveHistory = moveHistory ?? [];
 
   Player get currentPlayer => currentPlayerId == 1 ? player1 : player2;
+
   Player get otherPlayer => currentPlayerId == 1 ? player2 : player1;
 
   bool get isGameOver => status != GameStatus.playing;
+
+  AIDifficulty get difficulty => aiDifficulty;
+
+  set difficulty(AIDifficulty newDifficulty) {
+    aiDifficulty = newDifficulty;
+    updatedAt = DateTime.now();
+  }
+
+  void toggleShowValidMoves() {
+    showValidMoves = !showValidMoves;
+    updatedAt = DateTime.now();
+  }
+
+  Player get firstPlayer => player1;
+
+  Player get secondPlayer => player2;
+
+  // bool get isAi => player2.isAI;
+  // set toggleAi(bool isAI) {
+  //   player2.isAI = isAI;
+  //   updatedAt = DateTime.now();
+  // }
 
   String? get winner {
     switch (status) {
@@ -193,6 +222,8 @@ class GameState {
     'walls': walls.map((w) => w.toJson()).toList(),
     'currentPlayerId': currentPlayerId,
     'status': status.index,
+    'aiDifficulty': aiDifficulty.index,
+    "showValidMoves": showValidMoves,
     'createdAt': createdAt.millisecondsSinceEpoch,
     'updatedAt': updatedAt.millisecondsSinceEpoch,
     'moveHistory': moveHistory.map((m) => m.toJson()).toList(),
@@ -205,6 +236,8 @@ class GameState {
     walls: (json['walls'] as List).map((w) => Wall.fromJson(w)).toList(),
     currentPlayerId: json['currentPlayerId'] as int,
     status: GameStatus.values[json['status'] as int],
+    aiDifficulty: AIDifficulty.values[json['aiDifficulty'] as int],
+    showValidMoves: json['showValidMoves'] as bool? ?? true,
     createdAt: DateTime.fromMillisecondsSinceEpoch(json['createdAt'] as int),
     updatedAt: DateTime.fromMillisecondsSinceEpoch(json['updatedAt'] as int),
     moveHistory: (json['moveHistory'] as List)

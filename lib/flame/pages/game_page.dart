@@ -1,5 +1,6 @@
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/widgets/game/game_celebrate.dart';
 import 'package:quoridor/flame/widgets/game/game_message_toast.dart';
 import 'package:quoridor/flame/widgets/game/game_small_screen.dart';
@@ -9,6 +10,7 @@ import '/flame/components/board_component.dart';
 import '/flame/constants.dart';
 import '/flame/widgets/game/game_drawer.dart';
 import '/flame/widgets/game/game_mode_selection.dart';
+import '../services/localizations.dart';
 import '../../flame/game/quoridor_game.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/firebase_service.dart';
@@ -145,7 +147,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _showGameMessage(String message) {
     setState(() {
-      _currentMessage = message;
+      _currentMessage = message.getString(context);
       _showMessage = true;
     });
 
@@ -185,7 +187,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               size: 28,
             ),
             const SizedBox(width: 12),
-            const Text('Game Over!'),
+            Text(AppLocale.gameOver.getString(context)),
           ],
         ),
         content: Column(
@@ -193,7 +195,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${_game.gameState.winner} wins!',
+              '${_game.gameState.winner} ${AppLocale.wins.getString(context)}!',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.bold,
@@ -201,7 +203,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 16),
             Text(
-              'Would you like to play again?',
+              AppLocale.playAgainSuggestion.getString(context),
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
@@ -211,7 +213,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             onPressed: () {
               Navigator.of(context).pop();
             },
-            child: const Text('Not Now'),
+            child: Text(AppLocale.notNow.getString(context)),
           ),
           FilledButton.icon(
             onPressed: () {
@@ -219,7 +221,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               _game.newGame();
             },
             icon: const Icon(Icons.refresh),
-            label: const Text('Play Again'),
+            label: Text(AppLocale.playAgain.getString(context)),
           ),
         ],
       ),

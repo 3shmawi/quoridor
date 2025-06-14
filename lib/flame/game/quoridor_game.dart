@@ -2,6 +2,8 @@ import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/services/localizations.dart';
 
 import '/flame/services/sounds.dart';
 import '../components/board_component.dart';
@@ -42,7 +44,9 @@ class QuoridorGame extends FlameGame
 
   void _updateUI() async {
     if (_gameState!.isGameOver) {
-      onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
+      onGameMessage?.call(
+        '${AppLocale.gameOver} ${_gameState!.winner} ${AppLocale.wins}!',
+      );
       onGameWon?.call();
       GameSounds.triggerFeedback(soundKey: 'win');
     }
@@ -73,7 +77,7 @@ class QuoridorGame extends FlameGame
 
       if (newGameState != _gameState) {
         updateGameState(newGameState);
-        onGameMessage?.call('AI played their move');
+        onGameMessage?.call(AppLocale.aiPlayedTheirMove);
       }
     } catch (e) {
       onGameMessage?.call('AI move failed: $e');
@@ -82,7 +86,7 @@ class QuoridorGame extends FlameGame
 
   void _handleMoveAttempt(Position newPosition) {
     if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
-      onGameMessage?.call('It\'s not your turn!');
+      onGameMessage?.call('${AppLocale.itsNotYourTurn}!');
       return;
     }
 
@@ -91,19 +95,19 @@ class QuoridorGame extends FlameGame
     if (GameService.isValidMove(_gameState!, move)) {
       _processMove(move);
     } else {
-      onGameMessage?.call('Invalid move!');
+      onGameMessage?.call(AppLocale.invalidMove);
       HapticFeedback.lightImpact();
     }
   }
 
   void _handleWallPlaceAttempt(Wall wall) {
     if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
-      onGameMessage?.call('It\'s not your turn!');
+      onGameMessage?.call(AppLocale.itsNotYourTurn);
       return;
     }
 
     if (!_gameState!.currentPlayer.hasWallsRemaining) {
-      onGameMessage?.call('No walls remaining!');
+      onGameMessage?.call(AppLocale.noWallsRemaining);
       HapticFeedback.lightImpact();
       return;
     }
@@ -113,7 +117,7 @@ class QuoridorGame extends FlameGame
     if (GameService.isValidMove(_gameState!, move)) {
       _processMove(move);
     } else {
-      onGameMessage?.call('Invalid wall placement!');
+      onGameMessage?.call(AppLocale.invalidWallPlacement);
       HapticFeedback.lightImpact();
     }
   }
@@ -129,11 +133,11 @@ class QuoridorGame extends FlameGame
       HapticFeedback.selectionClick();
 
       if (newGameState.isGameOver) {
-        onGameMessage?.call('${newGameState.winner} wins!');
+        onGameMessage?.call('${newGameState.winner} ${AppLocale.wins}!');
         HapticFeedback.mediumImpact();
       }
     } catch (e) {
-      onGameMessage?.call('Move failed: $e');
+      onGameMessage?.call('${AppLocale.moveFailed}: $e');
       HapticFeedback.lightImpact();
     }
   }
@@ -141,16 +145,24 @@ class QuoridorGame extends FlameGame
   // Game control methods
   void newGame() {
     updateGameState(GameStateFactory.createNewGame());
-    onGameMessage?.call('New game started!');
+    onGameMessage?.call(AppLocale.newGameStarted);
   }
 
   void setDifficulty(AIDifficulty difficulty) {
-    // This could be used to adjust AI behavior in future moves
-    onGameMessage?.call('Difficulty set to ${difficulty.name}');
+    _gameState!.difficulty = difficulty;
+    onGameMessage?.call('${AppLocale.difficultySetTo} ${difficulty.name}');
   }
 
-  void showValidMoves(bool show) {
-    _boardComponent.showValidMoves = show;
+  void showValidMoves() {
+    gameState.toggleShowValidMoves();
+    _boardComponent.showValidMoves = gameState.showValidMoves;
+    _boardComponent.updateGameState(gameState);
+
+    onGameMessage?.call(
+      gameState.showValidMoves
+          ? AppLocale.validMovesHighlighted
+          : AppLocale.validMovesHidden,
+    );
   }
 
   void togglePlayerMode() {
@@ -170,8 +182,8 @@ class QuoridorGame extends FlameGame
     updateGameState(newGameState);
     onGameMessage?.call(
       newGameState.player2.isAI
-          ? 'Switched to AI opponent'
-          : 'Switched to human opponent',
+          ? AppLocale.switchedToAI
+          : AppLocale.switchedToTwoPlayers,
     );
   }
 
@@ -226,7 +238,7 @@ class QuoridorGame extends FlameGame
   GameState get gameState {
     if (!_isInitialized || _gameState == null) {
       throw StateError(
-        'Game state has not been initialized yet. Please wait for the game to load.',
+        '${AppLocale.gameStateNotInitialized} ${AppLocale.pleaseWait}',
       );
     }
     return _gameState!;

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/services/localizations.dart';
 import 'package:quoridor/flame/widgets/game/game_board.dart';
 import 'package:quoridor/flame/widgets/game/game_player_info_widget.dart';
 import 'package:quoridor/flame/widgets/game/game_wall_controls.dart';
@@ -62,7 +64,7 @@ class GameWideScreen extends StatelessWidget {
                       children: [
                         GamePlayerInfoWidget(
                           playerId: 1,
-                          name: 'Player 1',
+                          name: AppLocale.player1.getString(context),
                           wallsRemaining: game.gameState.player1.wallsRemaining,
                           isCurrentPlayer: game.gameState.currentPlayer.id == 1,
                           isAI: false,
@@ -70,7 +72,7 @@ class GameWideScreen extends StatelessWidget {
                         const SizedBox(height: 16),
                         GamePlayerInfoWidget(
                           playerId: 2,
-                          name: 'Player 2',
+                          name: AppLocale.player2.getString(context),
                           wallsRemaining: game.gameState.player2.wallsRemaining,
                           isCurrentPlayer: game.gameState.currentPlayer.id == 2,
                           isAI: game.gameState.player2.isAI,
