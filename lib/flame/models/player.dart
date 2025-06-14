@@ -6,7 +6,7 @@ class Player {
   int wallsRemaining;
   final int goalRow;
   final String name;
-  final bool isAI;
+  bool isAI;
 
   Player({
     required this.id,

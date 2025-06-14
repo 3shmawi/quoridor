@@ -15,6 +15,8 @@ class GameState {
   DateTime updatedAt;
   final List<GameMove> moveHistory;
   bool showValidMoves;
+  WallOrientation wallOrientation;
+  Wall? previewWall;
 
   GameState({
     required this.gameId,
@@ -28,6 +30,8 @@ class GameState {
     DateTime? updatedAt,
     this.showValidMoves = true,
     List<GameMove>? moveHistory,
+    this.wallOrientation = WallOrientation.horizontal,
+    this.previewWall,
   }) : walls = walls ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -55,11 +59,26 @@ class GameState {
 
   Player get secondPlayer => player2;
 
-  // bool get isAi => player2.isAI;
-  // set toggleAi(bool isAI) {
-  //   player2.isAI = isAI;
-  //   updatedAt = DateTime.now();
-  // }
+  bool get isAi => player2.isAI;
+
+  set toggleAi(bool isAI) {
+    player2.copyWith(isAI: isAI);
+    updatedAt = DateTime.now();
+  }
+
+  WallOrientation get getWallOrientation => wallOrientation;
+
+  set setWallOrientation(WallOrientation orientation) {
+    wallOrientation = orientation;
+    updatedAt = DateTime.now();
+  }
+
+  Wall? get wallPreview => previewWall;
+
+  set setWallPreview(Wall? wall) {
+    previewWall = wall;
+    updatedAt = DateTime.now();
+  }
 
   String? get winner {
     switch (status) {

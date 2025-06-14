@@ -5,7 +5,6 @@ import 'package:quoridor/flame/widgets/game/game_board.dart';
 import 'package:quoridor/flame/widgets/game/game_player_info_widget.dart';
 import 'package:quoridor/flame/widgets/game/game_wall_controls.dart';
 
-import '../../constants.dart';
 import '../../game/quoridor_game.dart';
 import 'game_app_bar.dart';
 
@@ -139,12 +138,7 @@ class GameWideScreen extends StatelessWidget {
                 ),
               ),
               Spacer(),
-              GameWallControls(
-                orientation: WallOrientation.horizontal,
-                onOrientationChanged: (n) {},
-                onWallMovement: (wall) {},
-                onWallPlacementConfirmed: () {},
-              ),
+              GameWallControls(game: game),
             ],
           ),
         ),

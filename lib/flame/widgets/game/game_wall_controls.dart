@@ -2,6 +2,7 @@ import 'dart:math' show pi;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/game/quoridor_game.dart';
 
 import '../../../flame/constants.dart';
 import '../../../flame/services/localizations.dart';
@@ -12,27 +13,83 @@ import '../../../flame/services/localizations.dart';
 /// - Toggling wall orientation (horizontal/vertical)
 /// - Moving the wall preview
 /// - Confirming wall placement
-class GameWallControls extends StatelessWidget {
-  /// The current wall orientation
-  final WallOrientation orientation;
-
-  /// Callback when wall orientation is changed
-  final ValueChanged<WallOrientation> onOrientationChanged;
-
-  /// Callback when wall movement is requested
-  final ValueChanged<String> onWallMovement;
-
-  /// Callback when wall placement is confirmed
-  final VoidCallback onWallPlacementConfirmed;
+class GameWallControls extends StatefulWidget {
+  final QuoridorGame game;
 
   /// Creates a new instance of [GameWallControls].
-  const GameWallControls({
-    super.key,
-    required this.orientation,
-    required this.onOrientationChanged,
-    required this.onWallMovement,
-    required this.onWallPlacementConfirmed,
-  });
+  const GameWallControls({super.key, required this.game});
+
+  @override
+  State<GameWallControls> createState() => _GameWallControlsState();
+}
+
+class _GameWallControlsState extends State<GameWallControls> {
+  late final gameState = widget.game.gameState;
+
+  void _confirmWallPlacement() {
+    if (gameState.previewWall == null) return;
+
+    final wall = Wall(
+      gameState.previewWall!.position,
+      gameState.wallOrientation,
+    );
+
+    widget.game.handleWallPlaceAttempt(wall);
+    setState(() {});
+  }
+
+  void _handleWallMovement(String direction) {
+    Position? newPosition;
+
+    if (gameState.previewWall == null) {
+      newPosition = Position(4, 4);
+      _moveWallPreview(newPosition);
+    }
+    switch (direction) {
+      case 'up':
+        if (gameState.previewWall!.position.row > 0) {
+          newPosition = Position(
+            gameState.previewWall!.position.row - 1,
+            gameState.previewWall!.position.col,
+          );
+        }
+        break;
+      case 'down':
+        if (gameState.previewWall!.position.row < GameConstants.boardSize - 1) {
+          newPosition = Position(
+            gameState.previewWall!.position.row + 1,
+            gameState.previewWall!.position.col,
+          );
+        }
+        break;
+      case 'left':
+        if (gameState.previewWall!.position.col > 0) {
+          newPosition = Position(
+            gameState.previewWall!.position.row,
+            gameState.previewWall!.position.col - 1,
+          );
+        }
+        break;
+      case 'right':
+        if (gameState.previewWall!.position.col < GameConstants.boardSize - 1) {
+          newPosition = Position(
+            gameState.previewWall!.position.row,
+            gameState.previewWall!.position.col + 1,
+          );
+        }
+        break;
+    }
+    if (newPosition != null) {
+      _moveWallPreview(newPosition);
+    }
+  }
+
+  void _moveWallPreview(Position? newPosition) {
+    if (newPosition == null) return;
+    setState(() {
+      gameState.previewWall = Wall(newPosition, gameState.wallOrientation);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,17 +103,17 @@ class GameWallControls extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              onPressed: () => onWallMovement('left'),
+              onPressed: () => _handleWallMovement('left'),
               icon: const Icon(Icons.arrow_back),
             ),
             Column(
               children: [
                 IconButton(
-                  onPressed: () => onWallMovement('up'),
+                  onPressed: () => _handleWallMovement('up'),
                   icon: const Icon(Icons.arrow_upward),
                 ),
                 IconButton(
-                  onPressed: onWallPlacementConfirmed,
+                  onPressed: _confirmWallPlacement,
                   icon: const Icon(Icons.check, color: Colors.green, size: 28),
                   style: IconButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.surface,
@@ -68,13 +125,13 @@ class GameWallControls extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  onPressed: () => onWallMovement('down'),
+                  onPressed: () => _handleWallMovement('down'),
                   icon: const Icon(Icons.arrow_downward),
                 ),
               ],
             ),
             IconButton(
-              onPressed: () => onWallMovement('right'),
+              onPressed: () => _handleWallMovement('right'),
               icon: const Icon(Icons.arrow_forward),
             ),
           ],
@@ -84,17 +141,15 @@ class GameWallControls extends StatelessWidget {
   }
 
   Widget _buildOrientationButton(BuildContext context) {
-    final isVertical = orientation == WallOrientation.vertical;
+    final isVertical =
+        widget.game.gameState.wallOrientation == WallOrientation.vertical;
     return Row(
       spacing: 8,
       children: [
         IconButton(
           onPressed: () {
-            onOrientationChanged(
-              orientation == WallOrientation.horizontal
-                  ? WallOrientation.vertical
-                  : WallOrientation.horizontal,
-            );
+            widget.game.toggleWallOrientation();
+            setState(() {});
           },
           icon: Transform.rotate(
             angle: isVertical ? pi / 2 : 0,

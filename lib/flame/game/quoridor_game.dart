@@ -2,7 +2,6 @@ import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/services/localizations.dart';
 
 import '/flame/services/sounds.dart';
@@ -28,7 +27,7 @@ class QuoridorGame extends FlameGame
     _gameState = GameStateFactory.createNewGame();
     _boardComponent = BoardComponent(_gameState!);
     _boardComponent.onMoveAttempted = _handleMoveAttempt;
-    _boardComponent.onWallPlaceAttempted = _handleWallPlaceAttempt;
+    _boardComponent.onWallPlaceAttempted = handleWallPlaceAttempt;
     add(_boardComponent);
     _updateUI();
     _isInitialized = true;
@@ -100,7 +99,7 @@ class QuoridorGame extends FlameGame
     }
   }
 
-  void _handleWallPlaceAttempt(Wall wall) {
+  void handleWallPlaceAttempt(Wall wall) {
     if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
       onGameMessage?.call(AppLocale.itsNotYourTurn);
       return;
@@ -112,9 +111,17 @@ class QuoridorGame extends FlameGame
       return;
     }
 
-    final move = GameMove.wallPlace(wall, _gameState!.currentPlayerId);
+    final move = GameMove.wallPlace(
+      Wall(wall.position, gameState.wallOrientation),
+      _gameState!.currentPlayerId,
+    );
 
     if (GameService.isValidMove(_gameState!, move)) {
+      _boardComponent.wallComponent.lastTappedWall = null;
+      _gameState!.previewWall = null;
+      GameSounds.triggerFeedback(
+        soundKey: _gameState!.currentPlayer.id == 1 ? 'wall_p1' : 'wall_p2',
+      );
       _processMove(move);
     } else {
       onGameMessage?.call(AppLocale.invalidWallPlacement);
@@ -163,6 +170,15 @@ class QuoridorGame extends FlameGame
           ? AppLocale.validMovesHighlighted
           : AppLocale.validMovesHidden,
     );
+  }
+
+  void toggleWallOrientation() {
+    final orientation =
+        _gameState!.getWallOrientation == WallOrientation.horizontal
+        ? WallOrientation.vertical
+        : WallOrientation.horizontal;
+    _gameState!.setWallOrientation = orientation;
+    _boardComponent.updateGameState(_gameState!);
   }
 
   void togglePlayerMode() {

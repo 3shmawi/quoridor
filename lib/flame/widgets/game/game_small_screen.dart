@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
-import 'package:quoridor/flame/constants.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
 import 'package:quoridor/flame/services/localizations.dart';
 import 'package:quoridor/flame/widgets/game/game_player_info_widget.dart';
@@ -24,12 +23,7 @@ class GameSmallScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Column(
             children: [
-              GameWallControls(
-                orientation: WallOrientation.horizontal,
-                onOrientationChanged: (n) {},
-                onWallMovement: (wall) {},
-                onWallPlacementConfirmed: () {},
-              ),
+              GameWallControls(game: game),
               IgnorePointer(
                 child: ValueListenableBuilder(
                   valueListenable: isInitializedProvider,

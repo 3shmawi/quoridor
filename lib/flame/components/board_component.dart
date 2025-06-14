@@ -18,7 +18,7 @@ class BoardComponent extends PositionComponent {
   Function(Position)? onMoveAttempted;
   Function(Wall)? onWallPlaceAttempted;
 
-  late final WallComponent _wallComponent;
+  late final WallComponent wallComponent;
   late final PlayerComponent _playerComponent;
 
   static const double _boardPadding = GameConstants.boardPadding;
@@ -26,8 +26,8 @@ class BoardComponent extends PositionComponent {
 
   BoardComponent(this._gameState) {
     _playerComponent = PlayerComponent(_gameState);
-    _wallComponent = WallComponent(_gameState);
-    add(_wallComponent);
+    wallComponent = WallComponent(_gameState);
+    add(wallComponent);
     add(_playerComponent);
   }
 
@@ -41,9 +41,9 @@ class BoardComponent extends PositionComponent {
     _playerComponent.showValidMoves = showValidMoves;
 
     ///walls
-    _wallComponent.previewWall = null;
-    _wallComponent.lastTappedWall = null;
-    _wallComponent.gameState = newGameState;
+    _gameState.previewWall = null;
+    wallComponent.lastTappedWall = null;
+    wallComponent.gameState = newGameState;
   }
 
   @override
@@ -99,7 +99,7 @@ class BoardComponent extends PositionComponent {
   void handleTap(Vector2 position) {
     final offset = Offset(position.x, position.y);
     final cellPosition = _getPositionFromOffset(offset);
-    final wall = _wallComponent.getWallFromOffset(offset);
+    final wall = wallComponent.getWallFromOffset(offset);
 
     debugPrint(
       'Tap detected at screen position: (${position.x}, ${position.y})',
@@ -205,9 +205,9 @@ class BoardComponent extends PositionComponent {
     );
 
     // Clear wall preview when tapping on a position
-    _wallComponent.previewWall = null;
-    _wallComponent.lastTappedWall = null;
-    _wallComponent.previewWall = null;
+    _gameState.previewWall = null;
+    wallComponent.lastTappedWall = null;
+    _gameState.previewWall = null;
 
     if (position == currentPlayerPosition) {
       if (_playerComponent.selectedPawn == position) {
@@ -234,43 +234,37 @@ class BoardComponent extends PositionComponent {
     );
     debugPrint('- Wall orientation: ${wall.orientation}');
 
-    if (_wallComponent.previewWall == null ||
-        _wallComponent.previewWall != wall) {
-      _wallComponent.previewWall = wall;
-      _wallComponent.lastTappedWall = wall;
-      _wallComponent.previewWall = wall;
-      _wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
+    if (_gameState.previewWall == null || _gameState.previewWall != wall) {
+      _gameState.previewWall = wall;
+      wallComponent.lastTappedWall = wall;
+      _gameState.previewWall = wall;
+      wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
       debugPrint('- Preview wall set');
-    } else if (_wallComponent.previewWall == wall &&
-        _wallComponent.lastTappedWall == wall) {
+    } else if (_gameState.previewWall == wall &&
+        wallComponent.lastTappedWall == wall) {
       if (_gameState.currentPlayer.hasWallsRemaining) {
         debugPrint('- Attempting to place wall');
+
         onWallPlaceAttempted?.call(wall);
-        GameSounds.triggerFeedback(
-          soundKey: playerId == 1 ? 'wall_p1' : 'wall_p2',
-        );
-        _wallComponent.previewWall = null;
-        _wallComponent.lastTappedWall = null;
-        _wallComponent.previewWall = null;
       } else {
         debugPrint('- Cannot place wall: No walls remaining');
       }
     } else {
       debugPrint('- Clearing wall preview');
-      _wallComponent.previewWall = null;
-      _wallComponent.lastTappedWall = null;
-      _wallComponent.previewWall = null;
+      _gameState.previewWall = null;
+      wallComponent.lastTappedWall = null;
+      _gameState.previewWall = null;
     }
   }
 
   void handleHover(Vector2 position) {
     final offset = Offset(position.x, position.y);
-    final wall = _wallComponent.getWallFromOffset(offset);
+    final wall = wallComponent.getWallFromOffset(offset);
     if (wall != null) {
-      _wallComponent.previewWall = wall;
-      _wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
+      _gameState.previewWall = wall;
+      wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
     } else {
-      _wallComponent.previewWall = null;
+      _gameState.previewWall = null;
     }
   }
 

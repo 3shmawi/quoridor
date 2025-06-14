@@ -8,7 +8,6 @@ import '/flame/models/game_state.dart';
 
 class WallComponent extends PositionComponent {
   GameState gameState;
-  Wall? previewWall;
 
   Wall? lastTappedWall;
   bool isValid = true;
@@ -22,7 +21,7 @@ class WallComponent extends PositionComponent {
   @override
   void render(Canvas canvas) {
     _drawWalls(canvas);
-    if (previewWall != null) {
+    if (gameState.previewWall != null) {
       _drawPreviewWall(canvas);
     }
   }
@@ -58,9 +57,11 @@ class WallComponent extends PositionComponent {
   }
 
   void _drawPreviewWall(Canvas canvas) {
-    if (previewWall == null) return;
+    if (gameState.previewWall == null) return;
 
-    final rect = _getWallRect(previewWall!);
+    final rect = _getWallRect(
+      Wall(gameState.previewWall!.position, gameState.wallOrientation),
+    );
 
     // Draw glow effect
     final glowPaint = Paint()
