@@ -1,9 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/pages/menu_page.dart';
 import 'package:quoridor/flame/services/local_storage.dart';
 
-import '/flame/pages/game_page.dart';
 import '/theme.dart';
 import 'firebase_options.dart';
 import 'flame/services/localizations.dart';
@@ -58,7 +58,7 @@ class _QuoridorAppState extends State<QuoridorApp> {
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: value ? ThemeMode.dark : ThemeMode.light,
-          home: const GamePage(),
+          home: const MenuPage(),
           debugShowCheckedModeBanner: false,
         );
       },

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/firebase_service.dart';
 import 'game_page.dart';
+import 'online_game_page.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -253,6 +254,57 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     const SizedBox(width: 12),
                     Text(
                       'Start New Game',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Online Game Button
+        SizedBox(
+          width: double.infinity,
+          height: 60,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OnlineGamePage(),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondary,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.secondary.withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.people, size: 28, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Play Online',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
@@ -6,10 +8,12 @@ import 'package:quoridor/flame/services/localizations.dart';
 
 import '/flame/services/sounds.dart';
 import '../components/board_component.dart';
+import '../components/emoji_animation_component.dart';
 import '../constants.dart';
 import '../models/game_state.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
+import '../services/game_session_service.dart';
 
 final isInitializedProvider = ValueNotifier(false);
 
@@ -18,12 +22,21 @@ class QuoridorGame extends FlameGame
   GameState? _gameState;
   late BoardComponent _boardComponent;
   bool _isInitialized = false;
+  final GameSessionService _sessionService = GameSessionService();
+  final String? _sessionId;
+  final bool? _isHost;
+  StreamSubscription? _gameStateSubscription;
+  EmojiAnimationComponent? _currentEmojiAnimation;
 
   Function(GameState)? onGameStateChanged;
   Function(String)? onGameMessage;
   VoidCallback? onGameWon;
+  final VoidCallback? onGameOver;
 
-  QuoridorGame() : super() {
+  QuoridorGame({String? sessionId, bool? isHost, this.onGameOver})
+    : _sessionId = sessionId,
+      _isHost = isHost,
+      super() {
     _gameState = GameStateFactory.createNewGame();
     _boardComponent = BoardComponent(_gameState!);
     _boardComponent.onMoveAttempted = _handleMoveAttempt;
@@ -31,11 +44,34 @@ class QuoridorGame extends FlameGame
     add(_boardComponent);
     _updateUI();
     _isInitialized = true;
+
+    if (_sessionId != null) {
+      _setupOnlineGame();
+    }
+  }
+
+  Future<void> _setupOnlineGame() async {
+    if (_sessionId == null) return;
+
+    // Listen for game state updates
+    _gameStateSubscription = _sessionService.streamGameState(_sessionId).listen(
+      (newState) {
+        if (newState != null && newState != _gameState) {
+          updateGameState(newState);
+        }
+      },
+    );
   }
 
   @override
   Future<void> onLoad() async {
     await GameSounds.preload();
+  }
+
+  @override
+  void onRemove() {
+    _gameStateSubscription?.cancel();
+    super.onRemove();
   }
 
   @override
@@ -48,6 +84,11 @@ class QuoridorGame extends FlameGame
       );
       onGameWon?.call();
       GameSounds.triggerFeedback(soundKey: 'win');
+
+      // End online session if game is over
+      if (_sessionId != null) {
+        await _sessionService.endSession(_sessionId!);
+      }
     }
   }
 
@@ -55,6 +96,11 @@ class QuoridorGame extends FlameGame
     _gameState = newGameState;
     _boardComponent.updateGameState(newGameState);
     _updateUI();
+
+    // Update online game state if in online mode
+    if (_sessionId != null) {
+      _sessionService.updateGameState(_sessionId!, newGameState);
+    }
 
     // Trigger AI move if needed
     if (!_gameState!.isGameOver && _gameState!.currentPlayer.isAI) {
@@ -89,6 +135,17 @@ class QuoridorGame extends FlameGame
       return;
     }
 
+    // In online mode, only allow moves for the current player
+    if (_sessionId != null) {
+      final isPlayer1 = _isHost ?? true; // Default to true if not set
+      final currentPlayerId = _gameState!.currentPlayerId;
+      if ((isPlayer1 && currentPlayerId != 1) ||
+          (!isPlayer1 && currentPlayerId != 2)) {
+        onGameMessage?.call('${AppLocale.itsNotYourTurn}!');
+        return;
+      }
+    }
+
     final move = GameMove.pawnMove(newPosition, _gameState!.currentPlayerId);
 
     if (GameService.isValidMove(_gameState!, move)) {
@@ -103,6 +160,17 @@ class QuoridorGame extends FlameGame
     if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
       onGameMessage?.call(AppLocale.itsNotYourTurn);
       return;
+    }
+
+    // In online mode, only allow wall placement for the current player
+    if (_sessionId != null) {
+      final isPlayer1 = _isHost ?? true; // Default to true if not set
+      final currentPlayerId = _gameState!.currentPlayerId;
+      if ((isPlayer1 && currentPlayerId != 1) ||
+          (!isPlayer1 && currentPlayerId != 2)) {
+        onGameMessage?.call('${AppLocale.itsNotYourTurn}!');
+        return;
+      }
     }
 
     if (!_gameState!.currentPlayer.hasWallsRemaining) {
@@ -267,4 +335,28 @@ class QuoridorGame extends FlameGame
   int get currentPlayerId => gameState.currentPlayerId;
 
   bool get isInitialized => _isInitialized;
+
+  void _handleGameOver() {
+    onGameOver?.call();
+  }
+
+  void showEmojiAnimation(String emoji) {
+    // Remove any existing animation
+    _currentEmojiAnimation?.removeFromParent();
+
+    // Create and add new animation
+    _currentEmojiAnimation = EmojiAnimationComponent(
+      emoji: emoji,
+      gameSize: size,
+    );
+
+    add(_currentEmojiAnimation!);
+    _currentEmojiAnimation!.playAnimation();
+
+    // Remove animation after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      _currentEmojiAnimation?.removeFromParent();
+      _currentEmojiAnimation = null;
+    });
+  }
 }
