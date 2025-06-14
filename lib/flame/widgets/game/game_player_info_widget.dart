@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+
 import '../../services/localizations.dart';
 
 /// A widget that displays information about a player in the game.
@@ -56,11 +57,15 @@ class GamePlayerInfoWidget extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
+                Expanded(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                 ),
                 if (isAI) ...[
@@ -92,12 +97,20 @@ class GamePlayerInfoWidget extends StatelessWidget {
                   ).colorScheme.onSurface.withOpacity(0.7),
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  '$wallsRemaining ${AppLocale.wallsLeft.getString(context)}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withOpacity(0.7),
+                Expanded(
+                  child: Text(
+                    '$wallsRemaining ${AppLocale.wallsLeft.getString(context)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textDirection:
+                        localization.currentLocale?.languageCode == 'ar'
+                        ? TextDirection.rtl
+                        : TextDirection.ltr,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.7),
+                    ),
                   ),
                 ),
               ],

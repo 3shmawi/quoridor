@@ -44,6 +44,8 @@ mixin AppLocale {
   static const String displayOptions = 'displayOptions';
   static const String showValidMoves = 'showValidMoves';
   static const String highlightPossibleMoves = 'highlightPossibleMoves';
+  static const String soundEnabled = 'soundEnabled';
+  static const String soundEnabledSubtitles = 'soundEnabledSubtitles';
   static const String darkMode = 'darkMode';
   static const String toggleDarkMode = 'toggleDarkMode';
   static const String englishMode = 'englishMode';
@@ -122,6 +124,8 @@ mixin AppLocale {
     displayOptions: 'Display Options',
     showValidMoves: 'Show Valid Moves',
     highlightPossibleMoves: 'Highlight possible moves',
+    soundEnabled: 'Sound Enabled',
+    soundEnabledSubtitles: 'Enable sound effects in the game',
     darkMode: 'Dark Mode',
     toggleDarkMode: 'Toggle dark mode',
     englishMode: 'English Mode',
@@ -200,6 +204,8 @@ mixin AppLocale {
     displayOptions: 'خيارات العرض',
     showValidMoves: 'اظهار الحركات الممكنة',
     highlightPossibleMoves: 'تمييز الحركات الممكنة',
+    soundEnabled: 'الصوت مفعل',
+    soundEnabledSubtitles: 'تفعيل الصوت في اللعبة',
     darkMode: 'الوضع الداكن',
     toggleDarkMode: 'تبديل الوضع الداكن',
     englishMode: 'الوضع الانجليزي',

@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/services/local_storage.dart';
 import 'package:quoridor/flame/services/localizations.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_menu_section.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_switch_item.dart';
@@ -34,6 +36,19 @@ class _DrawerDisplayOptionsState extends State<DrawerDisplayOptions> {
     return DrawerMenuSection(
       title: AppLocale.displayOptions.getString(context),
       children: [
+        DrawerSwitchItem(
+          icon: CupertinoIcons.mic,
+          title: AppLocale.soundEnabled.getString(context),
+          subtitle: AppLocale.soundEnabledSubtitles.getString(context),
+          value: CacheHelper.getData(key: "soundEnabled") ?? true,
+          onChanged: () {
+            CacheHelper.saveData(
+              key: "soundEnabled",
+              value: !(CacheHelper.getData(key: "soundEnabled") ?? true),
+            );
+            _closeMenu();
+          },
+        ),
         DrawerSwitchItem(
           icon: Icons.visibility,
           title: AppLocale.showValidMoves.getString(context),

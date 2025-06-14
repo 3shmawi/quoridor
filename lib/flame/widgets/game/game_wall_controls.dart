@@ -15,9 +15,14 @@ import '../../../flame/services/localizations.dart';
 /// - Confirming wall placement
 class GameWallControls extends StatefulWidget {
   final QuoridorGame game;
+  final bool isWideScreen;
 
   /// Creates a new instance of [GameWallControls].
-  const GameWallControls({super.key, required this.game});
+  const GameWallControls({
+    super.key,
+    required this.game,
+    this.isWideScreen = false,
+  });
 
   @override
   State<GameWallControls> createState() => _GameWallControlsState();
@@ -98,57 +103,65 @@ class _GameWallControlsState extends State<GameWallControls> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const SizedBox(width: 8),
-        _buildOrientationButton(context),
-        const Spacer(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              onPressed: () => _handleWallMovement('left'),
-              icon: const Icon(Icons.arrow_back),
-            ),
-            Column(
-              children: [
-                IconButton(
-                  onPressed: () => _handleWallMovement('up'),
-                  icon: const Icon(Icons.arrow_upward),
-                ),
-                IconButton(
-                  onPressed: _confirmWallPlacement,
-                  icon: const Icon(Icons.check, color: Colors.green, size: 28),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    padding: const EdgeInsets.all(12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Colors.green),
-                    ),
+    final children = [
+      const SizedBox(width: 8),
+      Center(child: _buildOrientationButton(context)),
+      if (!widget.isWideScreen) const Spacer(),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            onPressed: () => _handleWallMovement('left'),
+            icon: const Icon(Icons.arrow_back),
+          ),
+          Column(
+            children: [
+              IconButton(
+                onPressed: () => _handleWallMovement('up'),
+                icon: const Icon(Icons.arrow_upward),
+              ),
+              IconButton(
+                onPressed: _confirmWallPlacement,
+                icon: const Icon(Icons.check, color: Colors.green, size: 28),
+                style: IconButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  padding: const EdgeInsets.all(12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Colors.green),
                   ),
                 ),
-                IconButton(
-                  onPressed: () => _handleWallMovement('down'),
-                  icon: const Icon(Icons.arrow_downward),
-                ),
-              ],
-            ),
-            IconButton(
-              onPressed: () => _handleWallMovement('right'),
-              icon: const Icon(Icons.arrow_forward),
-            ),
-          ],
-        ),
-      ],
-    );
+              ),
+              IconButton(
+                onPressed: () => _handleWallMovement('down'),
+                icon: const Icon(Icons.arrow_downward),
+              ),
+            ],
+          ),
+          IconButton(
+            onPressed: () => _handleWallMovement('right'),
+            icon: const Icon(Icons.arrow_forward),
+          ),
+        ],
+      ),
+    ];
+    if (widget.isWideScreen) {
+      return Wrap(
+        alignment: WrapAlignment.center,
+        runAlignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 16,
+        children: children,
+      );
+    }
+    return Row(mainAxisAlignment: MainAxisAlignment.center, children: children);
   }
 
   Widget _buildOrientationButton(BuildContext context) {
     final isVertical =
         widget.game.gameState.wallOrientation == WallOrientation.vertical;
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       spacing: 8,
       children: [
         IconButton(

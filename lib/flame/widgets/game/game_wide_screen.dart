@@ -17,7 +17,7 @@ class GameWideScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
+        Flexible(
           child: Container(
             padding: const EdgeInsets.all(16),
 
@@ -85,61 +85,63 @@ class GameWideScreen extends StatelessWidget {
           ),
         ),
         GameBoard(game),
-        Container(
-          padding: const EdgeInsets.all(16),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.all(16),
 
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border(
-              left: BorderSide(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.2),
-                width: 1,
-              ),
-              top: BorderSide(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.2),
-                width: 1,
-              ),
-              bottom: BorderSide(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.2),
-                width: 1,
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 8,
-                offset: const Offset(2, 0),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Text(
-                "Wall Controls",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              SizedBox(
-                width: 200,
-                child: Divider(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border(
+                left: BorderSide(
                   color: Theme.of(
                     context,
                   ).colorScheme.outline.withValues(alpha: 0.2),
-                  thickness: 1,
-                  height: 20,
+                  width: 1,
+                ),
+                top: BorderSide(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+                bottom: BorderSide(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
+                  width: 1,
                 ),
               ),
-              Spacer(),
-              GameWallControls(game: game),
-            ],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(2, 0),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Text(
+                  "Wall Controls",
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                SizedBox(
+                  width: 200,
+                  child: Divider(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outline.withValues(alpha: 0.2),
+                    thickness: 1,
+                    height: 20,
+                  ),
+                ),
+                Spacer(),
+                GameWallControls(game: game, isWideScreen: true),
+              ],
+            ),
           ),
         ),
       ],

@@ -1,6 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/widgets.dart';
+import 'package:quoridor/flame/services/local_storage.dart';
 
 abstract class GameSounds extends PositionComponent {
   static final Map<String, String> _soundAssets = {
@@ -15,10 +16,13 @@ abstract class GameSounds extends PositionComponent {
     await FlameAudio.audioCache.loadAll(_soundAssets.values.toList());
   }
 
-  static void triggerFeedback({String? soundKey}) {
+  static void triggerFeedback({String? soundKey}) async {
+    if (CacheHelper.getData(key: "soundEnabled") == false) {
+      return; // Sound is disabled in settings
+    }
     if (soundKey != null && _soundAssets.containsKey(soundKey)) {
       try {
-        FlameAudio.play(_soundAssets[soundKey]!);
+        await FlameAudio.play(_soundAssets[soundKey]!);
       } catch (e) {
         debugPrint('Error playing sound: $e');
       }

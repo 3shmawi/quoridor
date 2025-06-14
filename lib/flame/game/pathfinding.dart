@@ -1,7 +1,7 @@
+import 'dart:math' as math;
+
 import '../constants.dart';
 import '../models/game_state.dart';
-import 'dart:math' as math;
-import '../services/sounds.dart';
 
 enum GamePhase { early, mid, late }
 
@@ -85,18 +85,8 @@ class Pathfinding {
               gameState,
             );
 
-            // Play move sound for AI (player 2) if this is a move path
-            if (gameState.currentPlayerId == 2 && selectedPath.isNotEmpty) {
-              GameSounds.triggerFeedback(soundKey: 'move_p2');
-            }
-
             return selectedPath;
           }
-        }
-
-        // Play move sound for AI (player 2) if this is a move path
-        if (gameState.currentPlayerId == 2 && path.isNotEmpty) {
-          GameSounds.triggerFeedback(soundKey: 'move_p2');
         }
 
         return path;
@@ -143,11 +133,6 @@ class Pathfinding {
     // If we have alternative paths but didn't find a direct path, return the best alternative
     if (alternativePaths.isNotEmpty) {
       final bestPath = _selectBestAlternativePath(alternativePaths, gameState);
-
-      // Play move sound for AI (player 2) if this is a move path
-      if (gameState.currentPlayerId == 2 && bestPath.isNotEmpty) {
-        GameSounds.triggerFeedback(soundKey: 'move_p2');
-      }
 
       return bestPath;
     }
@@ -418,14 +403,7 @@ class Pathfinding {
         }
       }
       // If no special strategy was chosen, pick randomly from good walls
-      if (selectedWall == null) {
-        selectedWall = goodWalls[random.nextInt(goodWalls.length)];
-      }
-    }
-
-    // Play wall placement sound for AI (player 2)
-    if (selectedWall != null && playerId == 2) {
-      GameSounds.triggerFeedback(soundKey: 'wall_p2');
+      selectedWall ??= goodWalls[random.nextInt(goodWalls.length)];
     }
 
     return selectedWall;
@@ -720,7 +698,6 @@ class Pathfinding {
     // Check how many potential paths this wall blocks
     for (int row = 0; row < GameConstants.boardSize; row++) {
       for (int col = 0; col < GameConstants.boardSize; col++) {
-        final pos = Position(row, col);
         if (wall.orientation == WallOrientation.horizontal) {
           if (wall.position.row == row &&
               wall.position.col <= col &&

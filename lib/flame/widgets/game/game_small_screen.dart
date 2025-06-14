@@ -18,12 +18,31 @@ class GameSmallScreen extends StatelessWidget {
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        AnimatedCrossFade(
+          firstChild: GameWallControls(game: game),
+          secondChild: SizedBox.shrink(),
+          crossFadeState:
+              !game.gameState.player2.isAI &&
+                  game.gameState.currentPlayer.id == 2
+              ? CrossFadeState.showFirst
+              : CrossFadeState.showSecond,
+          duration: Duration(milliseconds: 500),
+        ),
+
         Expanded(child: GameBoard(game)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Column(
             children: [
-              GameWallControls(game: game),
+              AnimatedCrossFade(
+                firstChild: GameWallControls(game: game),
+                secondChild: SizedBox.shrink(),
+                crossFadeState: game.gameState.currentPlayer.id == 1
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                duration: Duration(milliseconds: 500),
+              ),
+
               IgnorePointer(
                 child: ValueListenableBuilder(
                   valueListenable: isInitializedProvider,
@@ -35,7 +54,7 @@ class GameSmallScreen extends StatelessWidget {
                             crossAxisCount: 2,
                             mainAxisSpacing: 16,
                             crossAxisSpacing: 16,
-                            childAspectRatio: 2.2,
+                            childAspectRatio: 1.6,
                           ),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),

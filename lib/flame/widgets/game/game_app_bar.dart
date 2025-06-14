@@ -50,10 +50,10 @@ class _GameAppBarState extends State<GameAppBar> {
             child: Text(
               AppLocale.title.getString(context),
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.bold,
-              ),
+              textDirection:
+                  Localizations.localeOf(context).languageCode == 'ar'
+                  ? TextDirection.rtl
+                  : TextDirection.ltr,
             ),
           ),
         ),
