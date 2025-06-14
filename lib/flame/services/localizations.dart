@@ -29,6 +29,8 @@ mixin AppLocale {
   static const String twoPlayers = 'twoPlayers';
   static const String playWithAFriendOnTheSameDevice =
       'playWithAFriendOnTheSameDevice';
+  static const String threePlayers = 'threePlayers';
+  static const String fourPlayers = 'fourPlayers';
   static const String wallsLeft = 'wallsLeft';
   static const String player1 = 'player1';
   static const String player2 = 'player2';
@@ -108,6 +110,8 @@ mixin AppLocale {
     playVsAI: 'Play vs AI',
     challengeOurIntelligentAIOpponent: 'Challenge our intelligent AI opponent',
     twoPlayers: 'Two Players',
+    threePlayers: 'Three Players',
+    fourPlayers: 'Four Players',
     playWithAFriendOnTheSameDevice: 'Play with a friend on the same device',
     wallsLeft: 'walls left',
     player1: 'Player 1',
@@ -188,6 +192,8 @@ mixin AppLocale {
     playVsAI: 'العب ضد الذكاء الصنعي',
     challengeOurIntelligentAIOpponent: 'تحدي الذكاء الصناعي الذي يتمتع بالذكاء',
     twoPlayers: 'لاعبان',
+    threePlayers: 'ثلاثة لاعبين',
+    fourPlayers: 'أربعة لاعبين',
     playWithAFriendOnTheSameDevice: 'العب مع صديق على نفس الجهاز',
     wallsLeft: 'الحواجز المتبقية',
     player1: 'اللاعب 1',

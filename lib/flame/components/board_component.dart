@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '/flame/components/player_components.dart';
 import '/flame/services/sounds.dart';
 import '/theme.dart';
-import '../constants.dart';
+import '../core/constants.dart';
 import '../models/game_state.dart';
 import 'wall_component.dart';
 
@@ -141,7 +141,9 @@ class BoardComponent extends PositionComponent {
     // If no player is selected, check for player selection first
     if (cellPosition != null) {
       final currentPlayerPosition = _gameState.currentPlayer.position;
-      final otherPlayerPosition = _gameState.otherPlayer.position;
+      final otherPlayerPosition = _gameState.players
+          .firstWhere((player) => player.id != _gameState.currentPlayer.id)
+          .position;
 
       debugPrint('Cell tap detected:');
       debugPrint(
@@ -155,8 +157,7 @@ class BoardComponent extends PositionComponent {
       );
 
       // Check if we're tapping on either player
-      if (cellPosition == currentPlayerPosition ||
-          cellPosition == otherPlayerPosition) {
+      if (_gameState.players.any((player) => player.position == cellPosition)) {
         debugPrint('- Tapped on player at position');
         _handlePositionTap(cellPosition);
         return;

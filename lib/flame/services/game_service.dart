@@ -1,13 +1,16 @@
-import '../../flame/constants.dart';
 import '../../flame/game/pathfinding.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/models/player.dart';
+import '../core/constants.dart';
 import 'ai_service.dart';
 
 class GameService {
   // Validate if a move is legal
   static bool isValidMove(GameState gameState, GameMove move) {
-    final player = move.playerId == 1 ? gameState.player1 : gameState.player2;
+    final player = gameState.players.firstWhere(
+      (p) => p.id == move.playerId,
+      orElse: () => throw ArgumentError('Invalid player ID'),
+    );
 
     if (move.type == MoveType.pawnMove) {
       return _isValidPawnMove(gameState, player, move.newPosition!);
@@ -25,8 +28,7 @@ class GameService {
     // Create a new game state (immutable approach)
     final newGameState = GameState(
       gameId: gameState.gameId,
-      player1: gameState.player1,
-      player2: gameState.player2,
+      players: List.from(gameState.players),
       walls: List.from(gameState.walls),
       currentPlayerId: gameState.currentPlayerId,
       status: gameState.status,
@@ -159,27 +161,25 @@ class GameService {
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
 
     // Check if both players still have valid paths
-    final player1Path = Pathfinding.findShortestPath(
-      tempGameState,
-      tempGameState.player1.position,
-      tempGameState.player1.goalRow,
-    );
-
-    final player2Path = Pathfinding.findShortestPath(
-      tempGameState,
-      tempGameState.player2.position,
-      tempGameState.player2.goalRow,
-    );
+    for (final player in tempGameState.players) {
+      final playerPath = Pathfinding.findShortestPath(
+        tempGameState,
+        player.position,
+        player.goalRow,
+      );
+      if (playerPath == null) {
+        return false;
+      }
+    }
 
     // Wall is valid if both players still have a path to their goal
-    return player1Path != null && player2Path != null;
+    return true;
   }
 
   static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
     return GameState(
       gameId: original.gameId,
-      player1: original.player1,
-      player2: original.player2,
+      players: original.players,
       walls: [...original.walls, wall],
       currentPlayerId: original.currentPlayerId,
       status: original.status,
@@ -276,15 +276,12 @@ enum GamePhase { opening, midgame, endgame }
 // Utility class for game creation and management
 class GameManager {
   static GameState createNewGame({
-    String player1Name = 'Player 1',
-    String player2Name = 'AI',
-    bool enableAI = true,
+    GameMode gameMode = GameMode.twoPlayers,
     AIDifficulty aiDifficulty = AIDifficulty.medium,
   }) {
     return GameStateFactory.createNewGame(
-      player1Name: player1Name,
-      player2Name: player2Name,
-      player2IsAI: enableAI,
+      gameMode: gameMode,
+      aiDifficulty: aiDifficulty,
     );
   }
 

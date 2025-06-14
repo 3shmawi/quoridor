@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:quoridor/flame/game/quoridor_game.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/game/quoridor_game.dart';
+
+import '../../core/constants.dart';
+import '../../models/game_state.dart';
 import '../../services/localizations.dart';
 import '../app/copywrite.dart';
 
@@ -67,11 +70,11 @@ class GameModeSelection extends StatelessWidget {
                   subtitle: AppLocale.challengeOurIntelligentAIOpponent
                       .getString(context),
                   onTap: () {
-                    if (!game.gameState.player2.isAI) {
-                      game.togglePlayerMode();
-                    } else {
-                      game.updateGameState(game.gameState);
-                    }
+                    game.updateGameState(
+                      GameStateFactory.createNewGame(
+                        gameMode: GameMode.aiVsPlayer,
+                      ),
+                    );
 
                     Navigator.pop(context);
                     onMessage?.call(AppLocale.aiModeActivated);
@@ -86,11 +89,50 @@ class GameModeSelection extends StatelessWidget {
                     context,
                   ),
                   onTap: () {
-                    if (game.gameState.player2.isAI) {
-                      game.togglePlayerMode();
-                    } else {
-                      game.updateGameState(game.gameState);
-                    }
+                    game.updateGameState(
+                      GameStateFactory.createNewGame(
+                        gameMode: GameMode.twoPlayers,
+                      ),
+                    );
+
+                    Navigator.pop(context);
+                    onMessage?.call(AppLocale.twoPlayerModeActivated);
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildModeCard(
+                  context,
+                  icon: Icons.groups,
+                  title: AppLocale.threePlayers.getString(context),
+                  subtitle: AppLocale.playWithAFriendOnTheSameDevice.getString(
+                    context,
+                  ),
+                  onTap: () {
+                    game.updateGameState(
+                      GameStateFactory.createNewGame(
+                        gameMode: GameMode.threePlayers,
+                      ),
+                    );
+
+                    Navigator.pop(context);
+                    onMessage?.call(AppLocale.twoPlayerModeActivated);
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildModeCard(
+                  context,
+                  icon: Icons.groups,
+                  title: AppLocale.fourPlayers.getString(context),
+                  subtitle: AppLocale.playWithAFriendOnTheSameDevice.getString(
+                    context,
+                  ),
+                  onTap: () {
+                    game.updateGameState(
+                      GameStateFactory.createNewGame(
+                        gameMode: GameMode.fourPlayers,
+                      ),
+                    );
+
                     Navigator.pop(context);
                     onMessage?.call(AppLocale.twoPlayerModeActivated);
                   },

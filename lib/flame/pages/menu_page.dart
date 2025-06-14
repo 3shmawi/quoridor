@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:quoridor/flame/widgets/game/game_info_dialog.dart';
 
 import '../../flame/models/game_state.dart';
 import '../../flame/services/firebase_service.dart';
+import '../models/player.dart';
 import 'game_page.dart';
 
 class MenuPage extends StatefulWidget {
@@ -88,7 +90,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   void _showAbout() {
-    showDialog(context: context, builder: (context) => _buildAboutDialog());
+    showDialog(context: context, builder: (context) => GameInfoDialog());
   }
 
   @override
@@ -384,75 +386,75 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: () => _loadGame(gameState),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Game Status Icon
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  isGameOver ? Icons.emoji_events : Icons.play_circle_outline,
-                  color: statusColor,
-                  size: 24,
-                ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Game Status Icon
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
-
-              const SizedBox(width: 16),
-
-              // Game Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      statusText,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${gameState.player1.name} vs ${gameState.player2.name}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatGameTime(gameState.updatedAt),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withOpacity(0.5),
-                      ),
-                    ),
-                  ],
-                ),
+              child: Icon(
+                isGameOver ? Icons.emoji_events : Icons.play_circle_outline,
+                color: statusColor,
+                size: 24,
               ),
+            ),
 
-              // Arrow Icon
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+            const SizedBox(width: 16),
+
+            // Game Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    statusText,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    vs(gameState.players),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatGameTime(gameState.updatedAt),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+
+            // Arrow Icon
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String vs(List<Player> players) {
+    return players.map((p) => p.name).join(' vs ');
   }
 
   Widget _buildGameInfo() {
@@ -511,73 +513,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAboutDialog() {
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.info, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 8),
-          const Text('About Quoridor'),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Quoridor is a strategic board game where two players race to reach the opposite side while placing walls to block each other.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            _buildAboutSection(
-              '🎯 Objective',
-              'Be the first to reach the opposite side of the 9×9 board.',
-            ),
-            _buildAboutSection(
-              '🎮 Gameplay',
-              'On each turn, move your pawn or place a wall. You have 10 walls to use strategically.',
-            ),
-            _buildAboutSection(
-              '🧠 Strategy',
-              'Balance between advancing toward your goal and blocking your opponent\'s path.',
-            ),
-            _buildAboutSection(
-              '🤖 AI Opponent',
-              'Challenge yourself against AI with Easy, Medium, or Hard difficulty levels.',
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Got it!'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAboutSection(String title, String content) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(content, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

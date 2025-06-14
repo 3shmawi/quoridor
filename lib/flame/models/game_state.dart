@@ -1,15 +1,16 @@
 import 'package:quoridor/flame/services/ai_service.dart';
 
-import '../../flame/constants.dart';
+import '../core/constants.dart';
 import 'player.dart';
 
 class GameState {
   final String gameId;
-  final Player player1;
-  final Player player2;
+  final List<Player> players;
   final List<Wall> walls;
   int currentPlayerId;
   GameStatus status;
+  GameMode gameMode;
+
   AIDifficulty aiDifficulty;
   final DateTime createdAt;
   DateTime updatedAt;
@@ -20,11 +21,11 @@ class GameState {
 
   GameState({
     required this.gameId,
-    required this.player1,
-    required this.player2,
+    required this.players,
     List<Wall>? walls,
     this.currentPlayerId = 1,
     this.status = GameStatus.playing,
+    this.gameMode = GameMode.aiVsPlayer,
     this.aiDifficulty = AIDifficulty.medium,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -37,9 +38,8 @@ class GameState {
        updatedAt = updatedAt ?? DateTime.now(),
        moveHistory = moveHistory ?? [];
 
-  Player get currentPlayer => currentPlayerId == 1 ? player1 : player2;
-
-  Player get otherPlayer => currentPlayerId == 1 ? player2 : player1;
+  Player get currentPlayer =>
+      players.firstWhere((player) => player.id == currentPlayerId);
 
   bool get isGameOver => status != GameStatus.playing;
 
@@ -55,14 +55,10 @@ class GameState {
     updatedAt = DateTime.now();
   }
 
-  Player get firstPlayer => player1;
-
-  Player get secondPlayer => player2;
-
-  bool get isAi => player2.isAI;
+  bool get isAi => players[1].isAI;
 
   set toggleAi(bool isAI) {
-    player2.copyWith(isAI: isAI);
+    players[1].copyWith(isAI: isAI);
     updatedAt = DateTime.now();
   }
 
@@ -83,16 +79,36 @@ class GameState {
   String? get winner {
     switch (status) {
       case GameStatus.player1Won:
-        return player1.name;
+        return players[0].name;
       case GameStatus.player2Won:
-        return player2.name;
+        return players[1].name;
+      case GameStatus.player3Won:
+        return players[2].name;
+      case GameStatus.player4Won:
+        return players[3].name;
       default:
         return null;
     }
   }
 
   void switchTurn() {
-    currentPlayerId = currentPlayerId == 1 ? 2 : 1;
+    if (players.length > 1) {
+      currentPlayerId = currentPlayerId == 1 ? 2 : 1;
+    } else if (players.length > 2) {
+      currentPlayerId = currentPlayerId == 1
+          ? 2
+          : currentPlayerId == 2
+          ? 3
+          : 1;
+    } else if (players.length > 3) {
+      currentPlayerId = currentPlayerId == 1
+          ? 2
+          : currentPlayerId == 2
+          ? 3
+          : currentPlayerId == 3
+          ? 4
+          : 1;
+    }
     updatedAt = DateTime.now();
   }
 
@@ -108,10 +124,14 @@ class GameState {
   }
 
   void checkWinCondition() {
-    if (player1.hasReachedGoal) {
+    if (players[0].hasReachedGoal) {
       status = GameStatus.player1Won;
-    } else if (player2.hasReachedGoal) {
+    } else if (players[1].hasReachedGoal) {
       status = GameStatus.player2Won;
+    } else if (players.length > 2 && players[2].hasReachedGoal) {
+      status = GameStatus.player3Won;
+    } else if (players.length > 3 && players[3].hasReachedGoal) {
+      status = GameStatus.player4Won;
     }
     updatedAt = DateTime.now();
   }
@@ -122,7 +142,12 @@ class GameState {
   }
 
   bool isPositionOccupied(Position position) {
-    return player1.position == position || player2.position == position;
+    for (final player in players) {
+      if (player.position == position) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool isWallBlocking(Position from, Position to) {
@@ -236,11 +261,11 @@ class GameState {
 
   Map<String, dynamic> toJson() => {
     'gameId': gameId,
-    'player1': player1.toJson(),
-    'player2': player2.toJson(),
+    'players': players.map((p) => p.toJson()).toList(),
     'walls': walls.map((w) => w.toJson()).toList(),
     'currentPlayerId': currentPlayerId,
     'status': status.index,
+    'gameMode': gameMode.index,
     'aiDifficulty': aiDifficulty.index,
     "showValidMoves": showValidMoves,
     'createdAt': createdAt.millisecondsSinceEpoch,
@@ -250,11 +275,11 @@ class GameState {
 
   static GameState fromJson(Map<String, dynamic> json) => GameState(
     gameId: json['gameId'] as String,
-    player1: Player.fromJson(json['player1']),
-    player2: Player.fromJson(json['player2']),
+    players: (json['players'] as List).map((p) => Player.fromJson(p)).toList(),
     walls: (json['walls'] as List).map((w) => Wall.fromJson(w)).toList(),
     currentPlayerId: json['currentPlayerId'] as int,
     status: GameStatus.values[json['status'] as int],
+    gameMode: GameMode.values[json['gameMode'] as int],
     aiDifficulty: AIDifficulty.values[json['aiDifficulty'] as int],
     showValidMoves: json['showValidMoves'] as bool? ?? true,
     createdAt: DateTime.fromMillisecondsSinceEpoch(json['createdAt'] as int),
@@ -271,17 +296,35 @@ class GameStateFactory {
     String? gameId,
     String player1Name = 'Player 1',
     String player2Name = 'Player 2',
-    bool player2IsAI = true,
+    String player3Name = 'Player 3',
+    String player4Name = 'Player 4',
+    required GameMode gameMode,
+    AIDifficulty aiDifficulty = AIDifficulty.medium,
   }) {
     gameId ??= 'game_${DateTime.now().millisecondsSinceEpoch}';
+    final players = <Player>[];
+    switch (gameMode) {
+      case GameMode.aiVsPlayer:
+        players.add(PlayerFactory.createPlayer1(name: player1Name));
+        players.add(PlayerFactory.createPlayer2(name: "AI", isAI: true));
+      case GameMode.twoPlayers:
+        players.add(PlayerFactory.createPlayer1(name: player1Name));
+        players.add(PlayerFactory.createPlayer2(name: player2Name));
+      case GameMode.threePlayers:
+        players.add(PlayerFactory.createPlayer1(name: player1Name));
+        players.add(PlayerFactory.createPlayer2(name: player2Name));
+        players.add(PlayerFactory.createPlayer3(name: player3Name));
+      case GameMode.fourPlayers:
+        players.add(PlayerFactory.createPlayer1(name: player1Name));
+        players.add(PlayerFactory.createPlayer2(name: player2Name));
+        players.add(PlayerFactory.createPlayer3(name: player3Name));
+        players.add(PlayerFactory.createPlayer4(name: player4Name));
+    }
 
     return GameState(
       gameId: gameId,
-      player1: PlayerFactory.createPlayer1(name: player1Name),
-      player2: PlayerFactory.createPlayer2(
-        name: player2Name,
-        isAI: player2IsAI,
-      ),
+      players: players,
+      aiDifficulty: aiDifficulty,
     );
   }
 }

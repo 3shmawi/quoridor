@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import '../constants.dart';
+import '../core/constants.dart';
 import '../models/game_state.dart';
 
 enum GamePhase { early, mid, late }
@@ -152,8 +152,8 @@ class Pathfinding {
 
       // Prefer paths that maintain distance from opponent
       final opponentPos = gameState.currentPlayerId == 1
-          ? gameState.player2.position
-          : gameState.player1.position;
+          ? gameState.players[1].position
+          : gameState.players[0].position;
 
       for (final pos in path) {
         final distance = math.sqrt(
@@ -191,14 +191,14 @@ class Pathfinding {
     // Check if both players still have valid paths
     final player1Path = findShortestPath(
       tempGameState,
-      tempGameState.player1.position,
-      tempGameState.player1.goalRow,
+      tempGameState.players[0].position,
+      tempGameState.players[0].goalRow,
     );
 
     final player2Path = findShortestPath(
       tempGameState,
-      tempGameState.player2.position,
-      tempGameState.player2.goalRow,
+      tempGameState.players[1].position,
+      tempGameState.players[1].goalRow,
     );
 
     return player1Path == null || player2Path == null;
@@ -208,14 +208,14 @@ class Pathfinding {
   static Map<int, int> calculatePathLengths(GameState gameState) {
     final player1Path = findShortestPath(
       gameState,
-      gameState.player1.position,
-      gameState.player1.goalRow,
+      gameState.players[0].position,
+      gameState.players[0].goalRow,
     );
 
     final player2Path = findShortestPath(
       gameState,
-      gameState.player2.position,
-      gameState.player2.goalRow,
+      gameState.players[1].position,
+      gameState.players[1].goalRow,
     );
 
     return {1: player1Path?.length ?? 999, 2: player2Path?.length ?? 999};
@@ -271,8 +271,8 @@ class Pathfinding {
     GameState gameState,
   ) {
     final opponentPos = gameState.currentPlayerId == 1
-        ? gameState.player2.position
-        : gameState.player1.position;
+        ? gameState.players[1].position
+        : gameState.players[0].position;
 
     final distance = math.sqrt(
       math.pow(position.row - opponentPos.row, 2) +
@@ -300,11 +300,11 @@ class Pathfinding {
   }) {
     final opponentId = playerId == 1 ? 2 : 1;
     final opponentPos = opponentId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
+        ? gameState.players[0].position
+        : gameState.players[1].position;
     final opponentGoal = opponentId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
+        ? gameState.players[0].goalRow
+        : gameState.players[1].goalRow;
 
     // Get current opponent path length
     final currentPath = findShortestPath(gameState, opponentPos, opponentGoal);
@@ -546,11 +546,11 @@ class Pathfinding {
     // Check if wall placement creates alternative paths for self
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
     final selfPos = gameState.currentPlayerId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
+        ? gameState.players[0].position
+        : gameState.players[1].position;
     final selfGoal = gameState.currentPlayerId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
+        ? gameState.players[0].goalRow
+        : gameState.players[1].goalRow;
 
     final paths = _findMultiplePaths(tempGameState, selfPos, selfGoal);
     return paths.length > 1;
@@ -591,11 +591,11 @@ class Pathfinding {
   static bool _blocksShortestPath(Wall wall, GameState gameState) {
     final opponentId = gameState.currentPlayerId == 1 ? 2 : 1;
     final opponentPos = opponentId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
+        ? gameState.players[0].position
+        : gameState.players[1].position;
     final opponentGoal = opponentId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
+        ? gameState.players[0].goalRow
+        : gameState.players[1].goalRow;
 
     final originalPath = findShortestPath(gameState, opponentPos, opponentGoal);
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
@@ -609,11 +609,11 @@ class Pathfinding {
   static bool _forcesLongerPath(Wall wall, GameState gameState) {
     final opponentId = gameState.currentPlayerId == 1 ? 2 : 1;
     final opponentPos = opponentId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
+        ? gameState.players[0].position
+        : gameState.players[1].position;
     final opponentGoal = opponentId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
+        ? gameState.players[0].goalRow
+        : gameState.players[1].goalRow;
 
     final originalPath = findShortestPath(gameState, opponentPos, opponentGoal);
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
@@ -639,8 +639,7 @@ class Pathfinding {
   static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
     return GameState(
       gameId: original.gameId,
-      player1: original.player1,
-      player2: original.player2,
+      players: List.from(original.players),
       walls: [...original.walls, wall],
       currentPlayerId: original.currentPlayerId,
       status: original.status,

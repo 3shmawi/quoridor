@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
 
-import '../../../flame/constants.dart';
 import '../../../flame/services/localizations.dart';
+import '../../core/constants.dart';
 
 /// A widget for controlling wall placement in the game.
 ///

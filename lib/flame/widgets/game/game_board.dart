@@ -2,7 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import '../../components/board_component.dart';
-import '../../constants.dart';
+import '../../core/constants.dart';
 import '../../game/quoridor_game.dart';
 
 class GameBoard extends StatelessWidget {

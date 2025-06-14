@@ -6,7 +6,7 @@ import 'package:quoridor/flame/services/localizations.dart';
 
 import '/flame/services/sounds.dart';
 import '../components/board_component.dart';
-import '../constants.dart';
+import '../core/constants.dart';
 import '../models/game_state.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
@@ -24,7 +24,7 @@ class QuoridorGame extends FlameGame
   VoidCallback? onGameWon;
 
   QuoridorGame() : super() {
-    _gameState = GameStateFactory.createNewGame();
+    _gameState = GameStateFactory.createNewGame(gameMode: GameMode.fourPlayers);
     _boardComponent = BoardComponent(_gameState!);
     _boardComponent.onMoveAttempted = _handleMoveAttempt;
     _boardComponent.onWallPlaceAttempted = handleWallPlaceAttempt;
@@ -66,12 +66,12 @@ class QuoridorGame extends FlameGame
 
   Future<void> _executeAIMove() async {
     // Add delay for better UX
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(seconds: 1));
 
     try {
       final newGameState = await GameService.executeAITurn(
         _gameState!,
-        AIDifficulty.medium,
+        gameState.aiDifficulty,
       );
 
       if (newGameState != _gameState) {
@@ -151,7 +151,9 @@ class QuoridorGame extends FlameGame
 
   // Game control methods
   void newGame() {
-    updateGameState(GameStateFactory.createNewGame());
+    updateGameState(
+      GameStateFactory.createNewGame(gameMode: gameState.gameMode),
+    );
     onGameMessage?.call(AppLocale.newGameStarted);
   }
 
@@ -185,8 +187,12 @@ class QuoridorGame extends FlameGame
     // Switch between AI and human player 2
     final newGameState = GameState(
       gameId: _gameState!.gameId,
-      player1: _gameState!.player1,
-      player2: _gameState!.player2.copyWith(isAI: !_gameState!.player2.isAI),
+      players: [
+        _gameState!.players[0],
+        _gameState!.players[1].copyWith(isAI: !_gameState!.players[1].isAI),
+        _gameState!.players[2],
+        _gameState!.players[3],
+      ],
       walls: _gameState!.walls,
       currentPlayerId: _gameState!.currentPlayerId,
       status: _gameState!.status,
@@ -197,7 +203,7 @@ class QuoridorGame extends FlameGame
 
     updateGameState(newGameState);
     onGameMessage?.call(
-      newGameState.player2.isAI
+      newGameState.players[1].isAI
           ? AppLocale.switchedToAI
           : AppLocale.switchedToTwoPlayers,
     );

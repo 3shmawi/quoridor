@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:quoridor/flame/components/board_component.dart';
 import 'package:quoridor/theme.dart';
 
-import '/flame/constants.dart';
 import '/flame/models/game_state.dart';
+import '../core/constants.dart';
 
 class WallComponent extends PositionComponent {
   GameState gameState;

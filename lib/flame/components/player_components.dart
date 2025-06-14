@@ -2,7 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 import '/flame/components/board_component.dart';
-import '../constants.dart';
+import '../core/constants.dart';
 import '../models/game_state.dart';
 
 class PlayerComponent extends PositionComponent {
@@ -25,20 +25,14 @@ class PlayerComponent extends PositionComponent {
 
   void _drawPlayers(Canvas canvas) {
     // Draw player 1
-    _drawPlayer(
-      canvas: canvas,
-      position: gameState.player1.position,
-      color: const Color(GameConstants.player1Color),
-      playerId: 1,
-    );
-
-    // Draw player 2
-    _drawPlayer(
-      canvas: canvas,
-      position: gameState.player2.position,
-      color: const Color(GameConstants.player2Color),
-      playerId: 2,
-    );
+    for (final player in gameState.players) {
+      _drawPlayer(
+        canvas: canvas,
+        position: player.position,
+        color: Color(player.playerColor),
+        playerId: player.id,
+      );
+    }
   }
 
   void _drawPlayer({

@@ -1,19 +1,20 @@
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/core/dimensions.dart';
 import 'package:quoridor/flame/widgets/game/game_celebrate.dart';
 import 'package:quoridor/flame/widgets/game/game_message_toast.dart';
 import 'package:quoridor/flame/widgets/game/game_small_screen.dart';
 import 'package:quoridor/flame/widgets/game/game_wide_screen.dart';
 
 import '/flame/components/board_component.dart';
-import '/flame/constants.dart';
 import '/flame/widgets/game/game_drawer.dart';
 import '/flame/widgets/game/game_mode_selection.dart';
-import '../services/localizations.dart';
 import '../../flame/game/quoridor_game.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/firebase_service.dart';
+import '../core/constants.dart';
+import '../services/localizations.dart';
 import '../widgets/game/game_app_bar.dart';
 
 class GamePage extends StatefulWidget {
@@ -65,56 +66,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void _initializeGame() {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final totalSpacing =
-        (GameConstants.boardSize - 1) * GameConstants.cellSpacing;
-    final totalPadding = GameConstants.boardPadding * 2;
-
-    // Define breakpoints for different screen sizes
-    final isWideScreen = screenWidth > 700;
-    final isExtraWideScreen = screenWidth > 1200;
-
-    // Calculate available width based on screen size
-    double availableWidth;
-    if (isExtraWideScreen) {
-      // For extra wide screens, reserve more space for the sidebar
-      availableWidth = screenWidth - totalPadding - totalSpacing - 400;
-    } else if (isWideScreen) {
-      // For wide screens, reserve some space for the sidebar
-      availableWidth = screenWidth - totalPadding - totalSpacing - 300;
-    } else {
-      // For mobile/tablet, use full width minus padding
-      availableWidth = screenWidth - totalPadding - totalSpacing;
-    }
-
-    // Calculate available height
-    // Reserve space for app bar, player info (if not in sidebar), and message toast
-    final appBarHeight = 64.0; // Standard app bar height
-    final playerInfoHeight = isWideScreen
-        ? 0.0
-        : 100.0; // Height of player info when at bottom
-    final messageToastHeight = 60.0; // Height for message toast
-    final bottomPadding = 20.0; // Additional bottom padding
-    final availableHeight =
-        screenHeight -
-        appBarHeight -
-        playerInfoHeight -
-        messageToastHeight -
-        bottomPadding;
-
-    // Calculate cell size based on both width and height
-    final widthBasedCellSize = availableWidth / GameConstants.boardSize;
-    final heightBasedCellSize = availableHeight / GameConstants.boardSize;
-
-    // Use the smaller of the two to ensure the board fits both dimensions
-    final rawCellSize = widthBasedCellSize < heightBasedCellSize
-        ? widthBasedCellSize
-        : heightBasedCellSize;
-
-    // Apply minimum and maximum constraints
-    final minCellSize = 30.0; // Minimum cell size for playability
-    final maxCellSize = 60.0; // Maximum cell size for aesthetics
-    final cellSize = rawCellSize.clamp(minCellSize, maxCellSize);
-
+    final cellSize = GameBoardDimensions(
+      screenHeight: screenHeight,
+      screenWidth: screenWidth,
+    ).calculateCellSize();
     cellSizeNotifier.value = cellSize;
     _game = QuoridorGame();
 
@@ -233,8 +188,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) =>
-          GameModeSelection(game: _game, onMessage: _showGameMessage),
+      isDismissible: false,
+      useRootNavigator: false,
+      enableDrag: false,
+      requestFocus: true,
+      showDragHandle: false,
+
+      builder: (context) => PopScope(
+        canPop: false, // Prevents back button
+        child: GameModeSelection(game: _game, onMessage: _showGameMessage),
+      ),
     );
   }
 
@@ -244,55 +207,12 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       builder: (context, constraints) {
         final screenWidth = constraints.maxWidth;
         final screenHeight = constraints.maxHeight;
-        final totalSpacing =
-            (GameConstants.boardSize - 1) * GameConstants.cellSpacing;
-        final totalPadding = GameConstants.boardPadding * 2;
-
-        // Define breakpoints for different screen sizes
-        final isWideScreen = screenWidth > 700;
-        final isExtraWideScreen = screenWidth > 1200;
-
-        // Calculate available width based on screen size
-        double availableWidth;
-        if (isExtraWideScreen) {
-          // For extra wide screens, reserve more space for the sidebar
-          availableWidth = screenWidth - totalPadding - totalSpacing - 400;
-        } else if (isWideScreen) {
-          // For wide screens, reserve some space for the sidebar
-          availableWidth = screenWidth - totalPadding - totalSpacing - 300;
-        } else {
-          // For mobile/tablet, use full width minus padding
-          availableWidth = screenWidth - totalPadding - totalSpacing;
-        }
-
-        // Calculate available height
-        // Reserve space for app bar, player info (if not in sidebar), and message toast
-        final appBarHeight = 64.0; // Standard app bar height
-        final playerInfoHeight = isWideScreen
-            ? 0.0
-            : 100.0; // Height of player info when at bottom
-        final messageToastHeight = 60.0; // Height for message toast
-        final bottomPadding = 20.0; // Additional bottom padding
-        final availableHeight =
-            screenHeight -
-            appBarHeight -
-            playerInfoHeight -
-            messageToastHeight -
-            bottomPadding;
-
-        // Calculate cell size based on both width and height
-        final widthBasedCellSize = availableWidth / GameConstants.boardSize;
-        final heightBasedCellSize = availableHeight / GameConstants.boardSize;
-
-        // Use the smaller of the two to ensure the board fits both dimensions
-        final rawCellSize = widthBasedCellSize < heightBasedCellSize
-            ? widthBasedCellSize
-            : heightBasedCellSize;
-
-        // Apply minimum and maximum constraints
-        final minCellSize = 30.0; // Minimum cell size for playability
-        final maxCellSize = 60.0; // Maximum cell size for aesthetics
-        final cellSize = rawCellSize.clamp(minCellSize, maxCellSize);
+        final dimensions = GameBoardDimensions(
+          screenHeight: screenHeight,
+          screenWidth: screenWidth,
+        );
+        final isWideScreen = dimensions.isWideScreen;
+        final cellSize = dimensions.calculateCellSize();
 
         cellSizeNotifier.value = cellSize;
 

@@ -3,14 +3,15 @@ import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
-import '../../flame/constants.dart';
 import '../../flame/game/pathfinding.dart';
 import '../../flame/models/game_state.dart';
+import '../core/constants.dart';
 
 enum AIDifficulty { easy, medium, hard }
 
 class AIService {
-  static const String _apiKey = 'EM0CslaVtzEsqKb6wNCk-4628bc90f1fb9205d2d0abf780b59f878985d392ff52eca5dc175fe755fa7352';
+  static const String _apiKey =
+      'EM0CslaVtzEsqKb6wNCk-4628bc90f1fb9205d2d0abf780b59f878985d392ff52eca5dc175fe755fa7352';
   static const String _apiUrl = 'https://api.openai.com/v1/chat/completions';
 
   // Generate AI move using OpenAI strategy analysis
@@ -88,7 +89,9 @@ Analyze the game state and recommend the optimal move as a JSON object with the 
   static String _analyzeGameState(GameState gameState) {
     final pathLengths = Pathfinding.calculatePathLengths(gameState);
     final currentPlayer = gameState.currentPlayer;
-    final opponent = gameState.otherPlayer;
+    final opponent = gameState.players.firstWhere(
+      (p) => p.id != currentPlayer.id,
+    );
 
     return '''
 Current Game State Analysis:
@@ -177,7 +180,6 @@ Provide your recommendation as a JSON object.
     GameState gameState,
     AIDifficulty difficulty,
   ) {
-    final currentPlayer = gameState.currentPlayer;
     final pathLengths = Pathfinding.calculatePathLengths(gameState);
 
     // Basic AI logic based on difficulty
@@ -220,7 +222,10 @@ Provide your recommendation as a JSON object.
     Map<int, int> pathLengths,
   ) {
     final currentPlayer = gameState.currentPlayer;
-    final opponentPathLength = pathLengths[gameState.otherPlayer.id]!;
+    final opponentPathLength =
+        pathLengths[gameState.players
+            .firstWhere((p) => p.id != currentPlayer.id)
+            .id]!;
     final playerPathLength = pathLengths[currentPlayer.id]!;
 
     // Consider wall placement if opponent is close to winning
@@ -242,7 +247,10 @@ Provide your recommendation as a JSON object.
 
   static GameMove _getHardMove(GameState gameState, Map<int, int> pathLengths) {
     final currentPlayer = gameState.currentPlayer;
-    final opponentPathLength = pathLengths[gameState.otherPlayer.id]!;
+    final opponentPathLength =
+        pathLengths[gameState.players
+            .firstWhere((p) => p.id != currentPlayer.id)
+            .id]!;
     final playerPathLength = pathLengths[currentPlayer.id]!;
 
     // Advanced strategy: Use walls more strategically
@@ -303,14 +311,13 @@ Provide your recommendation as a JSON object.
     int shortestPath = 999;
 
     for (final move in validMoves) {
+      final players = gameState.players.map((p) {
+        return p.id == currentPlayer.id ? p.copyWith(position: move) : p;
+      }).toList();
       final tempGameState = GameState(
         gameId: gameState.gameId,
-        player1: gameState.currentPlayerId == 1
-            ? gameState.player1.copyWith(position: move)
-            : gameState.player1,
-        player2: gameState.currentPlayerId == 2
-            ? gameState.player2.copyWith(position: move)
-            : gameState.player2,
+        players: players,
+
         walls: gameState.walls,
         currentPlayerId: gameState.currentPlayerId,
         status: gameState.status,

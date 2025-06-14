@@ -3,7 +3,9 @@
 class GameConstants {
   // Board dimensions
   static const int boardSize = 9;
-  static const int maxWallsPerPlayer = 10;
+  static final int maxWallsPerPlayer = playersStartPositions.length == 2
+      ? 10
+      : 5; // 10 walls per player
 
   // Cell dimensions for rendering
   // static const double cellSize = 40.0;
@@ -11,6 +13,7 @@ class GameConstants {
   static const double boardPadding = 10.0;
   static const double goalLineThickness = 4.0;
   static const double wallThickness = 6.0;
+
   // static const double wallLength = cellSize * 2 + wallThickness;
 
   // Board colors
@@ -18,12 +21,18 @@ class GameConstants {
   static const int darkCellColor = 0xFFE5E7EB;
   static const int player1Color = 0xFF6F61EF;
   static const int player2Color = 0xFF39D2C0;
+  static const int player3Color = 0xFFF9A826;
+  static const int player4Color = 0xFFEF6F61;
   static const int wallColor = 0xFF15161E;
   static const int validMoveColor = 0xFFEE8B60;
 
   // Player starting positions
-  static const Position player1Start = Position(8, 4);
-  static const Position player2Start = Position(0, 4);
+  static const List<Position> playersStartPositions = [
+    Position(8, 4), // Player 1 starting position
+    Position(0, 4), // Player 2 starting position
+    Position(4, 0), // Player 3 starting position
+    Position(4, 8), // Player 4 starting position
+  ];
 
   // Goal rows
   static const int player1Goal = 0;
@@ -84,7 +93,9 @@ class Wall {
   );
 }
 
-enum GameStatus { playing, player1Won, player2Won, draw }
+enum GameStatus { playing, player1Won, player2Won, player3Won, player4Won }
+
+enum GameMode { aiVsPlayer, twoPlayers, threePlayers, fourPlayers }
 
 enum MoveType { pawnMove, wallPlace }
 

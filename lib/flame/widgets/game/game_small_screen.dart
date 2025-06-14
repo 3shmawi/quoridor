@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
-import 'package:quoridor/flame/services/localizations.dart';
 import 'package:quoridor/flame/widgets/game/game_player_info_widget.dart';
 import 'package:quoridor/flame/widgets/game/game_wall_controls.dart';
 
@@ -22,8 +20,7 @@ class GameSmallScreen extends StatelessWidget {
           firstChild: GameWallControls(game: game),
           secondChild: SizedBox.shrink(),
           crossFadeState:
-              !game.gameState.player2.isAI &&
-                  game.gameState.currentPlayer.id == 2
+              !game.gameState.isAi && game.gameState.currentPlayer.id == 2
               ? CrossFadeState.showFirst
               : CrossFadeState.showSecond,
           duration: Duration(milliseconds: 500),
@@ -58,22 +55,19 @@ class GameSmallScreen extends StatelessWidget {
                           ),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        GamePlayerInfoWidget(
-                          playerId: 1,
-                          name: AppLocale.player1.getString(context),
-                          wallsRemaining: game.gameState.player1.wallsRemaining,
-                          isCurrentPlayer: game.gameState.currentPlayer.id == 1,
-                          isAI: false,
+                      children: List.generate(
+                        game.gameState.players.length,
+                        (index) => GamePlayerInfoWidget(
+                          playerId: game.gameState.players[index].id,
+                          name: game.gameState.players[index].name,
+                          wallsRemaining:
+                              game.gameState.players[index].wallsRemaining,
+                          isCurrentPlayer:
+                              game.gameState.currentPlayer.id ==
+                              game.gameState.players[index].id,
+                          isAI: game.gameState.players[index].isAI,
                         ),
-                        GamePlayerInfoWidget(
-                          playerId: 2,
-                          name: AppLocale.player2.getString(context),
-                          wallsRemaining: game.gameState.player2.wallsRemaining,
-                          isCurrentPlayer: game.gameState.currentPlayer.id == 2,
-                          isAI: game.gameState.player2.isAI,
-                        ),
-                      ],
+                      ),
                     );
                   },
                 ),
