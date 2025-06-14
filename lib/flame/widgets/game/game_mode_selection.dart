@@ -74,7 +74,7 @@ class GameModeSelection extends StatelessWidget {
                     }
 
                     Navigator.pop(context);
-                    onMessage?.call('AI mode activated');
+                    onMessage?.call(AppLocale.aiModeActivated);
                   },
                 ),
                 const SizedBox(height: 16),
@@ -92,7 +92,7 @@ class GameModeSelection extends StatelessWidget {
                       game.updateGameState(game.gameState);
                     }
                     Navigator.pop(context);
-                    onMessage?.call('Two player mode activated');
+                    onMessage?.call(AppLocale.twoPlayerModeActivated);
                   },
                 ),
               ],

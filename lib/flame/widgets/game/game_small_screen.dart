@@ -54,20 +54,6 @@ class GameSmallScreen extends StatelessWidget {
                           isCurrentPlayer: game.gameState.currentPlayer.id == 2,
                           isAI: game.gameState.player2.isAI,
                         ),
-                        GamePlayerInfoWidget(
-                          playerId: 2,
-                          name: AppLocale.player2.getString(context),
-                          wallsRemaining: game.gameState.player2.wallsRemaining,
-                          isCurrentPlayer: game.gameState.currentPlayer.id == 2,
-                          isAI: game.gameState.player2.isAI,
-                        ),
-                        GamePlayerInfoWidget(
-                          playerId: 2,
-                          name: AppLocale.player2.getString(context),
-                          wallsRemaining: game.gameState.player2.wallsRemaining,
-                          isCurrentPlayer: game.gameState.currentPlayer.id == 2,
-                          isAI: game.gameState.player2.isAI,
-                        ),
                       ],
                     );
                   },

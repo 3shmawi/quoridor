@@ -24,14 +24,12 @@ class GameWallControls extends StatefulWidget {
 }
 
 class _GameWallControlsState extends State<GameWallControls> {
-  late final gameState = widget.game.gameState;
-
   void _confirmWallPlacement() {
-    if (gameState.previewWall == null) return;
+    if (widget.game.gameState.previewWall == null) return;
 
     final wall = Wall(
-      gameState.previewWall!.position,
-      gameState.wallOrientation,
+      widget.game.gameState.previewWall!.position,
+      widget.game.gameState.wallOrientation,
     );
 
     widget.game.handleWallPlaceAttempt(wall);
@@ -41,40 +39,44 @@ class _GameWallControlsState extends State<GameWallControls> {
   void _handleWallMovement(String direction) {
     Position? newPosition;
 
-    if (gameState.previewWall == null) {
-      newPosition = Position(4, 4);
-      _moveWallPreview(newPosition);
+    if (widget.game.gameState.previewWall == null) {
+      widget.game.gameState.previewWall = Wall(
+        Position(4, 4),
+        widget.game.gameState.wallOrientation,
+      );
     }
     switch (direction) {
       case 'up':
-        if (gameState.previewWall!.position.row > 0) {
+        if (widget.game.gameState.previewWall!.position.row > 0) {
           newPosition = Position(
-            gameState.previewWall!.position.row - 1,
-            gameState.previewWall!.position.col,
+            widget.game.gameState.previewWall!.position.row - 1,
+            widget.game.gameState.previewWall!.position.col,
           );
         }
         break;
       case 'down':
-        if (gameState.previewWall!.position.row < GameConstants.boardSize - 1) {
+        if (widget.game.gameState.previewWall!.position.row <
+            GameConstants.boardSize - 1) {
           newPosition = Position(
-            gameState.previewWall!.position.row + 1,
-            gameState.previewWall!.position.col,
+            widget.game.gameState.previewWall!.position.row + 1,
+            widget.game.gameState.previewWall!.position.col,
           );
         }
         break;
       case 'left':
-        if (gameState.previewWall!.position.col > 0) {
+        if (widget.game.gameState.previewWall!.position.col > 0) {
           newPosition = Position(
-            gameState.previewWall!.position.row,
-            gameState.previewWall!.position.col - 1,
+            widget.game.gameState.previewWall!.position.row,
+            widget.game.gameState.previewWall!.position.col - 1,
           );
         }
         break;
       case 'right':
-        if (gameState.previewWall!.position.col < GameConstants.boardSize - 1) {
+        if (widget.game.gameState.previewWall!.position.col <
+            GameConstants.boardSize - 1) {
           newPosition = Position(
-            gameState.previewWall!.position.row,
-            gameState.previewWall!.position.col + 1,
+            widget.game.gameState.previewWall!.position.row,
+            widget.game.gameState.previewWall!.position.col + 1,
           );
         }
         break;
@@ -87,7 +89,10 @@ class _GameWallControlsState extends State<GameWallControls> {
   void _moveWallPreview(Position? newPosition) {
     if (newPosition == null) return;
     setState(() {
-      gameState.previewWall = Wall(newPosition, gameState.wallOrientation);
+      widget.game.gameState.previewWall = Wall(
+        newPosition,
+        widget.game.gameState.wallOrientation,
+      );
     });
   }
 

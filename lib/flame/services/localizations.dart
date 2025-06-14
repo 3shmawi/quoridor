@@ -75,6 +75,8 @@ mixin AppLocale {
   static const String invalidWallPlacement = 'invalidWallPlacement';
   static const String moveFailed = 'moveFailed';
   static const String newGameStarted = 'newGameStarted';
+  static const String aiModeActivated = 'aiModeActivated';
+  static const String twoPlayerModeActivated = 'twoPlayerModeActivated';
 
   /// English locale
   static const Map<String, dynamic> en = {
@@ -151,6 +153,8 @@ mixin AppLocale {
     invalidWallPlacement: 'Invalid wall placement!',
     moveFailed: 'Move failed: %a',
     newGameStarted: 'New game started!',
+    aiModeActivated: 'AI mode activated',
+    twoPlayerModeActivated: 'Two player mode activated',
   };
 
   /// Arabic locale
@@ -227,5 +231,7 @@ mixin AppLocale {
     invalidWallPlacement: 'وضع الحاجز غير متاح!',
     moveFailed: 'فشل الحركة: %a',
     newGameStarted: 'تم بدء اللعبة الجديدة!',
+    aiModeActivated: 'تم تفعيل وضع الذكاء الصناعي',
+    twoPlayerModeActivated: 'تم تفعيل وضع اللاعبين',
   };
 }
