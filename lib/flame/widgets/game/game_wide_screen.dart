@@ -5,13 +5,15 @@ import 'package:quoridor/flame/widgets/game/game_board.dart';
 import 'package:quoridor/flame/widgets/game/game_player_info_widget.dart';
 import 'package:quoridor/flame/widgets/game/game_wall_controls.dart';
 
+import '../../controller/game_controller.dart';
 import '../../game/quoridor_game.dart';
 import 'game_app_bar.dart';
 
 class GameWideScreen extends StatelessWidget {
-  const GameWideScreen(this.game, {super.key});
-
   final QuoridorGame game;
+  final GameController? gameController;
+
+  const GameWideScreen(this.game, {super.key, this.gameController});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +22,6 @@ class GameWideScreen extends StatelessWidget {
         Flexible(
           child: Container(
             padding: const EdgeInsets.all(16),
-
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border(
@@ -64,17 +65,21 @@ class GameWideScreen extends StatelessWidget {
                         GamePlayerInfoWidget(
                           playerId: 1,
                           name: AppLocale.player1.getString(context),
-                          wallsRemaining: game.gameState.player1.wallsRemaining,
-                          isCurrentPlayer: game.gameState.currentPlayer.id == 1,
+                          wallsRemaining:
+                              game.gameState?.player1.wallsRemaining ?? 0,
+                          isCurrentPlayer:
+                              (game.gameState?.currentPlayer.id ?? 0) == 1,
                           isAI: false,
                         ),
                         const SizedBox(height: 16),
                         GamePlayerInfoWidget(
                           playerId: 2,
                           name: AppLocale.player2.getString(context),
-                          wallsRemaining: game.gameState.player2.wallsRemaining,
-                          isCurrentPlayer: game.gameState.currentPlayer.id == 2,
-                          isAI: game.gameState.player2.isAI,
+                          wallsRemaining:
+                              game.gameState?.player2.wallsRemaining ?? 0,
+                          isCurrentPlayer:
+                              (game.gameState?.currentPlayer.id ?? 0) == 2,
+                          isAI: game.gameState?.player2.isAI ?? false,
                         ),
                       ],
                     );
@@ -84,11 +89,10 @@ class GameWideScreen extends StatelessWidget {
             ),
           ),
         ),
-        GameBoard(game),
+        GameBoard(game, gameController: gameController),
         Flexible(
           child: Container(
             padding: const EdgeInsets.all(16),
-
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border(
@@ -139,7 +143,11 @@ class GameWideScreen extends StatelessWidget {
                   ),
                 ),
                 Spacer(),
-                GameWallControls(game: game, isWideScreen: true),
+                GameWallControls(
+                  game: game,
+                  isWideScreen: true,
+                  gameController: gameController,
+                ),
               ],
             ),
           ),

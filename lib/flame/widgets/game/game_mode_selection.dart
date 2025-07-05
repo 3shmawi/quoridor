@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import '../../controller/game_controller.dart';
 import '../../services/localizations.dart';
 import '../app/copywrite.dart';
 
@@ -12,8 +13,14 @@ class GameModeSelection extends StatelessWidget {
   /// Creates a new instance of [GameModeSelection].
   final QuoridorGame game;
   final Function(String)? onMessage;
+  final GameController? gameController;
 
-  const GameModeSelection({required this.game, this.onMessage, super.key});
+  const GameModeSelection({
+    required this.game,
+    this.onMessage,
+    this.gameController,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -67,10 +74,16 @@ class GameModeSelection extends StatelessWidget {
                   subtitle: AppLocale.challengeOurIntelligentAIOpponent
                       .getString(context),
                   onTap: () {
-                    if (!game.gameState.player2.isAI) {
-                      game.togglePlayerMode();
+                    if (gameController != null) {
+                      // Use controller to toggle player mode
+                      gameController!.add(TogglePlayerMode());
                     } else {
-                      game.updateGameState(game.gameState);
+                      // Fallback to direct game method
+                      if (!(game.gameState?.player2.isAI ?? false)) {
+                        game.togglePlayerMode();
+                      } else {
+                        game.updateFromController();
+                      }
                     }
 
                     Navigator.pop(context);
@@ -86,10 +99,16 @@ class GameModeSelection extends StatelessWidget {
                     context,
                   ),
                   onTap: () {
-                    if (game.gameState.player2.isAI) {
-                      game.togglePlayerMode();
+                    if (gameController != null) {
+                      // Use controller to toggle player mode
+                      gameController!.add(TogglePlayerMode());
                     } else {
-                      game.updateGameState(game.gameState);
+                      // Fallback to direct game method
+                      if ((game.gameState?.player2.isAI ?? false)) {
+                        game.togglePlayerMode();
+                      } else {
+                        game.updateFromController();
+                      }
                     }
                     Navigator.pop(context);
                     onMessage?.call(AppLocale.twoPlayerModeActivated);

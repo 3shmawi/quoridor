@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/services/localizations.dart';
+import '../../controller/game_controller.dart';
 import '../../game/quoridor_game.dart';
 import '../../services/firebase_service.dart';
 import 'drawer_menu_item.dart';
 import 'drawer_menu_section.dart';
 
 class DrawerGameControls extends StatefulWidget {
-  const DrawerGameControls(this.game, {this.onMessage, super.key});
+  const DrawerGameControls(
+    this.game, {
+    this.onMessage,
+    this.gameController,
+    super.key,
+  });
 
   final QuoridorGame game;
   final void Function(String message)? onMessage;
+  final GameController? gameController;
 
   @override
   State<DrawerGameControls> createState() => _DrawerGameControlsState();
@@ -24,7 +31,11 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
   }
 
   void _newGame() {
-    widget.game.newGame();
+    if (widget.gameController != null) {
+      widget.gameController!.add(StartNewGame());
+    } else {
+      widget.game.newGame();
+    }
     _closeMenu();
   }
 
@@ -39,19 +50,27 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
       return;
     }
 
-    final gameId = await FirebaseService.saveGame(widget.game.gameState);
-    if (gameId != null) {
-      widget.onMessage?.call(
-        AppLocale.gameSavedSuccessfullyWithId.getString(context),
-      );
+    if (widget.gameController != null) {
+      widget.gameController!.add(SaveGame());
     } else {
-      widget.onMessage?.call(AppLocale.failedToSaveGame.getString(context));
+      final gameId = await FirebaseService.saveGame(widget.game.gameState!);
+      if (gameId != null) {
+        widget.onMessage?.call(
+          AppLocale.gameSavedSuccessfullyWithId.getString(context),
+        );
+      } else {
+        widget.onMessage?.call(AppLocale.failedToSaveGame.getString(context));
+      }
     }
     _closeMenu();
   }
 
   void _togglePlayerMode() {
-    widget.game.togglePlayerMode();
+    if (widget.gameController != null) {
+      widget.gameController!.add(TogglePlayerMode());
+    } else {
+      widget.game.togglePlayerMode();
+    }
     _closeMenu();
   }
 
@@ -75,7 +94,7 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
         DrawerMenuItem(
           icon: Icons.people,
           title: AppLocale.togglePlayerMode.getString(context),
-          subtitle: widget.game.gameState.currentPlayer.isAI
+          subtitle: widget.game.gameState?.currentPlayer.isAI ?? false
               ? AppLocale.switchToTwoPlayers.getString(context)
               : AppLocale.switchToAI.getString(context),
           onTap: _togglePlayerMode,

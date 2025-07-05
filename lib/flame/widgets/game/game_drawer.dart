@@ -3,6 +3,7 @@ import 'package:quoridor/flame/widgets/drawer/drawer_body.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_footer.dart';
 
 import '/flame/game/quoridor_game.dart';
+import '../../controller/game_controller.dart';
 import '../drawer/drawer_header.dart';
 
 /// A custom drawer widget for the Quoridor game.
@@ -13,9 +14,15 @@ class GameDrawer extends StatelessWidget {
   /// Callback function when new game is requested
   final QuoridorGame game;
   final Function(String)? onMessage;
+  final GameController? gameController;
 
   /// Creates a new instance of [GameDrawer].
-  const GameDrawer({super.key, required this.game, this.onMessage});
+  const GameDrawer({
+    super.key,
+    required this.game,
+    this.onMessage,
+    this.gameController,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +44,7 @@ class GameDrawer extends StatelessWidget {
             DrawerAppHeader(),
 
             // Menu Body
-            DrawerBody(game),
+            DrawerBody(game, gameController: gameController),
 
             // Menu Footer
             DrawerFooter(),

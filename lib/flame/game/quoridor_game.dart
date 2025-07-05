@@ -7,6 +7,8 @@ import 'package:quoridor/flame/services/localizations.dart';
 import '/flame/services/sounds.dart';
 import '../components/board_component.dart';
 import '../constants.dart';
+import '../controller/game_controller.dart';
+import '../controller/game_states.dart';
 import '../models/game_state.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
@@ -15,17 +17,18 @@ final isInitializedProvider = ValueNotifier(false);
 
 class QuoridorGame extends FlameGame
     with TapCallbacks, HasKeyboardHandlerComponents, HoverCallbacks {
-  GameState? _gameState;
   late BoardComponent _boardComponent;
   bool _isInitialized = false;
+  GameController? _gameController;
 
   Function(GameState)? onGameStateChanged;
   Function(String)? onGameMessage;
   VoidCallback? onGameWon;
 
-  QuoridorGame() : super() {
-    _gameState = GameStateFactory.createNewGame();
-    _boardComponent = BoardComponent(_gameState!);
+  QuoridorGame({GameController? gameController}) {
+    _gameController = gameController;
+
+    _boardComponent = BoardComponent(gameController: gameController);
     _boardComponent.onMoveAttempted = _handleMoveAttempt;
     _boardComponent.onWallPlaceAttempted = handleWallPlaceAttempt;
     add(_boardComponent);
@@ -33,174 +36,104 @@ class QuoridorGame extends FlameGame
     _isInitialized = true;
   }
 
-  @override
-  Future<void> onLoad() async {
-    await GameSounds.preload();
+  void setGameController(GameController controller) {
+    _gameController = controller;
+    _boardComponent.setGameController(controller);
   }
 
   @override
   Color backgroundColor() => Colors.transparent;
 
   void _updateUI() async {
-    if (_gameState!.isGameOver) {
+    if (_gameController == null) return;
+
+    final currentState = _gameController!.state;
+    if (currentState is! GamePlayingState) return;
+
+    final gameState = currentState.gameState;
+
+    if (gameState.isGameOver) {
       onGameMessage?.call(
-        '${AppLocale.gameOver} ${_gameState!.winner} ${AppLocale.wins}!',
+        '${AppLocale.gameOver} ${gameState.winner} ${AppLocale.wins}!',
       );
       onGameWon?.call();
       GameSounds.triggerFeedback(soundKey: 'win');
     }
   }
 
-  void updateGameState(GameState newGameState) {
-    _gameState = newGameState;
-    _boardComponent.updateGameState(newGameState);
-    _updateUI();
+  void updateFromController() {
+    if (!_isInitialized || _gameController == null) return;
 
-    // Trigger AI move if needed
-    if (!_gameState!.isGameOver && _gameState!.currentPlayer.isAI) {
-      _executeAIMove();
-    }
-
-    onGameStateChanged?.call(_gameState!);
-  }
-
-  Future<void> _executeAIMove() async {
-    // Add delay for better UX
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    try {
-      final newGameState = await GameService.executeAITurn(
-        _gameState!,
-        AIDifficulty.medium,
-      );
-
-      if (newGameState != _gameState) {
-        updateGameState(newGameState);
-        onGameMessage?.call(AppLocale.aiPlayedTheirMove);
-      }
-    } catch (e) {
-      onGameMessage?.call('AI move failed: $e');
+    final currentState = _gameController!.state;
+    if (currentState is GamePlayingState) {
+      _boardComponent.updateFromState(currentState);
+      _updateUI();
+      onGameStateChanged?.call(currentState.gameState);
     }
   }
 
   void _handleMoveAttempt(Position newPosition) {
-    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
-      onGameMessage?.call('${AppLocale.itsNotYourTurn}!');
+    // If using controller, let it handle the move
+    if (_gameController != null) {
+      _gameController!.add(MakePawnMove(newPosition));
       return;
     }
 
-    final move = GameMove.pawnMove(newPosition, _gameState!.currentPlayerId);
-
-    if (GameService.isValidMove(_gameState!, move)) {
-      _processMove(move);
-    } else {
-      onGameMessage?.call(AppLocale.invalidMove);
-      HapticFeedback.lightImpact();
-    }
+    // Fallback to direct game logic (legacy support)
+    onGameMessage?.call('${AppLocale.itsNotYourTurn}!');
   }
 
   void handleWallPlaceAttempt(Wall wall) {
-    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
-      onGameMessage?.call(AppLocale.itsNotYourTurn);
+    // If using controller, let it handle the wall placement
+    if (_gameController != null) {
+      _gameController!.add(PlaceWall(wall));
       return;
     }
 
-    if (!_gameState!.currentPlayer.hasWallsRemaining) {
-      onGameMessage?.call(AppLocale.noWallsRemaining);
-      HapticFeedback.lightImpact();
-      return;
-    }
-
-    final move = GameMove.wallPlace(
-      Wall(wall.position, gameState.wallOrientation),
-      _gameState!.currentPlayerId,
-    );
-
-    if (GameService.isValidMove(_gameState!, move)) {
-      _boardComponent.wallComponent.lastTappedWall = null;
-      _gameState!.previewWall = null;
-      GameSounds.triggerFeedback(
-        soundKey: _gameState!.currentPlayer.id == 1 ? 'wall_p1' : 'wall_p2',
-      );
-      _processMove(move);
-    } else {
-      onGameMessage?.call(AppLocale.invalidWallPlacement);
-      HapticFeedback.lightImpact();
-    }
-  }
-
-  Future<void> _processMove(GameMove move) async {
-    try {
-      final newGameState = await GameManager.processPlayerMove(
-        _gameState!,
-        move,
-      );
-      updateGameState(newGameState);
-
-      HapticFeedback.selectionClick();
-
-      if (newGameState.isGameOver) {
-        onGameMessage?.call('${newGameState.winner} ${AppLocale.wins}!');
-        HapticFeedback.mediumImpact();
-      }
-    } catch (e) {
-      onGameMessage?.call('${AppLocale.moveFailed}: $e');
-      HapticFeedback.lightImpact();
-    }
+    // Fallback to direct game logic (legacy support)
+    onGameMessage?.call(AppLocale.noWallsRemaining);
+    HapticFeedback.lightImpact();
   }
 
   // Game control methods
   void newGame() {
-    updateGameState(GameStateFactory.createNewGame());
-    onGameMessage?.call(AppLocale.newGameStarted);
+    if (_gameController != null) {
+      _gameController!.add(StartNewGame());
+    } else {
+      onGameMessage?.call(AppLocale.newGameStarted);
+    }
   }
 
   void setDifficulty(AIDifficulty difficulty) {
-    _gameState!.difficulty = difficulty;
-    onGameMessage?.call('${AppLocale.difficultySetTo} ${difficulty.name}');
+    if (_gameController != null) {
+      _gameController!.add(SetAIDifficulty(difficulty));
+    } else {
+      onGameMessage?.call('${AppLocale.difficultySetTo} ${difficulty.name}');
+    }
   }
 
   void showValidMoves() {
-    gameState.toggleShowValidMoves();
-    _boardComponent.showValidMoves = gameState.showValidMoves;
-    _boardComponent.updateGameState(gameState);
-
-    onGameMessage?.call(
-      gameState.showValidMoves
-          ? AppLocale.validMovesHighlighted
-          : AppLocale.validMovesHidden,
-    );
+    if (_gameController != null) {
+      _gameController!.add(ToggleValidMoves());
+    } else {
+      onGameMessage?.call(AppLocale.validMovesHighlighted);
+    }
   }
 
   void toggleWallOrientation() {
-    final orientation =
-        _gameState!.getWallOrientation == WallOrientation.horizontal
-        ? WallOrientation.vertical
-        : WallOrientation.horizontal;
-    _gameState!.setWallOrientation = orientation;
-    _boardComponent.updateGameState(_gameState!);
+    if (_gameController != null) {
+      _gameController!.add(ToggleWallOrientation());
+    } else {
+      onGameMessage?.call('Wall orientation toggled');
+    }
   }
 
   void togglePlayerMode() {
-    // Switch between AI and human player 2
-    final newGameState = GameState(
-      gameId: _gameState!.gameId,
-      player1: _gameState!.player1,
-      player2: _gameState!.player2.copyWith(isAI: !_gameState!.player2.isAI),
-      walls: _gameState!.walls,
-      currentPlayerId: _gameState!.currentPlayerId,
-      status: _gameState!.status,
-      createdAt: _gameState!.createdAt,
-      updatedAt: DateTime.now(),
-      moveHistory: _gameState!.moveHistory,
-    );
-
-    updateGameState(newGameState);
-    onGameMessage?.call(
-      newGameState.player2.isAI
-          ? AppLocale.switchedToAI
-          : AppLocale.switchedToTwoPlayers,
-    );
+    if (_gameController != null) {
+      _gameController!.add(TogglePlayerMode());
+    } else {
+      onGameMessage?.call(AppLocale.switchedToAI);
+    }
   }
 
   // Input handling
@@ -251,20 +184,32 @@ class QuoridorGame extends FlameGame
   }
 
   // Getters for external access
-  GameState get gameState {
-    if (!_isInitialized || _gameState == null) {
-      throw StateError(
-        '${AppLocale.gameStateNotInitialized} ${AppLocale.pleaseWait}',
-      );
+  GameState? get gameState {
+    if (!_isInitialized || _gameController == null) {
+      return null;
     }
-    return _gameState!;
+
+    final currentState = _gameController!.state;
+    if (currentState is GamePlayingState) {
+      return currentState.gameState;
+    }
+    return null;
   }
 
-  bool get isGameOver => gameState.isGameOver;
+  bool get isGameOver {
+    final state = gameState;
+    return state?.isGameOver ?? false;
+  }
 
-  String? get winner => gameState.winner;
+  String? get winner {
+    final state = gameState;
+    return state?.winner;
+  }
 
-  int get currentPlayerId => gameState.currentPlayerId;
+  int get currentPlayerId {
+    final state = gameState;
+    return state?.currentPlayerId ?? 1;
+  }
 
   bool get isInitialized => _isInitialized;
 }

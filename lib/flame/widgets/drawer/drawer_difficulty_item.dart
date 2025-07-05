@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import '../../services/localizations.dart';
+import '../../controller/game_controller.dart';
 import '../../game/quoridor_game.dart';
 import '../../services/ai_service.dart';
 
@@ -8,11 +9,13 @@ class DrawerDifficultyItem extends StatefulWidget {
   const DrawerDifficultyItem({
     required this.difficulty,
     required this.game,
+    this.gameController,
     super.key,
   });
 
   final AIDifficulty difficulty;
   final QuoridorGame game;
+  final GameController? gameController;
 
   @override
   State<DrawerDifficultyItem> createState() => _DrawerDifficultyItemState();
@@ -26,15 +29,19 @@ class _DrawerDifficultyItemState extends State<DrawerDifficultyItem> {
   }
 
   void _changeDifficulty(AIDifficulty difficulty) {
-    setState(() {
-      widget.game.setDifficulty(difficulty);
-    });
+    if (widget.gameController != null) {
+      widget.gameController!.add(SetAIDifficulty(difficulty));
+    } else {
+      setState(() {
+        widget.game.setDifficulty(difficulty);
+      });
+    }
     _closeMenu();
   }
 
   @override
   Widget build(BuildContext context) {
-    bool isSelected = widget.game.gameState.difficulty == widget.difficulty;
+    bool isSelected = widget.game.gameState?.difficulty == widget.difficulty;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,

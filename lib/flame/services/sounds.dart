@@ -18,7 +18,7 @@ abstract class GameSounds extends PositionComponent {
 
   static void triggerFeedback({String? soundKey}) async {
     if (CacheHelper.getData(key: "soundEnabled") == false) {
-      return; // Sound is disabled in settings
+      return;
     }
     if (soundKey != null && _soundAssets.containsKey(soundKey)) {
       try {

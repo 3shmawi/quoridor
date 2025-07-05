@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '/flame/game/quoridor_game.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/firebase_service.dart';
 import 'game_page.dart';
@@ -74,7 +75,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   void _startNewGame() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const GamePage()),
+      MaterialPageRoute(builder: (context) => GamePage(QuoridorGame())),
     );
   }
 
@@ -82,7 +83,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => GamePage(initialGameState: gameState),
+        builder: (context) =>
+            GamePage(QuoridorGame(), initialGameState: gameState),
       ),
     );
   }

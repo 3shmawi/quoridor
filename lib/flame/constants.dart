@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart';
+
+final cellSizeNotifier = ValueNotifier<double>(40);
+
 // Game constants and configurations for Quoridor game
 
 class GameConstants {

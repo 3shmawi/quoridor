@@ -1,12 +1,15 @@
+import 'dart:math';
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-import '/flame/components/board_component.dart';
 import '../constants.dart';
+import '../controller/game_controller.dart';
+import '../controller/game_states.dart';
 import '../models/game_state.dart';
 
 class PlayerComponent extends PositionComponent {
-  GameState gameState;
+  GameController? _gameController;
   bool showValidMoves = true;
   Position? selectedPawn;
   List<Position> validMoves = [];
@@ -14,30 +17,60 @@ class PlayerComponent extends PositionComponent {
   final double _boardPadding = GameConstants.boardPadding;
   final double _cellSpacing = GameConstants.cellSpacing;
 
-  PlayerComponent(this.gameState);
+  PlayerComponent({GameController? gameController}) {
+    _gameController = gameController;
+  }
+
+  void setGameController(GameController controller) {
+    _gameController = controller;
+  }
+
+  void updateFromState(GamePlayingState state) {
+    showValidMoves = state.showValidMoves;
+    validMoves = state.validMoves;
+    // Keep selectedPawn as is - it's UI state
+  }
+
+  void clearSelection() {
+    selectedPawn = null;
+    validMoves.clear();
+  }
 
   @override
   void render(Canvas canvas) {
+    if (_gameController == null) return;
+
+    final currentState = _gameController!.state;
+    if (currentState is! GamePlayingState) return;
+
+    final gameState = currentState.gameState;
+
     _drawValidMoves(canvas);
-    _drawPlayers(canvas);
+    _drawPlayers(canvas, gameState);
     _drawSelection(canvas);
   }
 
-  void _drawPlayers(Canvas canvas) {
+  void _drawPlayers(Canvas canvas, GameState gameState) {
     // Draw player 1
     _drawPlayer(
       canvas: canvas,
       position: gameState.player1.position,
-      color: const Color(GameConstants.player1Color),
+      color: gameState.currentPlayerId == 1
+          ? const Color(GameConstants.player1Color)
+          : Colors.transparent,
       playerId: 1,
+      gameState: gameState,
     );
 
     // Draw player 2
     _drawPlayer(
       canvas: canvas,
       position: gameState.player2.position,
-      color: const Color(GameConstants.player2Color),
+      color: gameState.currentPlayerId == 2
+          ? const Color(GameConstants.player2Color)
+          : Colors.transparent,
       playerId: 2,
+      gameState: gameState,
     );
   }
 
@@ -46,26 +79,35 @@ class PlayerComponent extends PositionComponent {
     required Position position,
     required Color color,
     required int playerId,
+    required GameState gameState,
   }) {
     final center = _getCellCenter(position);
     final isSelected = selectedPawn == position;
     final radius = cellSizeNotifier.value * 0.35;
 
+    final milliseconds = DateTime.now().millisecondsSinceEpoch;
+    final t = gameState.currentPlayerId == playerId
+        ? (sin(milliseconds / 300.0) + 1) / 2
+        : 1;
+
+    // Set opacity: 1.0 if selected, 0.4 if not
+    final double opacity = gameState.currentPlayerId == playerId ? 1.0 : 0.3;
+
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.2)
+      ..color = Colors.black.withValues(alpha: 0.2 * opacity * (.5 + t))
       ..style = PaintingStyle.fill;
 
     final pawnPaint = Paint()
-      ..color = color
+      ..color = color.withValues(alpha: opacity)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = Colors.white
+      ..color = Colors.white.withValues(alpha: opacity * (.5 + t))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.3)
+      ..color = Colors.white.withValues(alpha: 0.3 * opacity * (.5 + t))
       ..style = PaintingStyle.fill;
 
     // Draw shadow
@@ -102,8 +144,8 @@ class PlayerComponent extends PositionComponent {
     final textPainter = TextPainter(
       text: TextSpan(
         text: playerId.toString(),
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: opacity),
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),
@@ -146,7 +188,7 @@ class PlayerComponent extends PositionComponent {
   }
 
   void _drawValidMoves(Canvas canvas) {
-    if (!showValidMoves || validMoves.isEmpty) return;
+    if (!showValidMoves || validMoves.isEmpty || selectedPawn == null) return;
 
     final paint = Paint()
       ..color = const Color(GameConstants.validMoveColor).withValues(alpha: 0.6)

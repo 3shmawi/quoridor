@@ -7,12 +7,14 @@ import 'package:quoridor/flame/widgets/drawer/drawer_menu_section.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_switch_item.dart';
 import 'package:quoridor/theme.dart';
 
+import '../../controller/game_controller.dart';
 import '../../game/quoridor_game.dart';
 
 class DrawerDisplayOptions extends StatefulWidget {
-  const DrawerDisplayOptions(this.game, {super.key});
+  const DrawerDisplayOptions(this.game, {this.gameController, super.key});
 
   final QuoridorGame game;
+  final GameController? gameController;
 
   @override
   State<DrawerDisplayOptions> createState() => _DrawerDisplayOptionsState();
@@ -26,7 +28,11 @@ class _DrawerDisplayOptionsState extends State<DrawerDisplayOptions> {
   }
 
   void _toggleValidMoves() {
-    widget.game.showValidMoves();
+    if (widget.gameController != null) {
+      widget.gameController!.add(ToggleValidMoves());
+    } else {
+      widget.game.showValidMoves();
+    }
 
     _closeMenu();
   }
@@ -53,7 +59,7 @@ class _DrawerDisplayOptionsState extends State<DrawerDisplayOptions> {
           icon: Icons.visibility,
           title: AppLocale.showValidMoves.getString(context),
           subtitle: AppLocale.highlightPossibleMoves.getString(context),
-          value: widget.game.gameState.showValidMoves,
+          value: widget.game.gameState?.showValidMoves ?? false,
           onChanged: _toggleValidMoves,
         ),
         DrawerSwitchItem(

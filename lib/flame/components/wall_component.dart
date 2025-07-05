@@ -1,14 +1,14 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'package:quoridor/flame/components/board_component.dart';
 import 'package:quoridor/theme.dart';
 
 import '/flame/constants.dart';
+import '/flame/controller/game_controller.dart';
+import '/flame/controller/game_states.dart';
 import '/flame/models/game_state.dart';
 
 class WallComponent extends PositionComponent {
-  GameState gameState;
-
+  GameController? _gameController;
   Wall? lastTappedWall;
   bool isValid = true;
 
@@ -16,17 +16,42 @@ class WallComponent extends PositionComponent {
   static const double _boardPadding = GameConstants.boardPadding;
   static const double _cellSpacing = GameConstants.cellSpacing;
 
-  WallComponent(this.gameState);
+  WallComponent({GameController? gameController}) {
+    _gameController = gameController;
+  }
+
+  void setGameController(GameController controller) {
+    _gameController = controller;
+  }
+
+  void updateFromState(GamePlayingState state) {
+    // Update validity based on current player's wall count
+    final gameState = state.gameState;
+    isValid = gameState.currentPlayer.hasWallsRemaining;
+    // Update lastTappedWall from state preview wall
+    lastTappedWall = state.previewWall;
+  }
+
+  void clearPreview() {
+    lastTappedWall = null;
+  }
 
   @override
   void render(Canvas canvas) {
-    _drawWalls(canvas);
+    if (_gameController == null) return;
+
+    final currentState = _gameController!.state;
+    if (currentState is! GamePlayingState) return;
+
+    final gameState = currentState.gameState;
+
+    _drawWalls(canvas, gameState);
     if (gameState.previewWall != null) {
-      _drawPreviewWall(canvas);
+      _drawPreviewWall(canvas, gameState);
     }
   }
 
-  void _drawWalls(Canvas canvas) {
+  void _drawWalls(Canvas canvas, GameState gameState) {
     final wallPaint = Paint()
       ..color = isDarkModeNotifier.value
           ? Colors.white
@@ -56,7 +81,7 @@ class WallComponent extends PositionComponent {
     }
   }
 
-  void _drawPreviewWall(Canvas canvas) {
+  void _drawPreviewWall(Canvas canvas, GameState gameState) {
     if (gameState.previewWall == null) return;
 
     final rect = _getWallRect(

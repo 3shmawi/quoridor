@@ -3,13 +3,15 @@ import 'package:quoridor/flame/game/quoridor_game.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_ai_difficulty.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_display_options.dart';
 
+import '../../controller/game_controller.dart';
 import 'drawer_game_controls.dart';
 
 class DrawerBody extends StatelessWidget {
-  const DrawerBody(this.game, {this.onMessage, super.key});
+  const DrawerBody(this.game, {this.onMessage, this.gameController, super.key});
 
   final QuoridorGame game;
   final void Function(String message)? onMessage;
+  final GameController? gameController;
 
   @override
   Widget build(BuildContext context) {
@@ -21,9 +23,10 @@ class DrawerBody extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: 24,
           children: [
-            DrawerGameControls(game, onMessage: onMessage),
-            DrawerAiDifficulty(game),
-            DrawerDisplayOptions(game),
+            DrawerGameControls(game,
+                onMessage: onMessage, gameController: gameController),
+            DrawerAiDifficulty(game, gameController: gameController),
+            DrawerDisplayOptions(game, gameController: gameController),
           ],
         ),
       ),
