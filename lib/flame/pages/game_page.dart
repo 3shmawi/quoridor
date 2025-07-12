@@ -187,64 +187,72 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       barrierDismissible: false,
       builder: (context) => BlocProvider.value(
         value: gameController,
-        child: AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                Icons.emoji_events,
-                color: Theme.of(context).colorScheme.primary,
-                size: 28,
+        child: BlocBuilder<GameController, GameStates>(
+          builder: (context, state) {
+            String winner = 'Unknown';
+            int playersCount = 3;
+            if (state is GameStatisticsState) {
+              winner = state.winner ?? 'Unknown';
+              playersCount = state.playersCount ?? 3;
+            } else if (state is GamePlayingState &&
+                state.gameState.isGameOver) {
+              winner = state.gameState.winner ?? 'Unknown';
+            }
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.emoji_events,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(AppLocale.gameOver.getString(context)),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(AppLocale.gameOver.getString(context)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              BlocBuilder<GameController, GameStates>(
-                builder: (context, state) {
-                  String winner = 'Unknown';
-                  if (state is GameStatisticsState) {
-                    winner = state.winner ?? 'Unknown';
-                  } else if (state is GamePlayingState &&
-                      state.gameState.isGameOver) {
-                    winner = state.gameState.winner ?? 'Unknown';
-                  } else if (state is GameStatisticsState) {}
-
-                  return Text(
-                    '$winner ${AppLocale.wins.getString(context)}!',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                },
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  BlocBuilder<GameController, GameStates>(
+                    builder: (context, state) {
+                      return Text(
+                        '$winner ${AppLocale.wins.getString(context)}!',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    AppLocale.playAgainSuggestion.getString(context),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                AppLocale.playAgainSuggestion.getString(context),
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(AppLocale.notNow.getString(context)),
-            ),
-            FilledButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                gameController.add(StartNewMultiPlayerGame(playerCount: 3));
-              },
-              icon: const Icon(Icons.refresh),
-              label: Text(AppLocale.playAgain.getString(context)),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(AppLocale.notNow.getString(context)),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    gameController.add(
+                      StartNewMultiPlayerGame(playerCount: playersCount),
+                    );
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: Text(AppLocale.playAgain.getString(context)),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

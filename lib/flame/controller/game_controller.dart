@@ -113,6 +113,7 @@ class UpdateStatistics extends GameEvent {
   final int totalMoves;
   final int wallsPlaced;
   final String? winner;
+  final int? playersCount;
 
   UpdateStatistics({
     required this.isWin,
@@ -121,6 +122,7 @@ class UpdateStatistics extends GameEvent {
     required this.totalMoves,
     required this.wallsPlaced,
     this.winner,
+    this.playersCount,
   });
 }
 
@@ -761,6 +763,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         totalWallsPlaced: newTotalWallsPlaced,
         totalMovesMade: newTotalMovesMade,
         winner: event.winner,
+        playersCount: event.playersCount,
       ),
     );
   }
@@ -797,6 +800,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         totalMoves: totalMoves,
         wallsPlaced: wallsPlaced,
         winner: winner,
+        playersCount: gameState.players.length,
       ),
     );
 

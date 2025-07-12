@@ -202,6 +202,7 @@ class GameStatisticsState extends GameStates {
   final int totalMovesMade;
   final Map<AIDifficulty, int> winsByDifficulty;
   final String? winner;
+  final int? playersCount;
 
   const GameStatisticsState({
     this.gamesPlayed = 0,
@@ -214,6 +215,7 @@ class GameStatisticsState extends GameStates {
     this.totalMovesMade = 0,
     this.winsByDifficulty = const {},
     this.winner,
+    this.playersCount,
   });
 
   @override

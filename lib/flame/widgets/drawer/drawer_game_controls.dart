@@ -33,11 +33,65 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
 
   void _newGame() {
     if (widget.gameController != null) {
-      widget.gameController!.add(StartNewMultiPlayerGame(playerCount: 3));
+      _closeMenu();
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Text("Game Mode"),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            ),
+            content: Text("Please select the number of players:"),
+
+            actions: [
+              ListTile(
+                leading: Icon(Icons.group),
+                title: Text("Two Players"),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  widget.gameController!.add(
+                    StartNewMultiPlayerGame(playerCount: 2),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.groups),
+                title: Text("Three Players"),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  widget.gameController!.add(
+                    StartNewMultiPlayerGame(playerCount: 3),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.groups_2_outlined),
+                title: Text("Four Players"),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  widget.gameController!.add(
+                    StartNewMultiPlayerGame(playerCount: 4),
+                  );
+                },
+              ),
+            ],
+          );
+        },
+      );
     } else {
       widget.game.newGame();
+
+      _closeMenu();
     }
-    _closeMenu();
   }
 
   Future<void> _saveGame() async {
@@ -66,15 +120,6 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
     _closeMenu();
   }
 
-  void _togglePlayerMode() {
-    if (widget.gameController != null) {
-      widget.gameController!.add(TogglePlayerMode());
-    } else {
-      widget.game.togglePlayerMode();
-    }
-    _closeMenu();
-  }
-
   @override
   Widget build(BuildContext context) {
     return DrawerMenuSection(
@@ -91,14 +136,6 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
           title: AppLocale.saveGame.getString(context),
           subtitle: AppLocale.saveCurrentProgress.getString(context),
           onTap: _saveGame,
-        ),
-        DrawerMenuItem(
-          icon: Icons.people,
-          title: AppLocale.togglePlayerMode.getString(context),
-          subtitle: widget.game.gameState?.currentPlayer.isAI ?? false
-              ? AppLocale.switchToTwoPlayers.getString(context)
-              : AppLocale.switchToAI.getString(context),
-          onTap: _togglePlayerMode,
         ),
       ],
     );
