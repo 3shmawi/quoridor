@@ -31,52 +31,91 @@ class GamePlayerInfoWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.topRight,
-      children: [
-        Card(
-          elevation: 0,
-          color: Theme.of(context).colorScheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: isCurrentPlayer
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.outline.withOpacity(0.2),
-              width: isCurrentPlayer ? 2 : 1,
+    return Opacity(
+      opacity: isCurrentPlayer ? 1.0 : 0.5,
+      child: Stack(
+        alignment: Alignment.topRight,
+        children: [
+          Card(
+            elevation: 0,
+            color: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: isCurrentPlayer
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(
+                        context,
+                      ).colorScheme.outline.withValues(alpha: 0.2),
+                width: isCurrentPlayer ? 2 : 1,
+              ),
             ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: isCurrentPlayer ? 1 : 0.4),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (isCurrentPlayer)
-          CircleAvatar(
-            radius: 12,
-            child: Text(
-              "$wallsRemaining",
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+                ],
               ),
             ),
           ),
-      ],
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: isCurrentPlayer
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(
+                        context,
+                      ).colorScheme.outline.withValues(alpha: 0.2),
+                border: Border.all(
+                  color: !isCurrentPlayer
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(
+                          context,
+                        ).colorScheme.outline.withValues(alpha: 0.2),
+                ),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 5,
+                children: [
+                  Icon(
+                    Icons.power_input,
+                    color: isCurrentPlayer
+                        ? Theme.of(context).scaffoldBackgroundColor
+                        : Colors.grey,
+                    size: 16,
+                  ),
+                  Text(
+                    "$wallsRemaining",
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: isCurrentPlayer
+                          ? Theme.of(context).scaffoldBackgroundColor
+                          : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

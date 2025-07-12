@@ -48,7 +48,7 @@ class _GameSmallScreenState extends State<GameSmallScreen> {
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
-                              mainAxisSpacing: 16,
+                              mainAxisSpacing: 0,
                               crossAxisSpacing: 16,
                               childAspectRatio: 2,
                             ),
@@ -63,11 +63,11 @@ class _GameSmallScreenState extends State<GameSmallScreen> {
                             GamePlayerInfoWidget(
                               playerId:
                                   (gameController.state as GamePlayingState)
-                                      .gameState!
+                                      .gameState
                                       .players[i]
                                       .id,
                               name: (gameController.state as GamePlayingState)
-                                  .gameState!
+                                  .gameState
                                   .players[i]
                                   .name,
                               wallsRemaining:
@@ -78,11 +78,11 @@ class _GameSmallScreenState extends State<GameSmallScreen> {
                               isCurrentPlayer:
                                   ((gameController.state as GamePlayingState)
                                           .gameState
-                                          ?.currentPlayer
+                                          .currentPlayer
                                           .id ??
                                       0) ==
                                   (gameController.state as GamePlayingState)
-                                      .gameState!
+                                      .gameState
                                       .players[i]
                                       .id,
                             ),

@@ -95,7 +95,6 @@ class BoardComponent extends PositionComponent {
         );
 
         // Check if this cell is a goal for any player
-        bool isGoalCell = false;
         Color goalColor = Colors.transparent;
 
         for (final player in gameState.players) {
@@ -117,48 +116,67 @@ class BoardComponent extends PositionComponent {
             }
           }
 
-          if (isGoal) {
-            isGoalCell = true;
+          if (isGoal && player.id == gameState.currentPlayerId) {
             goalColor = Color(GameConstants.getPlayerColor(player.id));
-            break;
-          }
-        }
 
+            // Draw glow as before
+            final glowPaint = Paint()
+              ..color = goalColor.withValues(alpha: 0.6 * t)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 3.5
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
 
-        if (isGoalCell) {
-          // 🔥 1. Glow effect
-          final glowPaint = Paint()
-            ..color = goalColor.withValues(alpha: 0.6 * t)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3.5
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              rect.inflate(1.5),
-              const Radius.circular(6),
-            ),
-            glowPaint,
-          );
-
-          // 🎯 3. Goal label (emoji or text)
-          final goalText = TextPainter(
-            text: TextSpan(
-              text: '🏁', // Or use: 'GOAL'
-              style: TextStyle(
-                fontSize: 16,
-                color: goalColor.withValues(alpha: 0.65),
-                fontWeight: FontWeight.bold,
+            canvas.drawRRect(
+              RRect.fromRectAndRadius(
+                rect.inflate(1.5),
+                const Radius.circular(6),
               ),
-            ),
-            textDirection: TextDirection.ltr,
-          );
-          goalText.layout();
-          final goalOffset = Offset(
-            rect.left + (rect.width - goalText.width) / 2,
-            rect.top + (rect.height - goalText.height) / 2,
-          );
-          goalText.paint(canvas, goalOffset);
+              glowPaint,
+            );
+
+            // 🎯 Rotated goal flag
+            final goalText = TextPainter(
+              text: TextSpan(
+                text: '🏁',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: goalColor.withValues(alpha: 0.65),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            );
+            goalText.layout();
+
+            final goalOffset = Offset(
+              rect.left + (rect.width - goalText.width) / 2,
+              rect.top + (rect.height - goalText.height) / 2,
+            );
+
+            // Center point for rotation
+            final center = Offset(
+              rect.left + rect.width / 2,
+              rect.top + rect.height / 2,
+            );
+
+            // Determine rotation based on player ID
+            double angle = switch (player.id) {
+              1 => 0,
+              2 => pi,
+              3 => -pi / 2,
+              4 => pi / 2,
+              _ => 0,
+            };
+
+            canvas.save();
+            canvas.translate(center.dx, center.dy);
+            canvas.rotate(angle);
+            canvas.translate(-center.dx, -center.dy);
+            goalText.paint(canvas, goalOffset);
+            canvas.restore();
+
+            break; // no need to keep looping, we found the matching goal
+          }
         }
 
         // 🧱 Cell border
@@ -241,6 +259,7 @@ class BoardComponent extends PositionComponent {
       }
 
       if (tappedOnPlayer) {
+        gameState.previewWall = null; // Clear preview wall if tapping on player
         _handlePositionTap(cellPosition, gameState);
         return;
       }
@@ -335,7 +354,7 @@ class BoardComponent extends PositionComponent {
     } else if (wallComponent.lastTappedWall == wall) {
       if (gameState.currentPlayer.hasWallsRemaining) {
         debugPrint('- Attempting to place wall');
-        _handleWallPlaceAttempt(wall);
+        // _handleWallPlaceAttempt(wall);
       } else {
         debugPrint('- Cannot place wall: No walls remaining');
       }
@@ -378,16 +397,6 @@ class BoardComponent extends PositionComponent {
     } else {
       // Fallback to direct callback
       onMoveAttempted?.call(newPosition);
-    }
-  }
-
-  // Handle wall placement attempts through controller if available
-  void _handleWallPlaceAttempt(Wall wall) {
-    if (_gameController != null) {
-      _gameController!.add(PlaceWall(wall));
-    } else {
-      // Fallback to direct callback
-      onWallPlaceAttempted?.call(wall);
     }
   }
 

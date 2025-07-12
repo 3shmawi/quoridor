@@ -27,7 +27,7 @@ class GameConstants {
   static const int lightCellColor = 0xFFF1F4F8;
   static const int darkCellColor = 0xFFE5E7EB;
   static const int player1Color = 0xFF6F61EF;
-  static const int player2Color = 0xFF39D2C0;
+  static const int player2Color = 0xFF006400;
   static const int player3Color = 0xFFE74C3C;
   static const int player4Color = 0xFFF39C12;
   static const int wallColor = 0xFF15161E;

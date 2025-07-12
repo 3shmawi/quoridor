@@ -146,13 +146,26 @@ class PlayerComponent extends PositionComponent {
     );
 
     textPainter.layout();
-    textPainter.paint(
-      canvas,
-      Offset(
-        center.dx - textPainter.width / 2,
-        center.dy - textPainter.height / 2,
-      ),
+    final textOffset = Offset(
+      center.dx - textPainter.width / 2,
+      center.dy - textPainter.height / 2,
     );
+
+    // Determine rotation based on current player
+    double angle = switch (gameState.currentPlayerId) {
+      1 => 0,
+      2 => pi,
+      3 => -pi / 2,
+      4 => pi / 2,
+      _ => 0,
+    };
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle);
+    canvas.translate(-center.dx, -center.dy);
+    textPainter.paint(canvas, textOffset);
+    canvas.restore();
   }
 
   void _drawSelection(Canvas canvas, GameState gameState) {
