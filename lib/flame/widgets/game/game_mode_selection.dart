@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
@@ -70,28 +71,6 @@ class GameModeSelection extends StatelessWidget {
               children: [
                 _buildModeCard(
                   context,
-                  icon: Icons.computer,
-                  title: AppLocale.playVsAI.getString(context),
-                  subtitle: AppLocale.challengeOurIntelligentAIOpponent
-                      .getString(context),
-                  onTap: () {
-                    if (gameController != null) {
-                      // Initialize 2-player game with AI
-                      gameController!.add(
-                        InitializeMultiPlayerGame(
-                          playerCount: 2,
-                          playerNames: ['Player 1', 'AI'],
-                        ),
-                      );
-                    }
-
-                    Navigator.pop(context);
-                    onMessage?.call(AppLocale.aiModeActivated);
-                  },
-                ),
-                const SizedBox(height: 16),
-                _buildModeCard(
-                  context,
                   icon: Icons.people,
                   title: AppLocale.twoPlayers.getString(context),
                   subtitle: AppLocale.playWithAFriendOnTheSameDevice.getString(
@@ -116,7 +95,7 @@ class GameModeSelection extends StatelessWidget {
                   context,
                   icon: Icons.groups,
                   title: '3 Players',
-                  subtitle: 'Play with 2 friends or AI opponents',
+                  subtitle: 'Play with 2 friends',
                   onTap: () {
                     if (gameController != null) {
                       // Initialize 3-player game
@@ -134,9 +113,9 @@ class GameModeSelection extends StatelessWidget {
                 const SizedBox(height: 16),
                 _buildModeCard(
                   context,
-                  icon: Icons.group,
+                  icon: CupertinoIcons.group,
                   title: '4 Players',
-                  subtitle: 'Play with 3 friends or AI opponents',
+                  subtitle: 'Play with 3 friends ',
                   onTap: () {
                     if (gameController != null) {
                       // Initialize 4-player game

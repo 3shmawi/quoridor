@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
-import 'package:quoridor/flame/widgets/drawer/drawer_ai_difficulty.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_display_options.dart';
 
 import '../../controller/game_controller.dart';
@@ -23,9 +22,12 @@ class DrawerBody extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: 24,
           children: [
-            DrawerGameControls(game,
-                onMessage: onMessage, gameController: gameController),
-            DrawerAiDifficulty(game, gameController: gameController),
+            DrawerGameControls(
+              game,
+              onMessage: onMessage,
+              gameController: gameController,
+            ),
+            // DrawerAiDifficulty(game, gameController: gameController),
             DrawerDisplayOptions(game, gameController: gameController),
           ],
         ),

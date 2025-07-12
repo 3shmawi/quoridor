@@ -206,12 +206,12 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               BlocBuilder<GameController, GameStates>(
                 builder: (context, state) {
                   String winner = 'Unknown';
-                  if (state is GameOverState) {
-                    winner = state.winner;
+                  if (state is GameStatisticsState) {
+                    winner = state.winner ?? 'Unknown';
                   } else if (state is GamePlayingState &&
                       state.gameState.isGameOver) {
                     winner = state.gameState.winner ?? 'Unknown';
-                  }
+                  } else if (state is GameStatisticsState) {}
 
                   return Text(
                     '$winner ${AppLocale.wins.getString(context)}!',

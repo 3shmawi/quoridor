@@ -112,6 +112,7 @@ class UpdateStatistics extends GameEvent {
   final Duration gameDuration;
   final int totalMoves;
   final int wallsPlaced;
+  final String? winner;
 
   UpdateStatistics({
     required this.isWin,
@@ -119,6 +120,7 @@ class UpdateStatistics extends GameEvent {
     required this.gameDuration,
     required this.totalMoves,
     required this.wallsPlaced,
+    this.winner,
   });
 }
 
@@ -758,6 +760,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         averageGameTime: newAverageGameTime,
         totalWallsPlaced: newTotalWallsPlaced,
         totalMovesMade: newTotalMovesMade,
+        winner: event.winner,
       ),
     );
   }
@@ -777,7 +780,14 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         winner == gameState.players.first.name; // Check if first player won
     final totalMoves = gameState.moveHistory.length;
     final wallsPlaced = gameState.walls.length;
-
+    emit(
+      GameOverState(
+        gameState: gameState,
+        winner: winner ?? 'Unknown',
+        totalMoves: totalMoves,
+        gameDuration: gameDuration,
+      ),
+    );
     // Update statistics
     add(
       UpdateStatistics(
@@ -786,15 +796,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         gameDuration: gameDuration,
         totalMoves: totalMoves,
         wallsPlaced: wallsPlaced,
-      ),
-    );
-
-    emit(
-      GameOverState(
-        gameState: gameState,
-        winner: winner ?? 'Unknown',
-        totalMoves: totalMoves,
-        gameDuration: gameDuration,
+        winner: winner,
       ),
     );
 

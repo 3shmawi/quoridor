@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
+import 'package:quoridor/theme.dart';
 
 import '../../../flame/constants.dart';
 import '../../controller/game_controller.dart';
@@ -47,7 +49,6 @@ class _GameWallControlsState extends State<GameWallControls> {
   @override
   Widget build(BuildContext context) {
     final children = [
-      const SizedBox(width: 8),
       IconButton(
         onPressed: () {
           if (widget.gameController != null) {
@@ -65,7 +66,7 @@ class _GameWallControlsState extends State<GameWallControls> {
         style: IconButton.styleFrom(
           backgroundColor: Theme.of(
             context,
-          ).colorScheme.primary.withOpacity(0.1),
+          ).colorScheme.primary.withValues(alpha: 0.1),
           padding: const EdgeInsets.all(12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -73,7 +74,8 @@ class _GameWallControlsState extends State<GameWallControls> {
           ),
         ),
       ),
-      const Spacer(),
+
+      Icon(CupertinoIcons.game_controller),
       IconButton(
         onPressed: _confirmWallPlacement,
         icon: const Icon(Icons.power_input, color: Colors.green, size: 28),
@@ -88,12 +90,56 @@ class _GameWallControlsState extends State<GameWallControls> {
       ),
     ];
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: children,
-      ),
+    return Stack(
+      alignment: Alignment.topCenter,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.primaryColor, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: children,
+          ),
+        ),
+        Positioned(
+          top: 0,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              border: Border.all(color: Theme.of(context).colorScheme.primary),
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 5,
+              children: [
+                Icon(Icons.rotate_left),
+
+                Text(
+                  "Wall controls",
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Icon(Icons.control_point_duplicate),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

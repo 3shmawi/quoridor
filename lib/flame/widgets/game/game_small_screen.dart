@@ -27,73 +27,67 @@ class _GameSmallScreenState extends State<GameSmallScreen> {
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        Divider(),
+        GameWallControls(
+          game: widget.game,
+          gameController: widget.gameController,
+        ),
         Expanded(
           child: GameBoard(widget.game, gameController: widget.gameController),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Column(
-            children: [
-              GameWallControls(
-                game: widget.game,
-                gameController: widget.gameController,
-              ),
-              if (gameController.state is GamePlayingState)
-                IgnorePointer(
-                  child: ValueListenableBuilder(
-                    valueListenable: isInitializedProvider,
-                    builder: (context, value, child) {
-                      if (!value) return const SizedBox.shrink();
-                      return GridView(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 0,
-                              crossAxisSpacing: 16,
-                              childAspectRatio: 2,
-                            ),
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        children: [
-                          for (
-                            int i = 0;
-                            i < (widget.game.gameState?.players.length ?? 0);
-                            i++
-                          )
-                            GamePlayerInfoWidget(
-                              playerId:
-                                  (gameController.state as GamePlayingState)
-                                      .gameState
-                                      .players[i]
-                                      .id,
-                              name: (gameController.state as GamePlayingState)
-                                  .gameState
-                                  .players[i]
-                                  .name,
-                              wallsRemaining:
-                                  (gameController.state as GamePlayingState)
-                                      .gameState!
-                                      .players[i]
-                                      .wallsRemaining,
-                              isCurrentPlayer:
-                                  ((gameController.state as GamePlayingState)
-                                          .gameState
-                                          .currentPlayer
-                                          .id ??
-                                      0) ==
-                                  (gameController.state as GamePlayingState)
-                                      .gameState
-                                      .players[i]
-                                      .id,
-                            ),
-                        ],
-                      );
-                    },
+        if (gameController.state is GamePlayingState)
+          IgnorePointer(
+            child: ValueListenableBuilder(
+              valueListenable: isInitializedProvider,
+              builder: (context, value, child) {
+                if (!value) return const SizedBox.shrink();
+                return GridView(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 0,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 2,
                   ),
-                ),
-            ],
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    for (
+                      int i = 0;
+                      i < (widget.game.gameState?.players.length ?? 0);
+                      i++
+                    )
+                      GamePlayerInfoWidget(
+                        playerId: (gameController.state as GamePlayingState)
+                            .gameState
+                            .players[i]
+                            .id,
+                        name: (gameController.state as GamePlayingState)
+                            .gameState
+                            .players[i]
+                            .name,
+                        wallsRemaining:
+                            (gameController.state as GamePlayingState)
+                                .gameState!
+                                .players[i]
+                                .wallsRemaining,
+                        isCurrentPlayer:
+                            ((gameController.state as GamePlayingState)
+                                    .gameState
+                                    .currentPlayer
+                                    .id ??
+                                0) ==
+                            (gameController.state as GamePlayingState)
+                                .gameState
+                                .players[i]
+                                .id,
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
-        ),
+
         const SizedBox(height: 10),
       ],
     );

@@ -1,7 +1,8 @@
 import 'package:equatable/equatable.dart';
+
+import '../constants.dart';
 import '../models/game_state.dart';
 import '../services/ai_service.dart';
-import '../constants.dart';
 
 // Base abstract class for all game states
 abstract class GameStates extends Equatable {
@@ -46,13 +47,13 @@ class GamePlayingState extends GameStates {
 
   @override
   List<Object?> get props => [
-        gameState,
-        isPlayerTurn,
-        showValidMoves,
-        validMoves,
-        previewWall,
-        currentMessage,
-      ];
+    gameState,
+    isPlayerTurn,
+    showValidMoves,
+    validMoves,
+    previewWall,
+    currentMessage,
+  ];
 
   GamePlayingState copyWith({
     GameState? gameState,
@@ -107,12 +108,12 @@ class GameOverState extends GameStates {
 
   @override
   List<Object?> get props => [
-        gameState,
-        winner,
-        isDraw,
-        totalMoves,
-        gameDuration,
-      ];
+    gameState,
+    winner,
+    isDraw,
+    totalMoves,
+    gameDuration,
+  ];
 }
 
 // Paused state
@@ -120,10 +121,7 @@ class GamePausedState extends GameStates {
   final GameState gameState;
   final String reason;
 
-  const GamePausedState({
-    required this.gameState,
-    this.reason = 'Game paused',
-  });
+  const GamePausedState({required this.gameState, this.reason = 'Game paused'});
 
   @override
   List<Object?> get props => [gameState, reason];
@@ -165,13 +163,13 @@ class GameSettingsState extends GameStates {
 
   @override
   List<Object?> get props => [
-        aiDifficulty,
-        showValidMoves,
-        enableSound,
-        enableHapticFeedback,
-        language,
-        isDarkMode,
-      ];
+    aiDifficulty,
+    showValidMoves,
+    enableSound,
+    enableHapticFeedback,
+    language,
+    isDarkMode,
+  ];
 
   GameSettingsState copyWith({
     AIDifficulty? aiDifficulty,
@@ -203,6 +201,7 @@ class GameStatisticsState extends GameStates {
   final int totalWallsPlaced;
   final int totalMovesMade;
   final Map<AIDifficulty, int> winsByDifficulty;
+  final String? winner;
 
   const GameStatisticsState({
     this.gamesPlayed = 0,
@@ -214,18 +213,19 @@ class GameStatisticsState extends GameStates {
     this.totalWallsPlaced = 0,
     this.totalMovesMade = 0,
     this.winsByDifficulty = const {},
+    this.winner,
   });
 
   @override
   List<Object?> get props => [
-        gamesPlayed,
-        gamesWon,
-        gamesLost,
-        gamesDrawn,
-        winRate,
-        averageGameTime,
-        totalWallsPlaced,
-        totalMovesMade,
-        winsByDifficulty,
-      ];
+    gamesPlayed,
+    gamesWon,
+    gamesLost,
+    gamesDrawn,
+    winRate,
+    averageGameTime,
+    totalWallsPlaced,
+    totalMovesMade,
+    winsByDifficulty,
+  ];
 }

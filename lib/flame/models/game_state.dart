@@ -83,13 +83,13 @@ class GameState {
   String? get winner {
     switch (status) {
       case GameStatus.player1Won:
-        return players[1].name;
+        return players[0].name;
       case GameStatus.player2Won:
-        return players[2].name;
+        return players[1].name;
       case GameStatus.player3Won:
-        return players[3].name;
+        return players[2].name;
       case GameStatus.player4Won:
-        return players[4].name;
+        return players[3].name;
       default:
         return null;
     }
