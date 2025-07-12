@@ -9,6 +9,12 @@ class GameConstants {
   static const int boardSize = 9;
   static const int maxWallsPerPlayer = 10;
 
+  // Multi-player configurations
+  static const int maxPlayers = 4;
+  static const int wallsFor2Players = 10;
+  static const int wallsFor3Players = 7;
+  static const int wallsFor4Players = 5;
+
   // Cell dimensions for rendering
   // static const double cellSize = 40.0;
   static const double cellSpacing = 4.0;
@@ -22,16 +28,58 @@ class GameConstants {
   static const int darkCellColor = 0xFFE5E7EB;
   static const int player1Color = 0xFF6F61EF;
   static const int player2Color = 0xFF39D2C0;
+  static const int player3Color = 0xFFE74C3C;
+  static const int player4Color = 0xFFF39C12;
   static const int wallColor = 0xFF15161E;
   static const int validMoveColor = 0xFFEE8B60;
 
-  // Player starting positions
-  static const Position player1Start = Position(8, 4);
-  static const Position player2Start = Position(0, 4);
+  // Player starting positions (correct Quoridor setup)
+  static const Position player1Start = Position(8, 4); // Bottom center
+  static const Position player2Start = Position(0, 4); // Top center
+  static const Position player3Start = Position(4, 8); // Right center
+  static const Position player4Start = Position(4, 0); // Left center
 
-  // Goal rows
-  static const int player1Goal = 0;
-  static const int player2Goal = 8;
+  // Goal rows (entire rows are goals)
+  static const int player1Goal = 0; // Top row
+  static const int player2Goal = 8; // Bottom row
+  static const int player3Goal = 4; // Center row (for 4-player mode)
+  static const int player4Goal = 4; // Center row (for 4-player mode)
+
+  // Goal columns (entire columns are goals for 4-player mode)
+  static const int player1GoalCol = 4; // Center column (for 4-player mode)
+  static const int player2GoalCol = 4; // Center column (for 4-player mode)
+  static const int player3GoalCol = 0; // Left column
+  static const int player4GoalCol = 8; // Right column
+
+  // Helper method to get wall count based on player count
+  static int getWallsForPlayerCount(int playerCount) {
+    switch (playerCount) {
+      case 2:
+        return wallsFor2Players;
+      case 3:
+        return wallsFor3Players;
+      case 4:
+        return wallsFor4Players;
+      default:
+        return wallsFor2Players;
+    }
+  }
+
+  // Helper method to get player color
+  static int getPlayerColor(int playerId) {
+    switch (playerId) {
+      case 1:
+        return player1Color;
+      case 2:
+        return player2Color;
+      case 3:
+        return player3Color;
+      case 4:
+        return player4Color;
+      default:
+        return player1Color;
+    }
+  }
 }
 
 class Position {
@@ -56,9 +104,20 @@ class Position {
 
   static Position fromJson(Map<String, dynamic> json) =>
       Position(json['row'] as int, json['col'] as int);
+
+  Position copyWith({int? row, int? col}) {
+    return Position(row ?? this.row, col ?? this.col);
+  }
 }
 
 enum WallOrientation { horizontal, vertical }
+
+enum WallRotationPhase {
+  verticalLeft,
+  horizontalTop,
+  verticalRight,
+  horizontalBottom,
+}
 
 class Wall {
   final Position position; // Top-left position of the wall
@@ -86,9 +145,20 @@ class Wall {
     Position.fromJson(json['position']),
     WallOrientation.values[json['orientation'] as int],
   );
+
+  Wall copyWith({Position? position, WallOrientation? orientation}) {
+    return Wall(position ?? this.position, orientation ?? this.orientation);
+  }
 }
 
-enum GameStatus { playing, player1Won, player2Won, draw }
+enum GameStatus {
+  playing,
+  player1Won,
+  player2Won,
+  player3Won,
+  player4Won,
+  draw,
+}
 
 enum MoveType { pawnMove, wallPlace }
 

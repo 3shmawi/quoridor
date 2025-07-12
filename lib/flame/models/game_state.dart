@@ -5,8 +5,7 @@ import 'player.dart';
 
 class GameState {
   final String gameId;
-  final Player player1;
-  final Player player2;
+  final List<Player> players;
   final List<Wall> walls;
   int currentPlayerId;
   GameStatus status;
@@ -16,12 +15,12 @@ class GameState {
   final List<GameMove> moveHistory;
   bool showValidMoves;
   WallOrientation wallOrientation;
+  WallRotationPhase wallRotationPhase;
   Wall? previewWall;
 
   GameState({
     required this.gameId,
-    required this.player1,
-    required this.player2,
+    required this.players,
     List<Wall>? walls,
     this.currentPlayerId = 1,
     this.status = GameStatus.playing,
@@ -31,15 +30,21 @@ class GameState {
     this.showValidMoves = true,
     List<GameMove>? moveHistory,
     this.wallOrientation = WallOrientation.horizontal,
+    this.wallRotationPhase = WallRotationPhase.horizontalBottom,
     this.previewWall,
   }) : walls = walls ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
        moveHistory = moveHistory ?? [];
 
-  Player get currentPlayer => currentPlayerId == 1 ? player1 : player2;
+  // Get player count
+  int get playerCount => players.length;
 
-  Player get otherPlayer => currentPlayerId == 1 ? player2 : player1;
+  Player get currentPlayer =>
+      players.firstWhere((p) => p.id == currentPlayerId);
+
+  List<Player> get otherPlayers =>
+      players.where((p) => p.id != currentPlayerId).toList();
 
   bool get isGameOver => status != GameStatus.playing;
 
@@ -55,21 +60,16 @@ class GameState {
     updatedAt = DateTime.now();
   }
 
-  Player get firstPlayer => player1;
-
-  Player get secondPlayer => player2;
-
-  bool get isAi => player2.isAI;
-
-  set toggleAi(bool isAI) {
-    player2.copyWith(isAI: isAI);
-    updatedAt = DateTime.now();
-  }
-
   WallOrientation get getWallOrientation => wallOrientation;
 
   set setWallOrientation(WallOrientation orientation) {
     wallOrientation = orientation;
+    updatedAt = DateTime.now();
+  }
+
+  WallRotationPhase get getWallRotationPhase => wallRotationPhase;
+  set setWallRotationPhase(WallRotationPhase phase) {
+    wallRotationPhase = phase;
     updatedAt = DateTime.now();
   }
 
@@ -83,16 +83,22 @@ class GameState {
   String? get winner {
     switch (status) {
       case GameStatus.player1Won:
-        return player1.name;
+        return players[1].name;
       case GameStatus.player2Won:
-        return player2.name;
+        return players[2].name;
+      case GameStatus.player3Won:
+        return players[3].name;
+      case GameStatus.player4Won:
+        return players[4].name;
       default:
         return null;
     }
   }
 
   void switchTurn() {
-    currentPlayerId = currentPlayerId == 1 ? 2 : 1;
+    final currentIndex = players.indexWhere((p) => p.id == currentPlayerId);
+    final nextIndex = (currentIndex + 1) % players.length;
+    currentPlayerId = players[nextIndex].id;
     updatedAt = DateTime.now();
   }
 
@@ -108,12 +114,26 @@ class GameState {
   }
 
   void checkWinCondition() {
-    if (player1.hasReachedGoal) {
-      status = GameStatus.player1Won;
-    } else if (player2.hasReachedGoal) {
-      status = GameStatus.player2Won;
+    for (final player in players) {
+      if (player.hasReachedGoal) {
+        switch (player.id) {
+          case 1:
+            status = GameStatus.player1Won;
+            break;
+          case 2:
+            status = GameStatus.player2Won;
+            break;
+          case 3:
+            status = GameStatus.player3Won;
+            break;
+          case 4:
+            status = GameStatus.player4Won;
+            break;
+        }
+        updatedAt = DateTime.now();
+        return;
+      }
     }
-    updatedAt = DateTime.now();
   }
 
   void addMoveToHistory(GameMove move) {
@@ -122,7 +142,7 @@ class GameState {
   }
 
   bool isPositionOccupied(Position position) {
-    return player1.position == position || player2.position == position;
+    return players.any((player) => player.position == position);
   }
 
   bool isWallBlocking(Position from, Position to) {
@@ -236,12 +256,10 @@ class GameState {
 
   Map<String, dynamic> toJson() => {
     'gameId': gameId,
-    'player1': player1.toJson(),
-    'player2': player2.toJson(),
+    'players': players.map((p) => p.toJson()).toList(),
     'walls': walls.map((w) => w.toJson()).toList(),
     'currentPlayerId': currentPlayerId,
     'status': status.index,
-    'aiDifficulty': aiDifficulty.index,
     "showValidMoves": showValidMoves,
     'createdAt': createdAt.millisecondsSinceEpoch,
     'updatedAt': updatedAt.millisecondsSinceEpoch,
@@ -250,12 +268,10 @@ class GameState {
 
   static GameState fromJson(Map<String, dynamic> json) => GameState(
     gameId: json['gameId'] as String,
-    player1: Player.fromJson(json['player1']),
-    player2: Player.fromJson(json['player2']),
+    players: (json['players'] as List).map((p) => Player.fromJson(p)).toList(),
     walls: (json['walls'] as List).map((w) => Wall.fromJson(w)).toList(),
     currentPlayerId: json['currentPlayerId'] as int,
     status: GameStatus.values[json['status'] as int],
-    aiDifficulty: AIDifficulty.values[json['aiDifficulty'] as int],
     showValidMoves: json['showValidMoves'] as bool? ?? true,
     createdAt: DateTime.fromMillisecondsSinceEpoch(json['createdAt'] as int),
     updatedAt: DateTime.fromMillisecondsSinceEpoch(json['updatedAt'] as int),
@@ -263,25 +279,56 @@ class GameState {
         .map((m) => GameMove.fromJson(m))
         .toList(),
   );
+
+  GameState copyWith({
+    String? gameId,
+    List<Player>? players,
+    List<Wall>? walls,
+    int? currentPlayerId,
+    GameStatus? status,
+    AIDifficulty? aiDifficulty,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? showValidMoves,
+    List<GameMove>? moveHistory,
+    WallOrientation? wallOrientation,
+    WallRotationPhase? wallRotationPhase,
+    Wall? previewWall,
+  }) {
+    return GameState(
+      gameId: gameId ?? this.gameId,
+      players: players ?? this.players,
+      walls: walls ?? this.walls,
+      currentPlayerId: currentPlayerId ?? this.currentPlayerId,
+      status: status ?? this.status,
+      aiDifficulty: aiDifficulty ?? this.aiDifficulty,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      showValidMoves: showValidMoves ?? this.showValidMoves,
+      moveHistory: moveHistory ?? this.moveHistory,
+      wallOrientation: wallOrientation ?? this.wallOrientation,
+      wallRotationPhase: wallRotationPhase ?? this.wallRotationPhase,
+      previewWall: previewWall ?? this.previewWall,
+    );
+  }
 }
 
 // Factory for creating new games
 class GameStateFactory {
-  static GameState createNewGame({
+  static GameState createMultiPlayerGame({
     String? gameId,
-    String player1Name = 'Player 1',
-    String player2Name = 'Player 2',
-    bool player2IsAI = true,
+    int playerCount = 2,
+    List<String>? playerNames,
+    List<bool>? aiPlayers,
   }) {
     gameId ??= 'game_${DateTime.now().millisecondsSinceEpoch}';
 
-    return GameState(
-      gameId: gameId,
-      player1: PlayerFactory.createPlayer1(name: player1Name),
-      player2: PlayerFactory.createPlayer2(
-        name: player2Name,
-        isAI: player2IsAI,
-      ),
+    final players = PlayerFactory.createPlayersForCount(
+      playerCount,
+      playerNames: playerNames,
+      aiPlayers: aiPlayers,
     );
+
+    return GameState(gameId: gameId, players: players);
   }
 }

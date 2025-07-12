@@ -28,7 +28,6 @@ class PlayerComponent extends PositionComponent {
   void updateFromState(GamePlayingState state) {
     showValidMoves = state.showValidMoves;
     validMoves = state.validMoves;
-    // Keep selectedPawn as is - it's UI state
   }
 
   void clearSelection() {
@@ -45,39 +44,25 @@ class PlayerComponent extends PositionComponent {
 
     final gameState = currentState.gameState;
 
-    _drawValidMoves(canvas);
+    _drawValidMoves(canvas, gameState);
     _drawPlayers(canvas, gameState);
-    _drawSelection(canvas);
+    _drawSelection(canvas, gameState);
   }
 
   void _drawPlayers(Canvas canvas, GameState gameState) {
-    // Draw player 1
-    _drawPlayer(
-      canvas: canvas,
-      position: gameState.player1.position,
-      color: gameState.currentPlayerId == 1
-          ? const Color(GameConstants.player1Color)
-          : Colors.transparent,
-      playerId: 1,
-      gameState: gameState,
-    );
-
-    // Draw player 2
-    _drawPlayer(
-      canvas: canvas,
-      position: gameState.player2.position,
-      color: gameState.currentPlayerId == 2
-          ? const Color(GameConstants.player2Color)
-          : Colors.transparent,
-      playerId: 2,
-      gameState: gameState,
-    );
+    for (final player in gameState.players) {
+      _drawPlayer(
+        canvas: canvas,
+        position: player.position,
+        playerId: player.id,
+        gameState: gameState,
+      );
+    }
   }
 
   void _drawPlayer({
     required Canvas canvas,
     required Position position,
-    required Color color,
     required int playerId,
     required GameState gameState,
   }) {
@@ -86,19 +71,25 @@ class PlayerComponent extends PositionComponent {
     final radius = cellSizeNotifier.value * 0.35;
 
     final milliseconds = DateTime.now().millisecondsSinceEpoch;
-    final t = gameState.currentPlayerId == playerId
-        ? (sin(milliseconds / 300.0) + 1) / 2
-        : 1;
+    final isCurrentPlayer = gameState.currentPlayerId == playerId;
+    final t = isCurrentPlayer ? (sin(milliseconds / 300.0) + 1) / 2 : 1;
+    final opacity = isCurrentPlayer ? 1.0 : 0.15;
 
-    // Set opacity: 1.0 if selected, 0.4 if not
-    final double opacity = gameState.currentPlayerId == playerId ? 1.0 : 0.3;
+    final playerColor = Color(GameConstants.getPlayerColor(playerId));
+
+    if (isCurrentPlayer) {
+      final glowPaint = Paint()
+        ..color = playerColor.withValues(alpha: 0.15)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      canvas.drawCircle(center, radius * 1.6, glowPaint);
+    }
 
     final shadowPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.2 * opacity * (.5 + t))
       ..style = PaintingStyle.fill;
 
     final pawnPaint = Paint()
-      ..color = color.withValues(alpha: opacity)
+      ..color = playerColor.withValues(alpha: opacity)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
@@ -110,37 +101,38 @@ class PlayerComponent extends PositionComponent {
       ..color = Colors.white.withValues(alpha: 0.3 * opacity * (.5 + t))
       ..style = PaintingStyle.fill;
 
-    // Draw shadow
+    // Animate scale for current player
+    final scale = isCurrentPlayer
+        ? 1.0 + 0.05 * sin(milliseconds / 200.0)
+        : 1.0;
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(scale);
+    canvas.translate(-center.dx, -center.dy);
+
     canvas.drawCircle(
       Offset(center.dx + 2, center.dy + 2),
       radius,
       shadowPaint,
     );
-
-    // Draw pawn base
     canvas.drawCircle(center, radius, pawnPaint);
-
-    // Draw white border
     canvas.drawCircle(center, radius, borderPaint);
-
-    // Draw highlight if selected
-    if (isSelected) {
-      final selectionPaint = Paint()
-        ..color = const Color(GameConstants.validMoveColor)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4.0;
-
-      canvas.drawCircle(center, radius + 6, selectionPaint);
-    }
-
-    // Draw inner highlight
     canvas.drawCircle(
       Offset(center.dx - radius * 0.3, center.dy - radius * 0.3),
       radius * 0.2,
       highlightPaint,
     );
 
-    // Draw player number
+    if (isSelected) {
+      final selectionPaint = Paint()
+        ..color = const Color(GameConstants.validMoveColor)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.0;
+      canvas.drawCircle(center, radius + 6, selectionPaint);
+    }
+
+    canvas.restore();
+
     final textPainter = TextPainter(
       text: TextSpan(
         text: playerId.toString(),
@@ -163,12 +155,10 @@ class PlayerComponent extends PositionComponent {
     );
   }
 
-  void _drawSelection(Canvas canvas) {
+  void _drawSelection(Canvas canvas, GameState gameState) {
     if (selectedPawn != null) {
       final paint = Paint()
-        ..color = const Color(
-          GameConstants.validMoveColor,
-        ).withValues(alpha: 0.3)
+        ..color = const Color(GameConstants.validMoveColor).withOpacity(0.3)
         ..style = PaintingStyle.fill;
 
       final rect = Rect.fromLTWH(
@@ -187,12 +177,11 @@ class PlayerComponent extends PositionComponent {
     }
   }
 
-  void _drawValidMoves(Canvas canvas) {
+  void _drawValidMoves(Canvas canvas, GameState gameState) {
     if (!showValidMoves || validMoves.isEmpty || selectedPawn == null) return;
 
     final paint = Paint()
-      ..color = const Color(GameConstants.validMoveColor).withValues(alpha: 0.6)
-      ..color = const Color(GameConstants.validMoveColor).withValues(alpha: 0.3)
+      ..color = const Color(GameConstants.validMoveColor).withOpacity(0.3)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
@@ -202,7 +191,6 @@ class PlayerComponent extends PositionComponent {
 
     for (final position in validMoves) {
       final center = _getCellCenter(position);
-
       canvas.drawCircle(center, cellSizeNotifier.value * 0.3, paint);
       canvas.drawCircle(center, cellSizeNotifier.value * 0.3, borderPaint);
     }

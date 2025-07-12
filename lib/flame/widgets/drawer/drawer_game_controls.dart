@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/services/localizations.dart';
+
 import '../../controller/game_controller.dart';
 import '../../game/quoridor_game.dart';
 import '../../services/firebase_service.dart';
@@ -32,7 +33,7 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
 
   void _newGame() {
     if (widget.gameController != null) {
-      widget.gameController!.add(StartNewGame());
+      widget.gameController!.add(StartNewMultiPlayerGame(playerCount: 3));
     } else {
       widget.game.newGame();
     }

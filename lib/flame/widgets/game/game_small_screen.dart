@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localization/flutter_localization.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:quoridor/flame/controller/game_states.dart';
 import 'package:quoridor/flame/game/quoridor_game.dart';
-import 'package:quoridor/flame/services/localizations.dart';
 import 'package:quoridor/flame/widgets/game/game_player_info_widget.dart';
 import 'package:quoridor/flame/widgets/game/game_wall_controls.dart';
 
 import '../../controller/game_controller.dart';
 import 'game_board.dart';
 
-class GameSmallScreen extends StatelessWidget {
+class GameSmallScreen extends StatefulWidget {
   final QuoridorGame game;
   final GameController? gameController;
 
   const GameSmallScreen(this.game, {super.key, this.gameController});
+
+  @override
+  State<GameSmallScreen> createState() => _GameSmallScreenState();
+}
+
+class _GameSmallScreenState extends State<GameSmallScreen> {
+  late final gameController = context.read<GameController>();
 
   @override
   Widget build(BuildContext context) {
@@ -20,74 +27,70 @@ class GameSmallScreen extends StatelessWidget {
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        AnimatedCrossFade(
-          firstChild: GameWallControls(
-            game: game,
-            gameController: gameController,
-          ),
-          secondChild: SizedBox.shrink(),
-          crossFadeState:
-              !(game.gameState?.player2.isAI ?? false) &&
-                  (game.gameState?.currentPlayer.id ?? 0) == 2
-              ? CrossFadeState.showFirst
-              : CrossFadeState.showSecond,
-          duration: Duration(milliseconds: 500),
+        Expanded(
+          child: GameBoard(widget.game, gameController: widget.gameController),
         ),
-        Expanded(child: GameBoard(game, gameController: gameController)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Column(
             children: [
-              AnimatedCrossFade(
-                firstChild: GameWallControls(
-                  game: game,
-                  gameController: gameController,
-                ),
-                secondChild: SizedBox.shrink(),
-                crossFadeState: (game.gameState?.currentPlayer.id ?? 0) == 1
-                    ? CrossFadeState.showFirst
-                    : CrossFadeState.showSecond,
-                duration: Duration(milliseconds: 500),
+              GameWallControls(
+                game: widget.game,
+                gameController: widget.gameController,
               ),
-              IgnorePointer(
-                child: ValueListenableBuilder(
-                  valueListenable: isInitializedProvider,
-                  builder: (context, value, child) {
-                    if (!value) return const SizedBox.shrink();
-                    return GridView(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 1.6,
-                          ),
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        GamePlayerInfoWidget(
-                          playerId: 1,
-                          name: AppLocale.player1.getString(context),
-                          wallsRemaining:
-                              game.gameState?.player1.wallsRemaining ?? 0,
-                          isCurrentPlayer:
-                              (game.gameState?.currentPlayer.id ?? 0) == 1,
-                          isAI: false,
-                        ),
-                        GamePlayerInfoWidget(
-                          playerId: 2,
-                          name: AppLocale.player2.getString(context),
-                          wallsRemaining:
-                              game.gameState?.player2.wallsRemaining ?? 0,
-                          isCurrentPlayer:
-                              (game.gameState?.currentPlayer.id ?? 0) == 2,
-                          isAI: game.gameState?.player2.isAI ?? false,
-                        ),
-                      ],
-                    );
-                  },
+              if (gameController.state is GamePlayingState)
+                IgnorePointer(
+                  child: ValueListenableBuilder(
+                    valueListenable: isInitializedProvider,
+                    builder: (context, value, child) {
+                      if (!value) return const SizedBox.shrink();
+                      return GridView(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 2,
+                            ),
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          for (
+                            int i = 0;
+                            i < (widget.game.gameState?.players.length ?? 0);
+                            i++
+                          )
+                            GamePlayerInfoWidget(
+                              playerId:
+                                  (gameController.state as GamePlayingState)
+                                      .gameState!
+                                      .players[i]
+                                      .id,
+                              name: (gameController.state as GamePlayingState)
+                                  .gameState!
+                                  .players[i]
+                                  .name,
+                              wallsRemaining:
+                                  (gameController.state as GamePlayingState)
+                                      .gameState!
+                                      .players[i]
+                                      .wallsRemaining,
+                              isCurrentPlayer:
+                                  ((gameController.state as GamePlayingState)
+                                          .gameState
+                                          ?.currentPlayer
+                                          .id ??
+                                      0) ==
+                                  (gameController.state as GamePlayingState)
+                                      .gameState!
+                                      .players[i]
+                                      .id,
+                            ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
             ],
           ),
         ),

@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localization/flutter_localization.dart';
-
-import '../../services/localizations.dart';
 
 /// A widget that displays information about a player in the game.
 ///
@@ -23,9 +20,6 @@ class GamePlayerInfoWidget extends StatelessWidget {
   /// Whether this player is the current player
   final bool isCurrentPlayer;
 
-  /// Whether this player is controlled by AI
-  final bool isAI;
-
   /// Creates a new instance of [GamePlayerInfoWidget].
   const GamePlayerInfoWidget({
     super.key,
@@ -33,29 +27,28 @@ class GamePlayerInfoWidget extends StatelessWidget {
     required this.name,
     required this.wallsRemaining,
     required this.isCurrentPlayer,
-    required this.isAI,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isCurrentPlayer
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.outline.withOpacity(0.2),
-          width: isCurrentPlayer ? 2 : 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Stack(
+      alignment: Alignment.topRight,
+      children: [
+        Card(
+          elevation: 0,
+          color: Theme.of(context).colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: isCurrentPlayer
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              width: isCurrentPlayer ? 2 : 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
                 Expanded(
                   child: Text(
@@ -68,56 +61,22 @@ class GamePlayerInfoWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (isAI) ...[
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.computer,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ],
-                if (isCurrentPlayer) ...[
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.play_arrow,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ],
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  Icons.wallpaper,
-                  size: 16,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withOpacity(0.7),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    '$wallsRemaining ${AppLocale.wallsLeft.getString(context)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textDirection:
-                        localization.currentLocale?.languageCode == 'ar'
-                        ? TextDirection.rtl
-                        : TextDirection.ltr,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
-      ),
+        if (isCurrentPlayer)
+          CircleAvatar(
+            radius: 12,
+            child: Text(
+              "$wallsRemaining",
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

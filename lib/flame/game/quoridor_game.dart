@@ -11,7 +11,6 @@ import '../controller/game_controller.dart';
 import '../controller/game_states.dart';
 import '../models/game_state.dart';
 import '../services/ai_service.dart';
-import '../services/game_service.dart';
 
 final isInitializedProvider = ValueNotifier(false);
 
@@ -98,7 +97,7 @@ class QuoridorGame extends FlameGame
   // Game control methods
   void newGame() {
     if (_gameController != null) {
-      _gameController!.add(StartNewGame());
+      _gameController!.add(StartNewMultiPlayerGame(playerCount: 3));
     } else {
       onGameMessage?.call(AppLocale.newGameStarted);
     }

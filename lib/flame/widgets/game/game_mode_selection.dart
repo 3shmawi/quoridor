@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:quoridor/flame/game/quoridor_game.dart';
 import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/game/quoridor_game.dart';
+
 import '../../controller/game_controller.dart';
 import '../../services/localizations.dart';
 import '../app/copywrite.dart';
@@ -25,7 +26,7 @@ class GameModeSelection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.8,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -75,15 +76,13 @@ class GameModeSelection extends StatelessWidget {
                       .getString(context),
                   onTap: () {
                     if (gameController != null) {
-                      // Use controller to toggle player mode
-                      gameController!.add(TogglePlayerMode());
-                    } else {
-                      // Fallback to direct game method
-                      if (!(game.gameState?.player2.isAI ?? false)) {
-                        game.togglePlayerMode();
-                      } else {
-                        game.updateFromController();
-                      }
+                      // Initialize 2-player game with AI
+                      gameController!.add(
+                        InitializeMultiPlayerGame(
+                          playerCount: 2,
+                          playerNames: ['Player 1', 'AI'],
+                        ),
+                      );
                     }
 
                     Navigator.pop(context);
@@ -100,18 +99,61 @@ class GameModeSelection extends StatelessWidget {
                   ),
                   onTap: () {
                     if (gameController != null) {
-                      // Use controller to toggle player mode
-                      gameController!.add(TogglePlayerMode());
-                    } else {
-                      // Fallback to direct game method
-                      if ((game.gameState?.player2.isAI ?? false)) {
-                        game.togglePlayerMode();
-                      } else {
-                        game.updateFromController();
-                      }
+                      // Initialize 2-player game with human players
+                      gameController!.add(
+                        InitializeMultiPlayerGame(
+                          playerCount: 2,
+                          playerNames: ['Player 1', 'Player 2'],
+                        ),
+                      );
                     }
                     Navigator.pop(context);
                     onMessage?.call(AppLocale.twoPlayerModeActivated);
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildModeCard(
+                  context,
+                  icon: Icons.groups,
+                  title: '3 Players',
+                  subtitle: 'Play with 2 friends or AI opponents',
+                  onTap: () {
+                    if (gameController != null) {
+                      // Initialize 3-player game
+                      gameController!.add(
+                        InitializeMultiPlayerGame(
+                          playerCount: 3,
+                          playerNames: ['Player 1', 'Player 2', 'Player 3'],
+                        ),
+                      );
+                    }
+                    Navigator.pop(context);
+                    onMessage?.call('3-player mode activated');
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildModeCard(
+                  context,
+                  icon: Icons.group,
+                  title: '4 Players',
+                  subtitle: 'Play with 3 friends or AI opponents',
+                  onTap: () {
+                    if (gameController != null) {
+                      // Initialize 4-player game
+                      gameController!.add(
+                        InitializeMultiPlayerGame(
+                          playerCount: 4,
+                          playerNames: [
+                            'Player 1',
+                            'Player 2',
+                            'Player 3',
+                            'Player 4',
+                          ],
+                        ),
+                      );
+                    }
+                    Navigator.pop(context);
+                    onMessage?.call('4-player mode activated');
                   },
                 ),
               ],

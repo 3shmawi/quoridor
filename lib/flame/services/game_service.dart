@@ -7,7 +7,7 @@ import 'ai_service.dart';
 class GameService {
   // Validate if a move is legal
   static bool isValidMove(GameState gameState, GameMove move) {
-    final player = move.playerId == 1 ? gameState.player1 : gameState.player2;
+    final player = gameState.players.firstWhere((p) => p.id == move.playerId);
 
     if (move.type == MoveType.pawnMove) {
       return _isValidPawnMove(gameState, player, move.newPosition!);
@@ -25,8 +25,7 @@ class GameService {
     // Create a new game state (immutable approach)
     final newGameState = GameState(
       gameId: gameState.gameId,
-      player1: gameState.player1,
-      player2: gameState.player2,
+      players: List.from(gameState.players),
       walls: List.from(gameState.walls),
       currentPlayerId: gameState.currentPlayerId,
       status: gameState.status,
@@ -57,84 +56,126 @@ class GameService {
   }
 
   // Get all valid moves for current player
-  static List<GameMove> getValidMoves(GameState gameState) {
+  static List<GameMove> getAllValidMoves(GameState gameState) {
+    final moves = <GameMove>[];
     final currentPlayer = gameState.currentPlayer;
-    final validMoves = <GameMove>[];
 
-    // Add valid pawn moves
+    // Get valid pawn moves
     final validPositions = gameState.getValidMoves(currentPlayer.position);
     for (final position in validPositions) {
-      validMoves.add(GameMove.pawnMove(position, currentPlayer.id));
+      moves.add(GameMove.pawnMove(position, currentPlayer.id));
     }
 
-    // Add valid wall placements
+    // Get valid wall placements
     if (currentPlayer.hasWallsRemaining) {
       final validWalls = _getValidWallPlacements(gameState);
       for (final wall in validWalls) {
-        validMoves.add(GameMove.wallPlace(wall, currentPlayer.id));
+        moves.add(GameMove.wallPlace(wall, currentPlayer.id));
       }
     }
 
-    return validMoves;
+    return moves;
   }
 
-  // Execute AI turn
-  static Future<GameState> executeAITurn(
-    GameState gameState,
-    AIDifficulty difficulty,
-  ) async {
-    if (!gameState.currentPlayer.isAI || gameState.isGameOver) {
-      return gameState;
+  // Get valid wall placements for current player
+  static List<Wall> _getValidWallPlacements(GameState gameState) {
+    final walls = <Wall>[];
+
+    // Check all possible wall positions
+    for (int row = 0; row < GameConstants.boardSize - 1; row++) {
+      for (int col = 0; col < GameConstants.boardSize - 1; col++) {
+        // Horizontal wall
+        final horizontalWall = Wall(
+          Position(row, col),
+          WallOrientation.horizontal,
+        );
+        if (_isValidWallPlacement(
+          gameState,
+          gameState.currentPlayer,
+          horizontalWall,
+        )) {
+          walls.add(horizontalWall);
+        }
+
+        // Vertical wall
+        final verticalWall = Wall(Position(row, col), WallOrientation.vertical);
+        if (_isValidWallPlacement(
+          gameState,
+          gameState.currentPlayer,
+          verticalWall,
+        )) {
+          walls.add(verticalWall);
+        }
+      }
     }
 
-    final aiMove = await AIService.generateMove(gameState, difficulty);
-
-    if (aiMove != null && isValidMove(gameState, aiMove)) {
-      return executeMove(gameState, aiMove);
-    }
-
-    // Fallback: get any valid move
-    final validMoves = getValidMoves(gameState);
-    if (validMoves.isNotEmpty) {
-      return executeMove(gameState, validMoves.first);
-    }
-
-    return gameState;
+    return walls;
   }
 
-  // Analyze game state for UI feedback
-  static GameAnalysis analyzeGameState(GameState gameState) {
-    final pathLengths = Pathfinding.calculatePathLengths(gameState);
-    final validMoves = getValidMoves(gameState);
-
-    return GameAnalysis(
-      playerPathLengths: pathLengths,
-      validMoves: validMoves,
-      gamePhase: _determineGamePhase(gameState),
-      winner: gameState.winner,
-      isGameOver: gameState.isGameOver,
-    );
-  }
-
-  // Private helper methods
+  // Check if pawn move is valid
   static bool _isValidPawnMove(
     GameState gameState,
     Player player,
     Position newPosition,
   ) {
+    // Check if it's the player's turn
+    if (gameState.currentPlayerId != player.id) {
+      return false;
+    }
+
+    // Check if game is over
+    if (gameState.isGameOver) {
+      return false;
+    }
+
+    // Check if position is within bounds
+    if (newPosition.row < 0 ||
+        newPosition.row >= GameConstants.boardSize ||
+        newPosition.col < 0 ||
+        newPosition.col >= GameConstants.boardSize) {
+      return false;
+    }
+
+    // Check if position is occupied
+    if (gameState.isPositionOccupied(newPosition)) {
+      return false;
+    }
+
+    // Check if move is blocked by walls
+    if (gameState.isWallBlocking(player.position, newPosition)) {
+      return false;
+    }
+
+    // Check if move is adjacent or a valid jump
     final validMoves = gameState.getValidMoves(player.position);
     return validMoves.contains(newPosition);
   }
 
+  // Check if wall placement is valid
   static bool _isValidWallPlacement(
     GameState gameState,
     Player player,
     Wall wall,
   ) {
-    if (!player.hasWallsRemaining) return false;
+    // Check if it's the player's turn
+    if (gameState.currentPlayerId != player.id) {
+      return false;
+    }
 
-    // Check bounds
-    if (wall.position.row < 0 || wall.position.col < 0) return false;
+    // Check if game is over
+    if (gameState.isGameOver) {
+      return false;
+    }
+
+    // Check if player has walls remaining
+    if (!player.hasWallsRemaining) {
+      return false;
+    }
+
+    // Check wall bounds
+    if (wall.position.row < 0 || wall.position.col < 0) {
+      return false;
+    }
 
     if (wall.orientation == WallOrientation.horizontal) {
       if (wall.position.row >= GameConstants.boardSize ||
@@ -148,113 +189,115 @@ class GameService {
       }
     }
 
-    // Check for overlapping walls
+    // Check if wall overlaps with existing walls
     for (final existingWall in gameState.walls) {
       if (_wallsOverlap(wall, existingWall)) {
         return false;
       }
     }
 
-    // Create temporary game state with the wall
-    final tempGameState = _createTempGameStateWithWall(gameState, wall);
-
-    // Check if both players still have valid paths
-    final player1Path = Pathfinding.findShortestPath(
-      tempGameState,
-      tempGameState.player1.position,
-      tempGameState.player1.goalRow,
-    );
-
-    final player2Path = Pathfinding.findShortestPath(
-      tempGameState,
-      tempGameState.player2.position,
-      tempGameState.player2.goalRow,
-    );
-
-    // Wall is valid if both players still have a path to their goal
-    return player1Path != null && player2Path != null;
+    // Check if wall would block all paths
+    return !Pathfinding.wouldWallBlockAllPaths(gameState, wall);
   }
 
-  static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
-    return GameState(
-      gameId: original.gameId,
-      player1: original.player1,
-      player2: original.player2,
-      walls: [...original.walls, wall],
-      currentPlayerId: original.currentPlayerId,
-      status: original.status,
-      createdAt: original.createdAt,
-      updatedAt: original.updatedAt,
-      moveHistory: List.from(original.moveHistory),
-    );
-  }
-
-  static List<Wall> _getValidWallPlacements(GameState gameState) {
-    final validWalls = <Wall>[];
-
-    for (int row = 0; row < GameConstants.boardSize; row++) {
-      for (int col = 0; col < GameConstants.boardSize; col++) {
-        // Try horizontal wall
-        final horizontalWall = Wall(
-          Position(row, col),
-          WallOrientation.horizontal,
-        );
-
-        if (_isValidWallPlacement(
-          gameState,
-          gameState.currentPlayer,
-          horizontalWall,
-        )) {
-          validWalls.add(horizontalWall);
-        }
-
-        // Try vertical wall
-        final verticalWall = Wall(Position(row, col), WallOrientation.vertical);
-
-        if (_isValidWallPlacement(
-          gameState,
-          gameState.currentPlayer,
-          verticalWall,
-        )) {
-          validWalls.add(verticalWall);
-        }
-      }
-    }
-
-    return validWalls;
-  }
-
+  // Check if two walls overlap
   static bool _wallsOverlap(Wall wall1, Wall wall2) {
-    if (wall1.orientation != wall2.orientation) return false;
+    if (wall1.orientation != wall2.orientation) {
+      return false;
+    }
 
     if (wall1.orientation == WallOrientation.horizontal) {
       return wall1.position.row == wall2.position.row &&
-          (wall1.position.col == wall2.position.col ||
-              wall1.position.col == wall2.position.col + 1 ||
-              wall1.position.col == wall2.position.col - 1);
+          wall1.position.col < wall2.position.col + 2 &&
+          wall1.position.col + 2 > wall2.position.col;
     } else {
       return wall1.position.col == wall2.position.col &&
-          (wall1.position.row == wall2.position.row ||
-              wall1.position.row == wall2.position.row + 1 ||
-              wall1.position.row == wall2.position.row - 1);
+          wall1.position.row < wall2.position.row + 2 &&
+          wall1.position.row + 2 > wall2.position.row;
     }
   }
 
-  static GamePhase _determineGamePhase(GameState gameState) {
-    final totalMoves = gameState.moveHistory.length;
-    final wallsPlaced = gameState.walls.length;
+  // Execute AI turn
+  static Future<GameState> executeAITurn(
+    GameState gameState,
+    AIDifficulty difficulty,
+  ) async {
+    final aiMove = await AIService.generateMove(gameState, difficulty);
+    if (aiMove != null) {
+      return executeMove(gameState, aiMove);
+    }
+    return gameState;
+  }
 
-    if (totalMoves < 6 && wallsPlaced < 2) {
+  // Analyze game state
+  static GameAnalysis analyzeGame(GameState gameState) {
+    final pathLengths = Pathfinding.calculatePathLengths(gameState);
+    final validMoves = getAllValidMoves(gameState);
+    final gamePhase = _determineGamePhase(gameState);
+    final winner = gameState.winner;
+    final isGameOver = gameState.isGameOver;
+
+    return GameAnalysis(
+      playerPathLengths: pathLengths,
+      validMoves: validMoves,
+      gamePhase: gamePhase,
+      winner: winner,
+      isGameOver: isGameOver,
+    );
+  }
+
+  // Determine game phase
+  static GamePhase _determineGamePhase(GameState gameState) {
+    final totalWallsPlaced = gameState.walls.length;
+    final maxWalls = gameState.players.length * GameConstants.maxWallsPerPlayer;
+
+    if (totalWallsPlaced < maxWalls * 0.3) {
       return GamePhase.opening;
-    } else if (wallsPlaced < 12 && totalMoves < 25) {
+    } else if (totalWallsPlaced < maxWalls * 0.7) {
       return GamePhase.midgame;
     } else {
       return GamePhase.endgame;
     }
   }
+
+  // Check if a player can reach their goal
+  static bool canPlayerReachGoal(GameState gameState, int playerId) {
+    final player = gameState.players.firstWhere((p) => p.id == playerId);
+    final path = Pathfinding.findShortestPath(
+      gameState,
+      player.position,
+      player.goalRow,
+    );
+    return path != null;
+  }
+
+  // Get player's shortest path to goal
+  static List<Position>? getPlayerPathToGoal(
+    GameState gameState,
+    int playerId,
+  ) {
+    final player = gameState.players.firstWhere((p) => p.id == playerId);
+    return Pathfinding.findShortestPath(
+      gameState,
+      player.position,
+      player.goalRow,
+    );
+  }
+
+  // Create a temporary game state for analysis
+  static GameState createTempGameState(GameState original) {
+    return GameState(
+      gameId: original.gameId,
+      players: List.from(original.players),
+      walls: List.from(original.walls),
+      currentPlayerId: original.currentPlayerId,
+      status: original.status,
+      createdAt: original.createdAt,
+      updatedAt: original.updatedAt,
+    );
+  }
 }
 
-// Data classes for game analysis
 class GameAnalysis {
   final Map<int, int> playerPathLengths;
   final List<GameMove> validMoves;
@@ -275,18 +318,18 @@ enum GamePhase { opening, midgame, endgame }
 
 // Utility class for game creation and management
 class GameManager {
-  static GameState createNewGame({
-    String player1Name = 'Player 1',
-    String player2Name = 'AI',
-    bool enableAI = true,
-    AIDifficulty aiDifficulty = AIDifficulty.medium,
-  }) {
-    return GameStateFactory.createNewGame(
-      player1Name: player1Name,
-      player2Name: player2Name,
-      player2IsAI: enableAI,
-    );
-  }
+  // static GameState createNewGame({
+  //   String player1Name = 'Player 1',
+  //   String player2Name = 'AI',
+  //   bool enableAI = true,
+  //   AIDifficulty aiDifficulty = AIDifficulty.medium,
+  // }) {
+  //   return GameStateFactory.createNewGame(
+  //     player1Name: player1Name,
+  //     player2Name: player2Name,
+  //     player2IsAI: enableAI,
+  //   );
+  // }
 
   static Future<GameState> processPlayerMove(
     GameState gameState,

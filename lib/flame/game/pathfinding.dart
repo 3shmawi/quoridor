@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import '../constants.dart';
 import '../models/game_state.dart';
+import '../models/player.dart';
 
 enum GamePhase { early, mid, late }
 
@@ -34,7 +35,7 @@ class PathNode {
 }
 
 class Pathfinding {
-  // A* algorithm to find shortest path from start to any position in target row
+  // A* algorithm to find shortest path from start to any position in target row/column
   static List<Position>? findShortestPath(
     GameState gameState,
     Position start,
@@ -59,7 +60,7 @@ class Pathfinding {
     while (openSet.isNotEmpty) {
       final currentNode = openSet.removeFirst();
 
-      // Check if we reached the target row
+      // Check if we reached the target row (for 2-player mode)
       if (currentNode.position.row == targetRow) {
         final path = _reconstructPath(currentNode);
 
@@ -140,6 +141,69 @@ class Pathfinding {
     return null; // No path found
   }
 
+  // Find shortest path to target column (for 4-player mode)
+  static List<Position>? findShortestPathToColumn(
+    GameState gameState,
+    Position start,
+    int targetCol,
+  ) {
+    final openSet = PriorityQueue<PathNode>(
+      (a, b) => a.fCost.compareTo(b.fCost),
+    );
+    final closedSet = <Position>{};
+    final gScores = <Position, int>{};
+    final random = math.Random();
+
+    final startNode = PathNode(
+      start,
+      0,
+      _calculateColumnHeuristic(start, targetCol, gameState),
+    );
+    openSet.add(startNode);
+    gScores[start] = 0;
+
+    while (openSet.isNotEmpty) {
+      final currentNode = openSet.removeFirst();
+
+      // Check if we reached the target column
+      if (currentNode.position.col == targetCol) {
+        return _reconstructPath(currentNode);
+      }
+
+      closedSet.add(currentNode.position);
+
+      // Explore neighbors
+      final neighbors = gameState.getValidMoves(currentNode.position);
+
+      for (final neighborPos in neighbors) {
+        if (closedSet.contains(neighborPos)) continue;
+
+        final tentativeGScore = currentNode.gCost + 1;
+        final existingGScore = gScores[neighborPos];
+
+        if (existingGScore == null || tentativeGScore < existingGScore) {
+          gScores[neighborPos] = tentativeGScore;
+          final hCost = _calculateColumnHeuristic(
+            neighborPos,
+            targetCol,
+            gameState,
+          );
+
+          final neighborNode = PathNode(
+            neighborPos,
+            tentativeGScore,
+            hCost,
+            currentNode,
+          );
+
+          openSet.add(neighborNode);
+        }
+      }
+    }
+
+    return null; // No path found
+  }
+
   static List<Position> _selectBestAlternativePath(
     List<List<Position>> paths,
     GameState gameState,
@@ -150,17 +214,15 @@ class Pathfinding {
     final pathScores = paths.map((path) {
       double score = 0;
 
-      // Prefer paths that maintain distance from opponent
-      final opponentPos = gameState.currentPlayerId == 1
-          ? gameState.player2.position
-          : gameState.player1.position;
-
-      for (final pos in path) {
-        final distance = math.sqrt(
-          math.pow(pos.row - opponentPos.row, 2) +
-              math.pow(pos.col - opponentPos.col, 2),
-        );
-        score += distance;
+      // Prefer paths that maintain distance from all opponents
+      for (final opponent in gameState.otherPlayers) {
+        for (final pos in path) {
+          final distance = math.sqrt(
+            math.pow(pos.row - opponent.position.row, 2) +
+                math.pow(pos.col - opponent.position.col, 2),
+          );
+          score += distance;
+        }
       }
 
       // Prefer paths that stay closer to center
@@ -188,37 +250,56 @@ class Pathfinding {
     // Create temporary game state with the wall
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
 
-    // Check if both players still have valid paths
-    final player1Path = findShortestPath(
-      tempGameState,
-      tempGameState.player1.position,
-      tempGameState.player1.goalRow,
-    );
+    // Check if ALL players still have valid paths
+    for (final player in tempGameState.players) {
+      List<Position>? path;
 
-    final player2Path = findShortestPath(
-      tempGameState,
-      tempGameState.player2.position,
-      tempGameState.player2.goalRow,
-    );
+      // For 2-player mode: check path to goal row
+      if (player.id <= 2) {
+        path = findShortestPath(tempGameState, player.position, player.goalRow);
+      }
+      // For 4-player mode: check path to goal column
+      else {
+        if (player.id == 3) {
+          path = findShortestPathToColumn(tempGameState, player.position, 0);
+        } else if (player.id == 4) {
+          path = findShortestPathToColumn(tempGameState, player.position, 8);
+        }
+      }
 
-    return player1Path == null || player2Path == null;
+      // If any player can't reach their goal, the wall is invalid
+      if (path == null) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
-  // Calculate shortest path lengths for both players
+  // Calculate shortest path lengths for all players
   static Map<int, int> calculatePathLengths(GameState gameState) {
-    final player1Path = findShortestPath(
-      gameState,
-      gameState.player1.position,
-      gameState.player1.goalRow,
-    );
+    final pathLengths = <int, int>{};
 
-    final player2Path = findShortestPath(
-      gameState,
-      gameState.player2.position,
-      gameState.player2.goalRow,
-    );
+    for (final player in gameState.players) {
+      List<Position>? path;
 
-    return {1: player1Path?.length ?? 999, 2: player2Path?.length ?? 999};
+      // For 2-player mode: check path to goal row
+      if (player.id <= 2) {
+        path = findShortestPath(gameState, player.position, player.goalRow);
+      }
+      // For 4-player mode: check path to goal column
+      else {
+        if (player.id == 3) {
+          path = findShortestPathToColumn(gameState, player.position, 0);
+        } else if (player.id == 4) {
+          path = findShortestPathToColumn(gameState, player.position, 8);
+        }
+      }
+
+      pathLengths[player.id] = path?.length ?? 999;
+    }
+
+    return pathLengths;
   }
 
   // Enhanced heuristic calculation
@@ -270,17 +351,22 @@ class Pathfinding {
     Position position,
     GameState gameState,
   ) {
-    final opponentPos = gameState.currentPlayerId == 1
-        ? gameState.player2.position
-        : gameState.player1.position;
+    double totalPenalty = 0;
 
-    final distance = math.sqrt(
-      math.pow(position.row - opponentPos.row, 2) +
-          math.pow(position.col - opponentPos.col, 2),
-    );
+    // Calculate penalty based on distance to all opponents
+    for (final opponent in gameState.otherPlayers) {
+      final distance = math.sqrt(
+        math.pow(position.row - opponent.position.row, 2) +
+            math.pow(position.col - opponent.position.col, 2),
+      );
 
-    // Add penalty if too close to opponent
-    return distance < 2 ? 3 : 0;
+      // Add penalty if too close to any opponent
+      if (distance < 2) {
+        totalPenalty += 3;
+      }
+    }
+
+    return totalPenalty;
   }
 
   static double _calculateEdgePenalty(Position position) {
@@ -292,22 +378,110 @@ class Pathfinding {
     return distanceFromCenter * 0.2;
   }
 
-  // Find the best wall placement to maximize opponent\'s path
+  // Enhanced heuristic calculation for column-based goals (4-player mode)
+  static double _calculateColumnHeuristic(
+    Position position,
+    int targetCol,
+    GameState gameState,
+  ) {
+    // Base Manhattan distance to target column
+    final baseDistance = (position.col - targetCol).abs().toDouble();
+
+    // Consider walls in the path
+    final wallPenalty = _calculateColumnWallPenalty(
+      position,
+      targetCol,
+      gameState,
+    );
+
+    // Consider opponent's position (avoid getting too close)
+    final opponentPenalty = _calculateOpponentPenalty(position, gameState);
+
+    // Consider board edges (prefer paths closer to center)
+    final edgePenalty = _calculateEdgePenalty(position);
+
+    return baseDistance + wallPenalty + opponentPenalty + edgePenalty;
+  }
+
+  static double _calculateColumnWallPenalty(
+    Position position,
+    int targetCol,
+    GameState gameState,
+  ) {
+    double penalty = 0;
+    final direction = position.col < targetCol ? 1 : -1;
+
+    // Check for walls in the path to target column
+    for (int col = position.col; col != targetCol; col += direction) {
+      for (final wall in gameState.walls) {
+        if (wall.orientation == WallOrientation.vertical) {
+          if (wall.position.col == col &&
+              wall.position.row <= position.row &&
+              wall.position.row + 1 >= position.row) {
+            penalty += 2;
+          }
+        }
+      }
+    }
+
+    return penalty;
+  }
+
+  // Find the best wall placement to maximize opponent's path
   static Wall? findBestWallPlacement(
     GameState gameState,
     int playerId, {
     List<Wall>? recentAIWalls,
   }) {
-    final opponentId = playerId == 1 ? 2 : 1;
-    final opponentPos = opponentId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
-    final opponentGoal = opponentId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
+    // Find the opponent with the shortest path to goal
+    final opponents = gameState.players.where((p) => p.id != playerId).toList();
+
+    if (opponents.isEmpty) return null;
+
+    // Find the opponent with the shortest path (most threatening)
+    int bestOpponentId = opponents.first.id;
+    int shortestPath = 999;
+
+    for (final opponent in opponents) {
+      List<Position>? path;
+
+      // For 2-player mode: check path to goal row
+      if (opponent.id <= 2) {
+        path = findShortestPath(gameState, opponent.position, opponent.goalRow);
+      }
+      // For 4-player mode: check path to goal column
+      else {
+        if (opponent.id == 3) {
+          path = findShortestPathToColumn(gameState, opponent.position, 0);
+        } else if (opponent.id == 4) {
+          path = findShortestPathToColumn(gameState, opponent.position, 8);
+        }
+      }
+
+      final pathLength = path?.length ?? 999;
+      if (pathLength < shortestPath) {
+        shortestPath = pathLength;
+        bestOpponentId = opponent.id;
+      }
+    }
+
+    final opponent = gameState.players.firstWhere(
+      (p) => p.id == bestOpponentId,
+    );
+    final opponentPos = opponent.position;
 
     // Get current opponent path length
-    final currentPath = findShortestPath(gameState, opponentPos, opponentGoal);
+    List<Position>? currentPath;
+    if (opponent.id <= 2) {
+      currentPath = findShortestPath(gameState, opponentPos, opponent.goalRow);
+    } else {
+      if (opponent.id == 3) {
+        currentPath = findShortestPathToColumn(gameState, opponentPos, 0);
+      } else if (opponent.id == 4) {
+        currentPath = findShortestPathToColumn(gameState, opponentPos, 8);
+      }
+    }
+
     final currentLength = currentPath?.length ?? 0;
 
     if (currentLength == 0) return null;
@@ -330,10 +504,10 @@ class Pathfinding {
 
         if (_isValidWallPlacement(gameState, horizontalWall)) {
           final score = _evaluateWallPlacement(
-            gameState,
             horizontalWall,
+            gameState,
             opponentPos,
-            opponentGoal,
+            opponent.goalRow,
             currentLength,
             recentWalls,
           );
@@ -351,10 +525,10 @@ class Pathfinding {
 
         if (_isValidWallPlacement(gameState, verticalWall)) {
           final score = _evaluateWallPlacement(
-            gameState,
             verticalWall,
+            gameState,
             opponentPos,
-            opponentGoal,
+            opponent.goalRow,
             currentLength,
             recentWalls,
           );
@@ -410,15 +584,34 @@ class Pathfinding {
   }
 
   static double _evaluateWallPlacement(
-    GameState gameState,
     Wall wall,
+    GameState gameState,
     Position opponentPos,
     int opponentGoal,
     int currentPathLength,
     List<Wall> recentAIWalls,
   ) {
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
-    final newPath = findShortestPath(tempGameState, opponentPos, opponentGoal);
+
+    // Find the opponent to determine their goal type
+    final opponent = gameState.players.firstWhere(
+      (p) => p.position == opponentPos,
+    );
+    List<Position>? newPath;
+
+    // For 2-player mode: check path to goal row
+    if (opponent.id <= 2) {
+      newPath = findShortestPath(tempGameState, opponentPos, opponent.goalRow);
+    }
+    // For 4-player mode: check path to goal column
+    else {
+      if (opponent.id == 3) {
+        newPath = findShortestPathToColumn(tempGameState, opponentPos, 0);
+      } else if (opponent.id == 4) {
+        newPath = findShortestPathToColumn(tempGameState, opponentPos, 8);
+      }
+    }
+
     final newLength = newPath?.length ?? 999;
     // Base score is the path length increase
     double score = (newLength - currentPathLength).toDouble();
@@ -465,9 +658,9 @@ class Pathfinding {
       score += 1.5;
     }
 
-    if (_createsMultiplePaths(wall, gameState)) {
-      score += 1.0;
-    }
+    // if (_createsMultiplePaths(wall, gameState)) {
+    //   score += 1.0;
+    // }
 
     return score;
   }
@@ -496,9 +689,9 @@ class Pathfinding {
     }
 
     // Check if wall creates multiple paths for self
-    if (_createsMultiplePaths(wall, gameState)) {
-      score += 1.0;
-    }
+    // if (_createsMultiplePaths(wall, gameState)) {
+    //   score += 1.0;
+    // }
 
     return score;
   }
@@ -542,19 +735,19 @@ class Pathfinding {
     return distanceFromCenter <= 2;
   }
 
-  static bool _createsMultiplePaths(Wall wall, GameState gameState) {
-    // Check if wall placement creates alternative paths for self
-    final tempGameState = _createTempGameStateWithWall(gameState, wall);
-    final selfPos = gameState.currentPlayerId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
-    final selfGoal = gameState.currentPlayerId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
-
-    final paths = _findMultiplePaths(tempGameState, selfPos, selfGoal);
-    return paths.length > 1;
-  }
+  // static bool _createsMultiplePaths(Wall wall, GameState gameState) {
+  //   // Check if wall placement creates alternative paths for self
+  //   final tempGameState = _createTempGameStateWithWall(gameState, wall);
+  //   final selfPos = gameState.currentPlayerId == 1
+  //       ? gameState.player1.position
+  //       : gameState.player2.position;
+  //   final selfGoal = gameState.currentPlayerId == 1
+  //       ? gameState.player1.goalRow
+  //       : gameState.player2.goalRow;
+  //
+  //   final paths = _findMultiplePaths(tempGameState, selfPos, selfGoal);
+  //   return paths.length > 1;
+  // }
 
   static List<List<Position>> _findMultiplePaths(
     GameState gameState,
@@ -589,17 +782,63 @@ class Pathfinding {
   }
 
   static bool _blocksShortestPath(Wall wall, GameState gameState) {
-    final opponentId = gameState.currentPlayerId == 1 ? 2 : 1;
-    final opponentPos = opponentId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
-    final opponentGoal = opponentId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
+    // Find the most threatening opponent (closest to winning)
+    Player? mostThreateningOpponent;
+    int shortestOpponentPath = 999;
 
-    final originalPath = findShortestPath(gameState, opponentPos, opponentGoal);
-    final tempGameState = _createTempGameStateWithWall(gameState, wall);
-    final newPath = findShortestPath(tempGameState, opponentPos, opponentGoal);
+    for (final opponent in gameState.otherPlayers) {
+      List<Position>? path;
+
+      // For 2-player mode: check path to goal row
+      if (opponent.id <= 2) {
+        path = findShortestPath(gameState, opponent.position, opponent.goalRow);
+      }
+      // For 4-player mode: check path to goal column
+      else {
+        if (opponent.id == 3) {
+          path = findShortestPathToColumn(gameState, opponent.position, 0);
+        } else if (opponent.id == 4) {
+          path = findShortestPathToColumn(gameState, opponent.position, 8);
+        }
+      }
+
+      final pathLength = path?.length ?? 999;
+      if (pathLength < shortestOpponentPath) {
+        shortestOpponentPath = pathLength;
+        mostThreateningOpponent = opponent;
+      }
+    }
+
+    if (mostThreateningOpponent == null) return false;
+
+    final opponentPos = mostThreateningOpponent.position;
+    List<Position>? originalPath;
+    List<Position>? newPath;
+
+    // Get original and new paths based on player mode
+    if (mostThreateningOpponent.id <= 2) {
+      originalPath = findShortestPath(
+        gameState,
+        opponentPos,
+        mostThreateningOpponent.goalRow,
+      );
+      final tempGameState = _createTempGameStateWithWall(gameState, wall);
+      newPath = findShortestPath(
+        tempGameState,
+        opponentPos,
+        mostThreateningOpponent.goalRow,
+      );
+    } else {
+      if (mostThreateningOpponent.id == 3) {
+        originalPath = findShortestPathToColumn(gameState, opponentPos, 0);
+        final tempGameState = _createTempGameStateWithWall(gameState, wall);
+        newPath = findShortestPathToColumn(tempGameState, opponentPos, 0);
+      } else if (mostThreateningOpponent.id == 4) {
+        originalPath = findShortestPathToColumn(gameState, opponentPos, 8);
+        final tempGameState = _createTempGameStateWithWall(gameState, wall);
+        newPath = findShortestPathToColumn(tempGameState, opponentPos, 8);
+      }
+    }
 
     return newPath != null &&
         originalPath != null &&
@@ -607,17 +846,63 @@ class Pathfinding {
   }
 
   static bool _forcesLongerPath(Wall wall, GameState gameState) {
-    final opponentId = gameState.currentPlayerId == 1 ? 2 : 1;
-    final opponentPos = opponentId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
-    final opponentGoal = opponentId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
+    // Find the most threatening opponent (closest to winning)
+    Player? mostThreateningOpponent;
+    int shortestOpponentPath = 999;
 
-    final originalPath = findShortestPath(gameState, opponentPos, opponentGoal);
-    final tempGameState = _createTempGameStateWithWall(gameState, wall);
-    final newPath = findShortestPath(tempGameState, opponentPos, opponentGoal);
+    for (final opponent in gameState.otherPlayers) {
+      List<Position>? path;
+
+      // For 2-player mode: check path to goal row
+      if (opponent.id <= 2) {
+        path = findShortestPath(gameState, opponent.position, opponent.goalRow);
+      }
+      // For 4-player mode: check path to goal column
+      else {
+        if (opponent.id == 3) {
+          path = findShortestPathToColumn(gameState, opponent.position, 0);
+        } else if (opponent.id == 4) {
+          path = findShortestPathToColumn(gameState, opponent.position, 8);
+        }
+      }
+
+      final pathLength = path?.length ?? 999;
+      if (pathLength < shortestOpponentPath) {
+        shortestOpponentPath = pathLength;
+        mostThreateningOpponent = opponent;
+      }
+    }
+
+    if (mostThreateningOpponent == null) return false;
+
+    final opponentPos = mostThreateningOpponent.position;
+    List<Position>? originalPath;
+    List<Position>? newPath;
+
+    // Get original and new paths based on player mode
+    if (mostThreateningOpponent.id <= 2) {
+      originalPath = findShortestPath(
+        gameState,
+        opponentPos,
+        mostThreateningOpponent.goalRow,
+      );
+      final tempGameState = _createTempGameStateWithWall(gameState, wall);
+      newPath = findShortestPath(
+        tempGameState,
+        opponentPos,
+        mostThreateningOpponent.goalRow,
+      );
+    } else {
+      if (mostThreateningOpponent.id == 3) {
+        originalPath = findShortestPathToColumn(gameState, opponentPos, 0);
+        final tempGameState = _createTempGameStateWithWall(gameState, wall);
+        newPath = findShortestPathToColumn(tempGameState, opponentPos, 0);
+      } else if (mostThreateningOpponent.id == 4) {
+        originalPath = findShortestPathToColumn(gameState, opponentPos, 8);
+        final tempGameState = _createTempGameStateWithWall(gameState, wall);
+        newPath = findShortestPathToColumn(tempGameState, opponentPos, 8);
+      }
+    }
 
     return newPath != null &&
         originalPath != null &&
@@ -639,8 +924,7 @@ class Pathfinding {
   static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
     return GameState(
       gameId: original.gameId,
-      player1: original.player1,
-      player2: original.player2,
+      players: original.players,
       walls: [...original.walls, wall],
       currentPlayerId: original.currentPlayerId,
       status: original.status,

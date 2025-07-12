@@ -1,32 +1,27 @@
 import 'dart:async';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:flutter/services.dart';
 
+import 'package:flutter/services.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+
+import '../constants.dart';
 import '../models/game_state.dart';
+import '../models/player.dart';
 import '../services/ai_service.dart';
-import '../services/game_service.dart';
 import '../services/firebase_service.dart';
+import '../services/game_service.dart';
 import '../services/local_storage.dart';
 import '../services/sounds.dart';
-import '../constants.dart';
 import 'game_states.dart';
 
 // Events that can be dispatched to the game controller
 abstract class GameEvent {}
 
-// Initialize a new game
-class InitializeGame extends GameEvent {
-  final String? player1Name;
-  final String? player2Name;
-  final bool player2IsAI;
-  final AIDifficulty aiDifficulty;
+// Initialize a multi-player game
+class InitializeMultiPlayerGame extends GameEvent {
+  final int playerCount;
+  final List<String>? playerNames;
 
-  InitializeGame({
-    this.player1Name,
-    this.player2Name,
-    this.player2IsAI = true,
-    this.aiDifficulty = AIDifficulty.medium,
-  });
+  InitializeMultiPlayerGame({required this.playerCount, this.playerNames});
 }
 
 // Load existing game
@@ -73,19 +68,12 @@ class SetAIDifficulty extends GameEvent {
 // Toggle player mode (AI vs Human)
 class TogglePlayerMode extends GameEvent {}
 
-// Start new game
-class StartNewGame extends GameEvent {
-  final String? player1Name;
-  final String? player2Name;
-  final bool player2IsAI;
-  final AIDifficulty aiDifficulty;
+// Start new multi-player game
+class StartNewMultiPlayerGame extends GameEvent {
+  final int playerCount;
+  final List<String>? playerNames;
 
-  StartNewGame({
-    this.player1Name,
-    this.player2Name,
-    this.player2IsAI = true,
-    this.aiDifficulty = AIDifficulty.medium,
-  });
+  StartNewMultiPlayerGame({required this.playerCount, this.playerNames});
 }
 
 // Pause game
@@ -143,7 +131,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
   int _currentMoveIndex = -1;
 
   GameController() : super(const GameInitialState()) {
-    on<InitializeGame>(_onInitializeGame);
+    on<InitializeMultiPlayerGame>(_onInitializeMultiPlayerGame);
     on<LoadGame>(_onLoadGame);
     on<MakePawnMove>(_onMakePawnMove);
     on<PlaceWall>(_onPlaceWall);
@@ -152,7 +140,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
     on<SetPreviewWall>(_onSetPreviewWall);
     on<SetAIDifficulty>(_onSetAIDifficulty);
     on<TogglePlayerMode>(_onTogglePlayerMode);
-    on<StartNewGame>(_onStartNewGame);
+    on<StartNewMultiPlayerGame>(_onStartNewMultiPlayerGame);
     on<PauseGame>(_onPauseGame);
     on<ResumeGame>(_onResumeGame);
     on<UpdateSettings>(_onUpdateSettings);
@@ -163,21 +151,19 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
     on<UpdateStatistics>(_onUpdateStatistics);
   }
 
-  // Initialize a new game
-  Future<void> _onInitializeGame(
-    InitializeGame event,
+  // Initialize a multi-player game
+  Future<void> _onInitializeMultiPlayerGame(
+    InitializeMultiPlayerGame event,
     Emitter<GameStates> emit,
   ) async {
-    emit(const GameLoadingState(message: 'Initializing game...'));
+    emit(const GameLoadingState(message: 'Initializing multi-player game...'));
 
     try {
-      final gameState = GameStateFactory.createNewGame(
-        player1Name: event.player1Name ?? 'Player 1',
-        player2Name: event.player2Name ?? 'AI',
-        player2IsAI: event.player2IsAI,
+      final gameState = GameStateFactory.createMultiPlayerGame(
+        playerCount: event.playerCount,
+        playerNames: event.playerNames,
       );
 
-      gameState.aiDifficulty = event.aiDifficulty;
       _gameStartTime = DateTime.now();
       _lastValidState = gameState;
       _moveHistory = [gameState];
@@ -196,15 +182,10 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
       if (FirebaseService.currentUser != null) {
         FirebaseService.updateGame(gameState);
       }
-
-      // Trigger AI move if it's AI's turn
-      if (gameState.currentPlayer.isAI) {
-        _triggerAIMove(gameState, event.aiDifficulty);
-      }
     } catch (e) {
       emit(
         GameErrorState(
-          error: 'Failed to initialize game: $e',
+          error: 'Failed to initialize multi-player game: $e',
           suggestion: 'Please try again',
         ),
       );
@@ -231,11 +212,6 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
             ),
           ),
         );
-
-        // Trigger AI move if it's AI's turn
-        if (gameState.currentPlayer.isAI) {
-          _triggerAIMove(gameState, gameState.aiDifficulty);
-        }
       } else {
         emit(
           const GameErrorState(
@@ -311,11 +287,6 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         ),
       );
 
-      // Trigger AI move if it's AI's turn
-      if (newGameState.currentPlayer.isAI) {
-        _triggerAIMove(newGameState, newGameState.aiDifficulty);
-      }
-
       // Auto-save
       if (FirebaseService.currentUser != null) {
         FirebaseService.updateGame(newGameState);
@@ -384,11 +355,6 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         ),
       );
 
-      // Trigger AI move if it's AI's turn
-      if (newGameState.currentPlayer.isAI) {
-        _triggerAIMove(newGameState, newGameState.aiDifficulty);
-      }
-
       // Auto-save
       if (FirebaseService.currentUser != null) {
         FirebaseService.updateGame(newGameState);
@@ -405,6 +371,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
   }
 
   // Toggle wall orientation
+
   void _onToggleWallOrientation(
     ToggleWallOrientation event,
     Emitter<GameStates> emit,
@@ -413,25 +380,51 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
     if (currentState is! GamePlayingState) return;
 
     final gameState = currentState.gameState;
-    final newOrientation =
-        gameState.wallOrientation == WallOrientation.horizontal
+    final previewWall = gameState.previewWall;
+
+    if (previewWall == null) return;
+    // Compute center of the wall based on current position and orientation
+    final oldStart = previewWall.position;
+    final oldOrientation = previewWall.orientation;
+
+    late final Position center;
+    if (oldOrientation == WallOrientation.horizontal) {
+      center = Position(
+        oldStart.row,
+        oldStart.col + 1,
+      ); // horizontal covers (x, x+1)
+    } else {
+      center = Position(
+        oldStart.row + 1,
+        oldStart.col,
+      ); // vertical covers (x, x+1)
+    }
+
+    // Toggle orientation
+    final newOrientation = oldOrientation == WallOrientation.horizontal
         ? WallOrientation.vertical
         : WallOrientation.horizontal;
 
-    final updatedGameState = GameState(
-      gameId: gameState.gameId,
-      player1: gameState.player1,
-      player2: gameState.player2,
-      walls: gameState.walls,
-      currentPlayerId: gameState.currentPlayerId,
-      status: gameState.status,
-      aiDifficulty: gameState.aiDifficulty,
-      createdAt: gameState.createdAt,
-      updatedAt: DateTime.now(),
-      moveHistory: gameState.moveHistory,
-      showValidMoves: gameState.showValidMoves,
+    // Compute new start position so that center stays the same
+    late final Position newStart;
+    if (newOrientation == WallOrientation.horizontal) {
+      newStart = Position(center.row, center.col - 1);
+    } else {
+      newStart = Position(center.row - 1, center.col);
+    }
+
+    print('Center: $center >>>>>>>>>>>>');
+    print('New start: $newStart >>>>>>>>>>>>');
+
+    final updatedPreviewWall = previewWall.copyWith(
+      orientation: newOrientation,
+      position: newStart,
+    );
+
+    final updatedGameState = gameState.copyWith(
       wallOrientation: newOrientation,
-      previewWall: gameState.previewWall,
+      previewWall: updatedPreviewWall,
+      updatedAt: DateTime.now(),
     );
 
     emit(currentState.copyWith(gameState: updatedGameState));
@@ -447,8 +440,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
 
     final updatedGameState = GameState(
       gameId: gameState.gameId,
-      player1: gameState.player1,
-      player2: gameState.player2,
+      players: gameState.players,
       walls: gameState.walls,
       currentPlayerId: gameState.currentPlayerId,
       status: gameState.status,
@@ -477,8 +469,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
     final gameState = currentState.gameState;
     final updatedGameState = GameState(
       gameId: gameState.gameId,
-      player1: gameState.player1,
-      player2: gameState.player2,
+      players: gameState.players,
       walls: gameState.walls,
       currentPlayerId: gameState.currentPlayerId,
       status: gameState.status,
@@ -507,8 +498,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
     final gameState = currentState.gameState;
     final updatedGameState = GameState(
       gameId: gameState.gameId,
-      player1: gameState.player1,
-      player2: gameState.player2,
+      players: gameState.players,
       walls: gameState.walls,
       currentPlayerId: gameState.currentPlayerId,
       status: gameState.status,
@@ -535,48 +525,53 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
     if (currentState is! GamePlayingState) return;
 
     final gameState = currentState.gameState;
-    final newPlayer2 = gameState.player2.copyWith(
-      isAI: !gameState.player2.isAI,
-    );
 
-    final updatedGameState = GameState(
-      gameId: gameState.gameId,
-      player1: gameState.player1,
-      player2: newPlayer2,
-      walls: gameState.walls,
-      currentPlayerId: gameState.currentPlayerId,
-      status: gameState.status,
-      aiDifficulty: gameState.aiDifficulty,
-      createdAt: gameState.createdAt,
-      updatedAt: DateTime.now(),
-      moveHistory: gameState.moveHistory,
-      showValidMoves: gameState.showValidMoves,
-      wallOrientation: gameState.wallOrientation,
-      previewWall: gameState.previewWall,
-    );
+    // Find player 2 and toggle AI status
+    final player2Index = gameState.players.indexWhere((p) => p.id == 2);
+    if (player2Index != -1) {
+      final newPlayer2 = gameState.players[player2Index].copyWith(
+        isAI: !gameState.players[player2Index].isAI,
+      );
 
-    emit(
-      currentState.copyWith(
-        gameState: updatedGameState,
-        isPlayerTurn: !newPlayer2.isAI,
-        currentMessage: newPlayer2.isAI
-            ? 'Switched to AI'
-            : 'Switched to two players',
-      ),
-    );
+      final updatedPlayers = List<Player>.from(gameState.players);
+      updatedPlayers[player2Index] = newPlayer2;
+
+      final updatedGameState = GameState(
+        gameId: gameState.gameId,
+        players: updatedPlayers,
+        walls: gameState.walls,
+        currentPlayerId: gameState.currentPlayerId,
+        status: gameState.status,
+        aiDifficulty: gameState.aiDifficulty,
+        createdAt: gameState.createdAt,
+        updatedAt: DateTime.now(),
+        moveHistory: gameState.moveHistory,
+        showValidMoves: gameState.showValidMoves,
+        wallOrientation: gameState.wallOrientation,
+        previewWall: gameState.previewWall,
+      );
+
+      emit(
+        currentState.copyWith(
+          gameState: updatedGameState,
+          isPlayerTurn: !newPlayer2.isAI,
+          currentMessage: newPlayer2.isAI
+              ? 'Switched to AI'
+              : 'Switched to two players',
+        ),
+      );
+    }
   }
 
-  // Start new game
-  Future<void> _onStartNewGame(
-    StartNewGame event,
+  // Start new multi-player game
+  Future<void> _onStartNewMultiPlayerGame(
+    StartNewMultiPlayerGame event,
     Emitter<GameStates> emit,
   ) async {
     add(
-      InitializeGame(
-        player1Name: event.player1Name,
-        player2Name: event.player2Name,
-        player2IsAI: event.player2IsAI,
-        aiDifficulty: event.aiDifficulty,
+      InitializeMultiPlayerGame(
+        playerCount: event.playerCount,
+        playerNames: event.playerNames,
       ),
     );
   }
@@ -753,26 +748,6 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
     CacheHelper.saveData(key: 'totalMovesMade', value: newTotalMovesMade);
     CacheHelper.saveData(key: 'totalGameTime', value: newTotalGameTime);
 
-    // Update wins by difficulty
-    final winsByDifficulty = Map<AIDifficulty, int>.from(
-      (CacheHelper.getData(key: 'winsByDifficulty') as Map<String, dynamic>?)
-              ?.map(
-                (key, value) =>
-                    MapEntry(AIDifficulty.values[int.parse(key)], value as int),
-              ) ??
-          {},
-    );
-    if (event.isWin) {
-      winsByDifficulty[event.difficulty] =
-          (winsByDifficulty[event.difficulty] ?? 0) + 1;
-    }
-    CacheHelper.saveData(
-      key: 'winsByDifficulty',
-      value: winsByDifficulty.map(
-        (key, value) => MapEntry(key.index.toString(), value),
-      ),
-    );
-
     emit(
       GameStatisticsState(
         gamesPlayed: newGamesPlayed,
@@ -783,39 +758,11 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         averageGameTime: newAverageGameTime,
         totalWallsPlaced: newTotalWallsPlaced,
         totalMovesMade: newTotalMovesMade,
-        winsByDifficulty: winsByDifficulty,
       ),
     );
   }
 
   // Helper method to trigger AI move
-  void _triggerAIMove(GameState gameState, AIDifficulty difficulty) {
-    _aiTimer?.cancel();
-
-    emit(GameAIThinkingState(gameState: gameState, difficulty: difficulty));
-
-    _aiTimer = Timer(const Duration(milliseconds: 800), () async {
-      try {
-        final aiMove = await AIService.generateMove(gameState, difficulty);
-
-        if (aiMove != null) {
-          if (aiMove.type == MoveType.pawnMove) {
-            add(MakePawnMove(aiMove.newPosition!));
-          } else {
-            add(PlaceWall(aiMove.wall!));
-          }
-        }
-      } catch (e) {
-        emit(
-          GameErrorState(
-            error: 'AI move failed: $e',
-            suggestion: 'Please try again',
-            lastValidState: gameState,
-          ),
-        );
-      }
-    });
-  }
 
   // Helper method to handle game over
   void _handleGameOver(GameState gameState, Emitter<GameStates> emit) {
@@ -823,7 +770,11 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
         ? DateTime.now().difference(_gameStartTime!)
         : Duration.zero;
 
-    final isWin = gameState.winner == gameState.player1.name;
+    // Find the actual winner instead of assuming player1
+    final winner = gameState.winner;
+    final isWin =
+        winner != null &&
+        winner == gameState.players.first.name; // Check if first player won
     final totalMoves = gameState.moveHistory.length;
     final wallsPlaced = gameState.walls.length;
 
@@ -841,7 +792,7 @@ class GameController extends HydratedBloc<GameEvent, GameStates> {
     emit(
       GameOverState(
         gameState: gameState,
-        winner: gameState.winner ?? 'Unknown',
+        winner: winner ?? 'Unknown',
         totalMoves: totalMoves,
         gameDuration: gameDuration,
       ),

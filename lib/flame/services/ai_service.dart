@@ -6,11 +6,13 @@ import 'package:http/http.dart' as http;
 import '../../flame/constants.dart';
 import '../../flame/game/pathfinding.dart';
 import '../../flame/models/game_state.dart';
+import '../../flame/models/player.dart';
 
 enum AIDifficulty { easy, medium, hard }
 
 class AIService {
-  static const String _apiKey = 'EM0CslaVtzEsqKb6wNCk-4628bc90f1fb9205d2d0abf780b59f878985d392ff52eca5dc175fe755fa7352';
+  static const String _apiKey =
+      'EM0CslaVtzEsqKb6wNCk-4628bc90f1fb9205d2d0abf780b59f878985d392ff52eca5dc175fe755fa7352';
   static const String _apiUrl = 'https://api.openai.com/v1/chat/completions';
 
   // Generate AI move using OpenAI strategy analysis
@@ -88,7 +90,9 @@ Analyze the game state and recommend the optimal move as a JSON object with the 
   static String _analyzeGameState(GameState gameState) {
     final pathLengths = Pathfinding.calculatePathLengths(gameState);
     final currentPlayer = gameState.currentPlayer;
-    final opponent = gameState.otherPlayer;
+    final opponent = gameState.otherPlayers.isNotEmpty
+        ? gameState.otherPlayers.first
+        : currentPlayer;
 
     return '''
 Current Game State Analysis:
@@ -196,12 +200,26 @@ Provide your recommendation as a JSON object.
     final validMoves = gameState.getValidMoves(currentPlayer.position);
 
     if (validMoves.isNotEmpty) {
-      // Move toward goal row
+      // Move toward goal based on player mode
       Position? bestMove;
       int bestDistance = 999;
 
       for (final move in validMoves) {
-        final distance = (move.row - currentPlayer.goalRow).abs();
+        int distance;
+
+        // For 2-player mode: distance to goal row
+        if (currentPlayer.id <= 2) {
+          distance = (move.row - currentPlayer.goalRow).abs();
+        }
+        // For 4-player mode: distance to goal column
+        else {
+          if (currentPlayer.id == 3) {
+            distance = (move.col - 0).abs(); // Distance to left column
+          } else {
+            distance = (move.col - 8).abs(); // Distance to right column
+          }
+        }
+
         if (distance < bestDistance) {
           bestDistance = distance;
           bestMove = move;
@@ -220,13 +238,29 @@ Provide your recommendation as a JSON object.
     Map<int, int> pathLengths,
   ) {
     final currentPlayer = gameState.currentPlayer;
-    final opponentPathLength = pathLengths[gameState.otherPlayer.id]!;
+
+    // Find the most threatening opponent (closest to winning)
+    Player? mostThreateningOpponent;
+    int shortestOpponentPath = 999;
+
+    for (final opponent in gameState.otherPlayers) {
+      final opponentPathLength = pathLengths[opponent.id]!;
+      if (opponentPathLength < shortestOpponentPath) {
+        shortestOpponentPath = opponentPathLength;
+        mostThreateningOpponent = opponent;
+      }
+    }
+
+    if (mostThreateningOpponent == null) {
+      return _getEasyMove(gameState);
+    }
+
     final playerPathLength = pathLengths[currentPlayer.id]!;
 
     // Consider wall placement if opponent is close to winning
     if (currentPlayer.hasWallsRemaining &&
-        opponentPathLength < playerPathLength &&
-        opponentPathLength <= 3) {
+        shortestOpponentPath < playerPathLength &&
+        shortestOpponentPath <= 3) {
       final bestWall = Pathfinding.findBestWallPlacement(
         gameState,
         currentPlayer.id,
@@ -242,7 +276,23 @@ Provide your recommendation as a JSON object.
 
   static GameMove _getHardMove(GameState gameState, Map<int, int> pathLengths) {
     final currentPlayer = gameState.currentPlayer;
-    final opponentPathLength = pathLengths[gameState.otherPlayer.id]!;
+
+    // Find the most threatening opponent (closest to winning)
+    Player? mostThreateningOpponent;
+    int shortestOpponentPath = 999;
+
+    for (final opponent in gameState.otherPlayers) {
+      final opponentPathLength = pathLengths[opponent.id]!;
+      if (opponentPathLength < shortestOpponentPath) {
+        shortestOpponentPath = opponentPathLength;
+        mostThreateningOpponent = opponent;
+      }
+    }
+
+    if (mostThreateningOpponent == null) {
+      return _getOptimalPawnMove(gameState);
+    }
+
     final playerPathLength = pathLengths[currentPlayer.id]!;
 
     // Advanced strategy: Use walls more strategically
@@ -250,7 +300,7 @@ Provide your recommendation as a JSON object.
       final shouldUseWall = _shouldUseWallStrategically(
         gameState,
         pathLengths,
-        opponentPathLength,
+        shortestOpponentPath,
         playerPathLength,
       );
 
@@ -303,18 +353,7 @@ Provide your recommendation as a JSON object.
     int shortestPath = 999;
 
     for (final move in validMoves) {
-      final tempGameState = GameState(
-        gameId: gameState.gameId,
-        player1: gameState.currentPlayerId == 1
-            ? gameState.player1.copyWith(position: move)
-            : gameState.player1,
-        player2: gameState.currentPlayerId == 2
-            ? gameState.player2.copyWith(position: move)
-            : gameState.player2,
-        walls: gameState.walls,
-        currentPlayerId: gameState.currentPlayerId,
-        status: gameState.status,
-      );
+      final tempGameState = _createTempGameStateWithMove(gameState, move);
 
       final path = Pathfinding.findShortestPath(
         tempGameState,
@@ -329,6 +368,33 @@ Provide your recommendation as a JSON object.
     }
 
     return GameMove.pawnMove(bestMove, currentPlayer.id);
+  }
+
+  static GameState _createTempGameStateWithMove(
+    GameState original,
+    Position move,
+  ) {
+    final currentPlayer = original.currentPlayer;
+    final updatedPlayers = List<Player>.from(original.players);
+    final playerIndex = updatedPlayers.indexWhere(
+      (p) => p.id == currentPlayer.id,
+    );
+
+    if (playerIndex != -1) {
+      updatedPlayers[playerIndex] = updatedPlayers[playerIndex].copyWith(
+        position: move,
+      );
+    }
+
+    return GameState(
+      gameId: original.gameId,
+      players: updatedPlayers,
+      walls: original.walls,
+      currentPlayerId: original.currentPlayerId,
+      status: original.status,
+      createdAt: original.createdAt,
+      updatedAt: original.updatedAt,
+    );
   }
 }
 

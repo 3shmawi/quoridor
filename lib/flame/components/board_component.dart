@@ -79,11 +79,6 @@ class BoardComponent extends PositionComponent {
     final milliseconds = DateTime.now().millisecondsSinceEpoch;
     final t = (sin(milliseconds / 300.0) + 1) / 2;
 
-    final isPlayer1 = gameState.currentPlayer.id == 1;
-    final playerColor = Color(
-      isPlayer1 ? GameConstants.player1Color : GameConstants.player2Color,
-    );
-
     for (int row = 0; row < GameConstants.boardSize; row++) {
       for (int col = 0; col < GameConstants.boardSize; col++) {
         final rect = Rect.fromLTWH(
@@ -99,14 +94,41 @@ class BoardComponent extends PositionComponent {
           isLight ? lightPaint : darkPaint,
         );
 
-        final isGoalRow =
-            (row == 0 && isPlayer1) ||
-            (row == GameConstants.boardSize - 1 && !isPlayer1);
+        // Check if this cell is a goal for any player
+        bool isGoalCell = false;
+        Color goalColor = Colors.transparent;
 
-        if (isGoalRow) {
+        for (final player in gameState.players) {
+          bool isGoal = false;
+
+          // For 2-player mode: entire rows are goals
+          if (player.id <= 2) {
+            isGoal = row == player.goalRow;
+          }
+          // For 4-player mode: check both rows and columns
+          else {
+            // Player 3 (right) goal is left column (0)
+            if (player.id == 3) {
+              isGoal = col == 0;
+            }
+            // Player 4 (left) goal is right column (8)
+            else if (player.id == 4) {
+              isGoal = col == 8;
+            }
+          }
+
+          if (isGoal) {
+            isGoalCell = true;
+            goalColor = Color(GameConstants.getPlayerColor(player.id));
+            break;
+          }
+        }
+
+
+        if (isGoalCell) {
           // 🔥 1. Glow effect
           final glowPaint = Paint()
-            ..color = playerColor.withValues(alpha: 0.6 * t)
+            ..color = goalColor.withValues(alpha: 0.6 * t)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 3.5
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
@@ -125,7 +147,7 @@ class BoardComponent extends PositionComponent {
               text: '🏁', // Or use: 'GOAL'
               style: TextStyle(
                 fontSize: 16,
-                color: playerColor.withValues(alpha: 0.65),
+                color: goalColor.withValues(alpha: 0.65),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -179,13 +201,17 @@ class BoardComponent extends PositionComponent {
           '- Is valid move: ${_playerComponent.validMoves.contains(cellPosition)}',
         );
 
-        if (_playerComponent.validMoves.contains(cellPosition)) {
-          debugPrint('- Moving to valid position');
+        // Only allow moves for the current player
+        if (_playerComponent.selectedPawn == gameState.currentPlayer.position &&
+            _playerComponent.validMoves.contains(cellPosition)) {
+          debugPrint('- Moving current player to valid position');
           _handleMoveAttempt(cellPosition);
           _playerComponent.clearSelection();
           return;
         } else {
-          debugPrint('- Invalid move, clearing selection');
+          debugPrint(
+            '- Invalid move or not current player, clearing selection',
+          );
           _playerComponent.clearSelection();
           return;
         }
@@ -195,7 +221,6 @@ class BoardComponent extends PositionComponent {
     // If no player is selected, check for player selection first
     if (cellPosition != null) {
       final currentPlayerPosition = gameState.currentPlayer.position;
-      final otherPlayerPosition = gameState.otherPlayer.position;
 
       debugPrint('Cell tap detected:');
       debugPrint(
@@ -204,14 +229,18 @@ class BoardComponent extends PositionComponent {
       debugPrint(
         '- Current player position: row=${currentPlayerPosition.row}, col=${currentPlayerPosition.col}',
       );
-      debugPrint(
-        '- Other player position: row=${otherPlayerPosition.row}, col=${otherPlayerPosition.col}',
-      );
 
-      // Check if we're tapping on either player
-      if (cellPosition == currentPlayerPosition ||
-          cellPosition == otherPlayerPosition) {
-        debugPrint('- Tapped on player at position');
+      // Check if we're tapping on any player
+      bool tappedOnPlayer = false;
+      for (final player in gameState.players) {
+        if (cellPosition == player.position) {
+          debugPrint('- Tapped on player ${player.id} at position');
+          tappedOnPlayer = true;
+          break;
+        }
+      }
+
+      if (tappedOnPlayer) {
         _handlePositionTap(cellPosition, gameState);
         return;
       }
@@ -261,17 +290,26 @@ class BoardComponent extends PositionComponent {
     // Clear wall preview when tapping on a position
     wallComponent.clearPreview();
 
-    if (position == currentPlayerPosition) {
-      if (_playerComponent.selectedPawn == position) {
-        debugPrint('- Deselecting current player');
-        _playerComponent.clearSelection();
-      } else {
-        debugPrint('- Selecting current player');
-        _playerComponent.selectedPawn = position;
-        _playerComponent.validMoves = gameState.getValidMoves(position);
-        debugPrint('- Valid moves: ${_playerComponent.validMoves.length}');
+    // Check if we're tapping on any player
+    for (final player in gameState.players) {
+      if (position == player.position &&
+          player.id == gameState.currentPlayerId) {
+        if (_playerComponent.selectedPawn == position) {
+          debugPrint('- Deselecting player ${player.id}');
+          _playerComponent.clearSelection();
+        } else {
+          debugPrint('- Selecting player ${player.id}');
+          _playerComponent.selectedPawn = position;
+          _playerComponent.validMoves = gameState.getValidMoves(position);
+          debugPrint('- Valid moves: ${_playerComponent.validMoves.length}');
+        }
+        return;
       }
     }
+
+    // If tapping on empty cell, clear selection
+    debugPrint('- Tapped on empty cell, clearing selection');
+    _playerComponent.clearSelection();
   }
 
   void _handleWallTap(Wall wall, GameState gameState) {

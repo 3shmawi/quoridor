@@ -62,25 +62,23 @@ class GameWideScreen extends StatelessWidget {
                     if (!value) return const SizedBox.shrink();
                     return Wrap(
                       children: [
-                        GamePlayerInfoWidget(
-                          playerId: 1,
-                          name: AppLocale.player1.getString(context),
-                          wallsRemaining:
-                              game.gameState?.player1.wallsRemaining ?? 0,
-                          isCurrentPlayer:
-                              (game.gameState?.currentPlayer.id ?? 0) == 1,
-                          isAI: false,
-                        ),
-                        const SizedBox(height: 16),
-                        GamePlayerInfoWidget(
-                          playerId: 2,
-                          name: AppLocale.player2.getString(context),
-                          wallsRemaining:
-                              game.gameState?.player2.wallsRemaining ?? 0,
-                          isCurrentPlayer:
-                              (game.gameState?.currentPlayer.id ?? 0) == 2,
-                          isAI: game.gameState?.player2.isAI ?? false,
-                        ),
+                        for (
+                          int i = 0;
+                          i < (game.gameState?.players.length ?? 0);
+                          i++
+                        ) ...[
+                          GamePlayerInfoWidget(
+                            playerId: game.gameState!.players[i].id,
+                            name: game.gameState!.players[i].name,
+                            wallsRemaining:
+                                game.gameState!.players[i].wallsRemaining,
+                            isCurrentPlayer:
+                                (game.gameState?.currentPlayer.id ?? 0) ==
+                                game.gameState!.players[i].id,
+                          ),
+                          if (i < (game.gameState?.players.length ?? 0) - 1)
+                            const SizedBox(height: 16),
+                        ],
                       ],
                     );
                   },

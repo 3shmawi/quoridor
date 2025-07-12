@@ -424,7 +424,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${gameState.player1.name} vs ${gameState.player2.name}',
+                      '${gameState.players[0].name} vs ${gameState.players[1].name}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(
                           context,

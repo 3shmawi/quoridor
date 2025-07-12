@@ -7,7 +7,6 @@ import 'package:quoridor/flame/widgets/game/game_message_toast.dart';
 import 'package:quoridor/flame/widgets/game/game_small_screen.dart';
 import 'package:quoridor/flame/widgets/game/game_wide_screen.dart';
 
-import '/flame/components/board_component.dart';
 import '/flame/constants.dart';
 import '/flame/controller/game_controller.dart';
 import '/flame/controller/game_states.dart';
@@ -240,7 +239,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             FilledButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                gameController.add(StartNewGame());
+                gameController.add(StartNewMultiPlayerGame(playerCount: 3));
               },
               icon: const Icon(Icons.refresh),
               label: Text(AppLocale.playAgain.getString(context)),
@@ -399,7 +398,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         const SizedBox(height: 24),
                         ElevatedButton(
                           onPressed: () {
-                            context.read<GameController>().add(StartNewGame());
+                            context.read<GameController>().add(
+                              StartNewMultiPlayerGame(playerCount: 3),
+                            );
                           },
                           child: const Text('Start New Game'),
                         ),

@@ -174,8 +174,8 @@ class WallComponent extends PositionComponent {
     final cellX = localX % (cellSizeNotifier.value + _cellSpacing);
     final cellY = localY % (cellSizeNotifier.value + _cellSpacing);
 
-    // Increased threshold for easier wall placement
-    const edgeThreshold = 0.4; // 40% of cell size for wall placement
+    // More precise threshold for wall placement
+    const edgeThreshold = 0.25; // 25% of cell size for wall placement
     final threshold = cellSizeNotifier.value * edgeThreshold;
 
     debugPrint('Wall position calculation:');
@@ -184,13 +184,16 @@ class WallComponent extends PositionComponent {
     debugPrint('- Cell position: row=$cellRow, col=$cellCol');
     debugPrint('- Edge threshold: $threshold');
 
-    // Check horizontal walls
-    if (cellY < threshold && cellRow > 0) {
+    // Check horizontal walls (above the cell)
+    if (cellY < threshold && cellRow > 0 && cellRow < GameConstants.boardSize) {
       debugPrint(
         '- Detected horizontal wall above at row: $cellRow, col: $cellCol',
       );
       return Wall(Position(cellRow, cellCol), WallOrientation.horizontal);
-    } else if (cellY > cellSizeNotifier.value - threshold &&
+    }
+    // Check horizontal walls (below the cell)
+    else if (cellY > cellSizeNotifier.value - threshold &&
+        cellRow >= 0 &&
         cellRow < GameConstants.boardSize - 1) {
       debugPrint(
         '- Detected horizontal wall below at row: ${cellRow + 1}, col: $cellCol',
@@ -198,13 +201,16 @@ class WallComponent extends PositionComponent {
       return Wall(Position(cellRow + 1, cellCol), WallOrientation.horizontal);
     }
 
-    // Check vertical walls
-    if (cellX < threshold && cellCol > 0) {
+    // Check vertical walls (left of the cell)
+    if (cellX < threshold && cellCol > 0 && cellCol < GameConstants.boardSize) {
       debugPrint(
         '- Detected vertical wall left at row: $cellRow, col: $cellCol',
       );
       return Wall(Position(cellRow, cellCol), WallOrientation.vertical);
-    } else if (cellX > cellSizeNotifier.value - threshold &&
+    }
+    // Check vertical walls (right of the cell)
+    else if (cellX > cellSizeNotifier.value - threshold &&
+        cellCol >= 0 &&
         cellCol < GameConstants.boardSize - 1) {
       debugPrint(
         '- Detected vertical wall right at row: $cellRow, col: ${cellCol + 1}',
