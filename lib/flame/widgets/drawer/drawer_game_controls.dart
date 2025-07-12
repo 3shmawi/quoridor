@@ -3,20 +3,13 @@ import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/services/localizations.dart';
 
 import '../../controller/game_controller.dart';
-import '../../game/quoridor_game.dart';
 import '../../services/firebase_service.dart';
 import 'drawer_menu_item.dart';
 import 'drawer_menu_section.dart';
 
 class DrawerGameControls extends StatefulWidget {
-  const DrawerGameControls(
-    this.game, {
-    this.onMessage,
-    this.gameController,
-    super.key,
-  });
+  const DrawerGameControls({this.onMessage, this.gameController, super.key});
 
-  final QuoridorGame game;
   final void Function(String message)? onMessage;
   final GameController? gameController;
 
@@ -40,7 +33,7 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
           return AlertDialog(
             title: Row(
               children: [
-                Text("Game Mode"),
+                Text(AppLocale.gameMode.getString(context)),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -50,12 +43,12 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
                 ),
               ],
             ),
-            content: Text("Please select the number of players:"),
+            content: Text(AppLocale.selectNumberOfPlayers.getString(context)),
 
             actions: [
               ListTile(
                 leading: Icon(Icons.group),
-                title: Text("Two Players"),
+                title: Text(AppLocale.twoPlayers.getString(context)),
                 onTap: () {
                   Navigator.of(context).pop();
                   widget.gameController!.add(
@@ -65,7 +58,7 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
               ),
               ListTile(
                 leading: Icon(Icons.groups),
-                title: Text("Three Players"),
+                title: Text(AppLocale.threePlayers.getString(context)),
                 onTap: () {
                   Navigator.of(context).pop();
                   widget.gameController!.add(
@@ -75,7 +68,7 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
               ),
               ListTile(
                 leading: Icon(Icons.groups_2_outlined),
-                title: Text("Four Players"),
+                title: Text(AppLocale.fourPlayers.getString(context)),
                 onTap: () {
                   Navigator.of(context).pop();
                   widget.gameController!.add(
@@ -88,8 +81,6 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
         },
       );
     } else {
-      widget.game.newGame();
-
       _closeMenu();
     }
   }
@@ -107,15 +98,6 @@ class _DrawerGameControlsState extends State<DrawerGameControls> {
 
     if (widget.gameController != null) {
       widget.gameController!.add(SaveGame());
-    } else {
-      final gameId = await FirebaseService.saveGame(widget.game.gameState!);
-      if (gameId != null) {
-        widget.onMessage?.call(
-          AppLocale.gameSavedSuccessfullyWithId.getString(context),
-        );
-      } else {
-        widget.onMessage?.call(AppLocale.failedToSaveGame.getString(context));
-      }
     }
     _closeMenu();
   }

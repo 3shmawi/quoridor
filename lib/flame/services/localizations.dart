@@ -79,6 +79,22 @@ mixin AppLocale {
   static const String newGameStarted = 'newGameStarted';
   static const String aiModeActivated = 'aiModeActivated';
   static const String twoPlayerModeActivated = 'twoPlayerModeActivated';
+  static const String wallControls = 'wallControls';
+  static const String gameMode = 'gameMode';
+  static const String selectNumberOfPlayers = 'selectNumberOfPlayers';
+  static const String threePlayers = 'threePlayers';
+  static const String fourPlayers = 'fourPlayers';
+  static const String startNewGame = 'startNewGame';
+  static const String resumeGame = 'resumeGame';
+  static const String strategicBoardGame = 'strategicBoardGame';
+  static const String refresh = 'refresh';
+  static const String recentGames = 'recentGames';
+  static const String quickTips = 'quickTips';
+  static const String aboutQuoridor = 'aboutQuoridor';
+  static const String tipReachOppositeSide = 'tipReachOppositeSide';
+  static const String tipUseWallsStrategically = 'tipUseWallsStrategically';
+  static const String tipPlayAgainstAI = 'tipPlayAgainstAI';
+  static const String tipGamesAutoSaved = 'tipGamesAutoSaved';
 
   /// English locale
   static const Map<String, dynamic> en = {
@@ -159,6 +175,22 @@ mixin AppLocale {
     newGameStarted: 'New game started!',
     aiModeActivated: 'AI mode activated',
     twoPlayerModeActivated: 'Two player mode activated',
+    wallControls: 'Wall Controls',
+    gameMode: 'Game Mode',
+    selectNumberOfPlayers: 'Please select the number of players:',
+    threePlayers: 'Three Players',
+    fourPlayers: 'Four Players',
+    startNewGame: 'Start New Game',
+    resumeGame: 'Resume Game',
+    strategicBoardGame: 'Strategic Board Game',
+    refresh: 'Refresh',
+    recentGames: 'Recent Games',
+    quickTips: 'Quick Tips',
+    aboutQuoridor: 'About Quoridor',
+    tipReachOppositeSide: 'Reach the opposite side to win',
+    tipUseWallsStrategically: 'Use walls strategically to block opponents',
+    tipPlayAgainstAI: 'Play against AI with different difficulty levels',
+    tipGamesAutoSaved: 'Your games are automatically saved',
   };
 
   /// Arabic locale
@@ -239,5 +271,21 @@ mixin AppLocale {
     newGameStarted: 'تم بدء اللعبة الجديدة!',
     aiModeActivated: 'تم تفعيل وضع الذكاء الصناعي',
     twoPlayerModeActivated: 'تم تفعيل وضع اللاعبين',
+    wallControls: 'تحكم الحواجز',
+    gameMode: 'وضع اللعبة',
+    selectNumberOfPlayers: 'يرجى اختيار عدد اللاعبين:',
+    threePlayers: 'ثلاثة لاعبين',
+    fourPlayers: 'أربعة لاعبين',
+    startNewGame: 'ابدأ لعبة جديدة',
+    resumeGame: 'استئناف اللعبة',
+    strategicBoardGame: 'لعبة استراتيجية',
+    refresh: 'تحديث',
+    recentGames: 'الألعاب الأخيرة',
+    quickTips: 'نصائح سريعة',
+    aboutQuoridor: 'حول كوريدور',
+    tipReachOppositeSide: 'وصل إلى الجانب المقابل للفوز',
+    tipUseWallsStrategically: 'استخدم الحواجز بشكل استراتيجي لمنع الخصوم',
+    tipPlayAgainstAI: 'العب ضد الذكاء الاصطناعي بمستويات صعوبة مختلفة',
+    tipGamesAutoSaved: 'يتم حفظ ألعابك تلقائياً',
   };
 }

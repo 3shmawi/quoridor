@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_body.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_footer.dart';
 
-import '/flame/game/quoridor_game.dart';
 import '../../controller/game_controller.dart';
 import '../drawer/drawer_header.dart';
 
@@ -12,17 +11,11 @@ import '../drawer/drawer_header.dart';
 /// and other settings. It's organized into sections for better user experience.
 class GameDrawer extends StatelessWidget {
   /// Callback function when new game is requested
-  final QuoridorGame game;
   final Function(String)? onMessage;
   final GameController? gameController;
 
   /// Creates a new instance of [GameDrawer].
-  const GameDrawer({
-    super.key,
-    required this.game,
-    this.onMessage,
-    this.gameController,
-  });
+  const GameDrawer({super.key, this.onMessage, this.gameController});
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +37,7 @@ class GameDrawer extends StatelessWidget {
             DrawerAppHeader(),
 
             // Menu Body
-            DrawerBody(game, gameController: gameController),
+            DrawerBody(gameController: gameController),
 
             // Menu Footer
             DrawerFooter(),

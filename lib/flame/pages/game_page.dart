@@ -12,7 +12,6 @@ import '/flame/controller/game_controller.dart';
 import '/flame/controller/game_states.dart';
 import '/flame/widgets/game/game_drawer.dart';
 import '/flame/widgets/game/game_mode_selection.dart';
-import '../../flame/game/quoridor_game.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/firebase_service.dart';
 import '../services/localizations.dart';
@@ -20,16 +19,14 @@ import '../widgets/game/game_app_bar.dart';
 
 class GamePage extends StatefulWidget {
   final GameState? initialGameState;
-  final QuoridorGame game;
 
-  const GamePage(this.game, {super.key, this.initialGameState});
+  const GamePage({super.key, this.initialGameState});
 
   @override
   State<GamePage> createState() => _GamePageState();
 }
 
 class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
-  late final QuoridorGame _game = widget.game;
   late AnimationController _messageController;
   late ConfettiController _confettiController;
   bool _isInitialized = false;
@@ -127,11 +124,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       );
     }
 
-    // Set up game callbacks to work with controller
-    _game.onGameStateChanged = _handleGameStateChanged;
-    _game.onGameMessage = _showGameMessage;
-    _game.onGameWon = _showConfetti;
-    isInitializedProvider.value = _game.isInitialized;
+    isInitializedProvider.value = true;
   }
 
   @override
@@ -269,7 +262,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         child: BlocBuilder<GameController, GameStates>(
           builder: (context, state) {
             return GameModeSelection(
-              game: _game,
               onMessage: _showGameMessage,
               gameController: gameController,
             );
@@ -285,19 +277,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       listener: (context, state) {
         // Handle state changes and update the game accordingly
         if (state is GamePlayingState) {
-          _game.updateFromController();
-
           // Show messages from controller
           if (state.currentMessage != null) {
             _showGameMessage(state.currentMessage!);
           }
         } else if (state is GameOverState) {
-          _game.updateFromController();
           _showConfetti();
         } else if (state is GameErrorState) {
           _showGameMessage(state.error);
         } else if (state is GameAIThinkingState) {
-          _game.updateFromController();
           _showGameMessage(state.message);
         }
       },
@@ -410,7 +398,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                               StartNewMultiPlayerGame(playerCount: 3),
                             );
                           },
-                          child: const Text('Start New Game'),
+                          child: Text(
+                            AppLocale.startNewGame.getString(context),
+                          ),
                         ),
                       ],
                     ),
@@ -441,7 +431,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                           onPressed: () {
                             context.read<GameController>().add(ResumeGame());
                           },
-                          child: const Text('Resume Game'),
+                          child: Text(AppLocale.resumeGame.getString(context)),
                         ),
                       ],
                     ),
@@ -460,7 +450,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         title: GameAppBar(),
                       ),
                 drawer: GameDrawer(
-                  game: _game,
                   onMessage: _showGameMessage,
                   gameController: context.read<GameController>(),
                 ),
@@ -483,12 +472,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                           },
                       child: isWideScreen
                           ? GameWideScreen(
-                              _game,
                               key: const ValueKey('wide'),
                               gameController: context.read<GameController>(),
                             )
                           : GameSmallScreen(
-                              _game,
                               key: const ValueKey('small'),
                               gameController: context.read<GameController>(),
                             ),

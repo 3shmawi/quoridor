@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 final cellSizeNotifier = ValueNotifier<double>(40);
+final isInitializedProvider = ValueNotifier<bool>(false);
 
 // Game constants and configurations for Quoridor game
 

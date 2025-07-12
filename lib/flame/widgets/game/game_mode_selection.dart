@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localization/flutter_localization.dart';
-import 'package:quoridor/flame/game/quoridor_game.dart';
 
 import '../../controller/game_controller.dart';
 import '../../services/localizations.dart';
@@ -13,16 +12,10 @@ import '../app/copywrite.dart';
 /// or playing with another player on the same device.
 class GameModeSelection extends StatelessWidget {
   /// Creates a new instance of [GameModeSelection].
-  final QuoridorGame game;
   final Function(String)? onMessage;
   final GameController? gameController;
 
-  const GameModeSelection({
-    required this.game,
-    this.onMessage,
-    this.gameController,
-    super.key,
-  });
+  const GameModeSelection({this.onMessage, this.gameController, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -207,10 +200,10 @@ class GameModeSelection extends StatelessWidget {
               ),
               Icon(
                 Icons.arrow_forward_ios,
-                size: 16,
                 color: Theme.of(
                   context,
-                ).colorScheme.onSurface.withValues(alpha: 0.4),
+                ).colorScheme.outline.withValues(alpha: 0.5),
+                size: 16,
               ),
             ],
           ),

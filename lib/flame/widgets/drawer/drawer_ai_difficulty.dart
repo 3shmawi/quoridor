@@ -5,13 +5,11 @@ import 'package:quoridor/flame/widgets/drawer/drawer_difficulty_item.dart';
 import 'package:quoridor/flame/widgets/drawer/drawer_menu_section.dart';
 
 import '../../controller/game_controller.dart';
-import '../../game/quoridor_game.dart';
 import '../../services/localizations.dart';
 
 class DrawerAiDifficulty extends StatelessWidget {
-  const DrawerAiDifficulty(this.game, {this.gameController, super.key});
+  const DrawerAiDifficulty({this.gameController, super.key});
 
-  final QuoridorGame game;
   final GameController? gameController;
 
   @override
@@ -20,17 +18,17 @@ class DrawerAiDifficulty extends StatelessWidget {
       title: AppLocale.aiDifficulty.getString(context),
       children: [
         DrawerDifficultyItem(
-            difficulty: AIDifficulty.easy,
-            game: game,
-            gameController: gameController),
+          difficulty: AIDifficulty.easy,
+          gameController: gameController,
+        ),
         DrawerDifficultyItem(
-            difficulty: AIDifficulty.medium,
-            game: game,
-            gameController: gameController),
+          difficulty: AIDifficulty.medium,
+          gameController: gameController,
+        ),
         DrawerDifficultyItem(
-            difficulty: AIDifficulty.hard,
-            game: game,
-            gameController: gameController),
+          difficulty: AIDifficulty.hard,
+          gameController: gameController,
+        ),
       ],
     );
   }

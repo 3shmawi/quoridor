@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localization/flutter_localization.dart';
+import 'package:quoridor/flame/controller/game_controller.dart';
+import 'package:quoridor/flame/models/game_state.dart';
+import 'package:quoridor/flame/services/firebase_service.dart';
+import 'package:quoridor/flame/services/local_storage.dart';
+import 'package:quoridor/flame/services/localizations.dart';
+import 'package:quoridor/flame/services/sounds.dart';
 
-import '/flame/game/quoridor_game.dart';
-import '../../flame/models/game_state.dart';
-import '../../flame/services/firebase_service.dart';
-import 'game_page.dart';
+import '/flame/pages/game_page.dart';
+import '/theme.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -75,7 +81,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   void _startNewGame() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => GamePage(QuoridorGame())),
+      MaterialPageRoute(
+        builder: (context) => BlocProvider(
+          create: (context) => GameController(),
+          child: const GamePage(),
+        ),
+      ),
     );
   }
 
@@ -83,8 +94,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            GamePage(QuoridorGame(), initialGameState: gameState),
+        builder: (context) => BlocProvider(
+          create: (context) => GameController(),
+          child: GamePage(initialGameState: gameState),
+        ),
       ),
     );
   }
@@ -190,7 +203,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
         // Subtitle
         Text(
-          'Strategic Board Game',
+          AppLocale.strategicBoardGame.getString(context),
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
             fontWeight: FontWeight.w400,
@@ -254,7 +267,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     const Icon(Icons.play_arrow, size: 28, color: Colors.white),
                     const SizedBox(width: 12),
                     Text(
-                      'Start New Game',
+                      AppLocale.startNewGame.getString(context),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -275,7 +288,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             Expanded(
               child: _buildSecondaryButton(
                 icon: Icons.info_outline,
-                label: 'How to Play',
+                label: AppLocale.howToPlay.getString(context),
                 onPressed: _showAbout,
               ),
             ),
@@ -283,7 +296,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             Expanded(
               child: _buildSecondaryButton(
                 icon: Icons.refresh,
-                label: 'Refresh',
+                label: AppLocale.refresh.getString(context),
                 onPressed: _loadRecentGames,
               ),
             ),
@@ -347,7 +360,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
             const SizedBox(width: 8),
             Text(
-              'Recent Games',
+              AppLocale.recentGames.getString(context),
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.onSurface,
@@ -478,7 +491,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
               const SizedBox(width: 8),
               Text(
-                'Quick Tips',
+                AppLocale.quickTips.getString(context),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.onSurface,
@@ -489,10 +502,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
           const SizedBox(height: 16),
 
-          _buildTip('🎯', 'Reach the opposite side to win'),
-          _buildTip('🧱', 'Use walls strategically to block opponents'),
-          _buildTip('🤖', 'Play against AI with different difficulty levels'),
-          _buildTip('💾', 'Your games are automatically saved'),
+          _buildTip('🎯', AppLocale.tipReachOppositeSide.getString(context)),
+          _buildTip(
+            '🧱',
+            AppLocale.tipUseWallsStrategically.getString(context),
+          ),
+          _buildTip('🤖', AppLocale.tipPlayAgainstAI.getString(context)),
+          _buildTip('💾', AppLocale.tipGamesAutoSaved.getString(context)),
         ],
       ),
     );
@@ -524,7 +540,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         children: [
           Icon(Icons.info, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
-          const Text('About Quoridor'),
+          Text(AppLocale.aboutQuoridor.getString(context)),
         ],
       ),
       content: SingleChildScrollView(
@@ -559,7 +575,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Got it!'),
+          child: Text(AppLocale.gotIt.getString(context)),
         ),
       ],
     );
