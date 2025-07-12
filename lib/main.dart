@@ -2,16 +2,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:quoridor/flame/services/local_storage.dart';
 
-import '/flame/pages/game_page.dart';
+import '/flame/pages/menu_page.dart';
 import '/theme.dart';
 import 'firebase_options.dart';
-import 'flame/controller/game_controller.dart';
 import 'flame/services/localizations.dart';
 import 'flame/services/sounds.dart';
 
@@ -70,10 +68,7 @@ class _QuoridorAppState extends State<QuoridorApp> {
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: value ? ThemeMode.dark : ThemeMode.light,
-          home: BlocProvider(
-            create: (context) => GameController(),
-            child: const GamePage(),
-          ),
+          home: const MenuPage(),
           debugShowCheckedModeBanner: false,
         );
       },

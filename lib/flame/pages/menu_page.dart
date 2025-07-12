@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localization/flutter_localization.dart';
 import 'package:quoridor/flame/controller/game_controller.dart';
+import 'package:quoridor/flame/controller/online_game_controller.dart';
 import 'package:quoridor/flame/models/game_state.dart';
 import 'package:quoridor/flame/services/firebase_service.dart';
-import 'package:quoridor/flame/services/local_storage.dart';
 import 'package:quoridor/flame/services/localizations.dart';
-import 'package:quoridor/flame/services/sounds.dart';
+import 'package:quoridor/flame/widgets/online/online_game_lobby.dart';
 
 import '/flame/pages/game_page.dart';
-import '/theme.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -90,6 +89,22 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
+  void _startOnlineGame() {
+    print('DEBUG: Starting online game navigation');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) {
+          print('DEBUG: Creating OnlineGameController');
+          return BlocProvider(
+            create: (context) => OnlineGameController(),
+            child: const OnlineGameLobby(),
+          );
+        },
+      ),
+    );
+  }
+
   void _loadGame(GameState gameState) {
     Navigator.push(
       context,
@@ -104,6 +119,53 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   void _showAbout() {
     showDialog(context: context, builder: (context) => _buildAboutDialog());
+  }
+
+  void _showRecentGames() {
+    if (_recentGames.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Recent Games'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: ListView.builder(
+              itemCount: _recentGames.length,
+              itemBuilder: (context, index) {
+                final game = _recentGames[index];
+                return ListTile(
+                  title: Text(
+                    '${game.players[0].name} vs ${game.players[1].name}',
+                  ),
+                  subtitle: Text(game.isGameOver ? 'Game Over' : 'In Progress'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.play_arrow),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _loadGame(game);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No recent games found'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   @override
@@ -222,12 +284,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
           const SizedBox(height: 32),
 
-          // Recent Games Section
-          if (_recentGames.isNotEmpty) ...[
-            _buildRecentGamesSection(),
-            const SizedBox(height: 32),
-          ],
-
           // Game Stats or Info
           _buildGameInfo(),
         ],
@@ -238,10 +294,20 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildActionButtons() {
     return Column(
       children: [
-        // New Game Button (Primary)
+        // Game Mode Selection Title
+        Text(
+          'Choose Game Mode',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Offline Game Button
         SizedBox(
           width: double.infinity,
-          height: 60,
+          height: 75,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
@@ -261,19 +327,53 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.play_arrow, size: 28, color: Colors.white),
-                    const SizedBox(width: 12),
-                    Text(
-                      AppLocale.startNewGame.getString(context),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.computer,
+                          size: 24,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Offline Game',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            Text(
+                              'Play vs local multiplayer',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withOpacity(0.8),
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -282,22 +382,98 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
         const SizedBox(height: 16),
 
-        // Secondary Action Buttons
+        // Online Multiplayer Button
+        SizedBox(
+          width: double.infinity,
+          height: 75,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _startOnlineGame,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.people,
+                          size: 24,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Online Multiplayer',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            Text(
+                              'Play with friends online',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withOpacity(0.8),
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Quick Actions Row
         Row(
           children: [
             Expanded(
               child: _buildSecondaryButton(
-                icon: Icons.info_outline,
-                label: AppLocale.howToPlay.getString(context),
-                onPressed: _showAbout,
+                icon: Icons.history,
+                label: 'Recent Games',
+                onPressed: _showRecentGames,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildSecondaryButton(
-                icon: Icons.refresh,
-                label: AppLocale.refresh.getString(context),
-                onPressed: _loadRecentGames,
+                icon: Icons.info_outline,
+                label: 'How to Play',
+                onPressed: _showAbout,
               ),
             ),
           ],

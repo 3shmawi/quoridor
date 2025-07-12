@@ -153,6 +153,7 @@ class Wall {
 }
 
 enum GameStatus {
+  waiting,
   playing,
   player1Won,
   player2Won,
