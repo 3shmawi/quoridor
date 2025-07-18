@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/widgets.dart';
 
 import '../constants.dart';
 import '../models/game_state.dart';
@@ -20,9 +21,12 @@ class OnlineGameService {
   static final Map<String, StreamController<GameState>> _gameStreams = {};
   static final Map<String, StreamController<RoomState>> _roomStreams = {};
 
+  // Cache latest room states for immediate emission to new listeners
+  static final Map<String, RoomState> _latestRoomStates = {};
+
   // Current room and game subscriptions
-  static StreamSubscription<DocumentSnapshot>? _currentGameSubscription;
   static StreamSubscription<DocumentSnapshot>? _currentRoomSubscription;
+  static StreamSubscription<DocumentSnapshot>? _currentGameSubscription;
 
   // Current user's room and game info
   static String? _currentRoomId;
@@ -196,19 +200,35 @@ class OnlineGameService {
   // Start the game
   static Future<String?> startGame() async {
     try {
-      if (_currentRoomId == null) return null;
+      print('DEBUG: startGame() called');
+      print('DEBUG: Current room ID: $_currentRoomId');
 
+      if (_currentRoomId == null) {
+        print('DEBUG: No current room ID, returning null');
+        return null;
+      }
+
+      print('DEBUG: Getting room document');
       final roomDoc = await _firestore
           .collection(_roomsCollection)
           .doc(_currentRoomId!)
           .get();
 
-      if (!roomDoc.exists) return null;
+      if (!roomDoc.exists) {
+        print('DEBUG: Room document does not exist, returning null');
+        return null;
+      }
 
+      print('DEBUG: Parsing room state');
       final roomState = RoomState.fromJson(roomDoc.data()!);
+      print('DEBUG: Room can start: ${roomState.canStart}');
 
-      if (!roomState.canStart) return null;
+      if (!roomState.canStart) {
+        print('DEBUG: Room cannot start, returning null');
+        return null;
+      }
 
+      print('DEBUG: Creating game state');
       // Create game state
       final players = roomState.players.map((rp) {
         return Player(
@@ -231,12 +251,14 @@ class OnlineGameService {
         status: GameStatus.playing,
       );
 
+      print('DEBUG: Saving game to Firestore');
       // Save game
       await _firestore
           .collection(_gamesCollection)
           .doc(gameState.gameId)
           .set(gameState.toJson());
 
+      print('DEBUG: Updating room status to playing');
       // Update room status
       await _firestore
           .collection(_roomsCollection)
@@ -248,10 +270,11 @@ class OnlineGameService {
           });
 
       _currentGameId = gameState.gameId;
+      print('DEBUG: Game started successfully, ID: ${gameState.gameId}');
 
       return gameState.gameId;
     } catch (e) {
-      print('Error starting game: $e');
+      print('DEBUG: Error starting game: $e');
       return null;
     }
   }
@@ -295,33 +318,57 @@ class OnlineGameService {
 
     if (_roomStreams.containsKey(roomId)) {
       print('DEBUG: Using existing stream for room: $roomId');
-      return _roomStreams[roomId]!.stream;
+      final existingStream = _roomStreams[roomId]!.stream;
+      print('DEBUG: Returning existing broadcast stream');
+
+      // If we have cached data, emit it immediately to the new listener
+      if (_latestRoomStates.containsKey(roomId)) {
+        print('DEBUG: Emitting cached room state to new listener');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _roomStreams[roomId]!.add(_latestRoomStates[roomId]!);
+        });
+      }
+
+      return existingStream;
     }
 
     print('DEBUG: Creating new stream for room: $roomId');
-    final controller = StreamController<RoomState>();
+    final controller = StreamController<RoomState>.broadcast();
     _roomStreams[roomId] = controller;
 
+    print('DEBUG: Setting up Firestore listener for room: $roomId');
     _currentRoomSubscription = _firestore
         .collection(_roomsCollection)
         .doc(roomId)
         .snapshots()
-        .listen((snapshot) {
-          print('DEBUG: Firestore snapshot received for room: $roomId');
-          print('DEBUG: Snapshot exists: ${snapshot.exists}');
-          print('DEBUG: Snapshot data: ${snapshot.data()}');
+        .listen(
+          (snapshot) {
+            print('DEBUG: Firestore snapshot received for room: $roomId');
+            print('DEBUG: Snapshot exists: ${snapshot.exists}');
+            print('DEBUG: Snapshot data: ${snapshot.data()}');
 
-          if (snapshot.exists && snapshot.data() != null) {
-            final roomState = RoomState.fromJson(snapshot.data()!);
-            print(
-              'DEBUG: Emitting room state to stream: ${roomState.roomName}',
-            );
-            controller.add(roomState);
-          } else {
-            print('DEBUG: Snapshot is empty or null');
-          }
-        });
+            if (snapshot.exists && snapshot.data() != null) {
+              final roomState = RoomState.fromJson(snapshot.data()!);
+              print(
+                'DEBUG: Emitting room state to stream: ${roomState.roomName}',
+              );
+              print('DEBUG: Adding room state to broadcast stream controller');
 
+              // Cache the latest room state
+              _latestRoomStates[roomId] = roomState;
+
+              controller.add(roomState);
+              print('DEBUG: Room state emitted to stream');
+            } else {
+              print('DEBUG: Snapshot is empty or null');
+            }
+          },
+          onError: (error) {
+            print('DEBUG: Firestore listener error: $error');
+          },
+        );
+
+    print('DEBUG: Stream created and Firestore listener set up');
     return controller.stream;
   }
 
@@ -331,7 +378,7 @@ class OnlineGameService {
       return _gameStreams[gameId]!.stream;
     }
 
-    final controller = StreamController<GameState>();
+    final controller = StreamController<GameState>.broadcast();
     _gameStreams[gameId] = controller;
 
     _currentGameSubscription = _firestore
@@ -351,20 +398,36 @@ class OnlineGameService {
   // Set player ready status
   static Future<void> setPlayerReady(bool isReady) async {
     try {
-      if (_currentRoomId == null) return;
+      print('DEBUG: setPlayerReady called with isReady: $isReady');
+      print('DEBUG: Current room ID: $_currentRoomId');
+
+      if (_currentRoomId == null) {
+        print('DEBUG: No current room ID, returning');
+        return;
+      }
 
       final user = _auth.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        print('DEBUG: No current user, returning');
+        return;
+      }
 
+      print('DEBUG: Getting room document for: $_currentRoomId');
       final roomDoc = await _firestore
           .collection(_roomsCollection)
           .doc(_currentRoomId!)
           .get();
 
       if (roomDoc.exists) {
+        print('DEBUG: Room document exists, updating ready status');
         final roomState = RoomState.fromJson(roomDoc.data()!);
+        print('DEBUG: Current players: ${roomState.players.length}');
+
         final updatedPlayers = roomState.players.map((p) {
           if (p.userId == user.uid) {
+            print(
+              'DEBUG: Updating player ${p.displayName} ready status to: $isReady',
+            );
             return p.copyWith(isReady: isReady);
           }
           return p;
@@ -382,10 +445,16 @@ class OnlineGameService {
           hostId: roomState.hostId,
         );
 
+        print('DEBUG: Updating room in Firestore');
+        print('DEBUG: Database update timestamp: ${DateTime.now()}');
         await _firestore
             .collection(_roomsCollection)
             .doc(_currentRoomId!)
             .update(updatedRoomState.toJson());
+        print('DEBUG: Room updated successfully');
+        print('DEBUG: Database update completed timestamp: ${DateTime.now()}');
+      } else {
+        print('DEBUG: Room document does not exist');
       }
     } catch (e) {
       print('Error setting player ready: $e');
@@ -481,6 +550,20 @@ class OnlineGameService {
     _currentRoomId = null;
     _currentGameId = null;
     _currentPlayerId = null;
+  }
+
+  // Remove a specific room stream
+  static void removeRoomStream(String roomId) {
+    print('DEBUG: Removing room stream for: $roomId');
+    final controller = _roomStreams.remove(roomId);
+    controller?.close();
+  }
+
+  // Remove a specific game stream
+  static void removeGameStream(String gameId) {
+    print('DEBUG: Removing game stream for: $gameId');
+    final controller = _gameStreams.remove(gameId);
+    controller?.close();
   }
 
   // Cleanup

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -20,10 +22,13 @@ class RoomLobbyScreen extends StatefulWidget {
 
 class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
   bool _isReady = false;
+  bool _isStartingGame = false;
+  Stream<RoomState>? _roomStream;
 
   @override
   void initState() {
     super.initState();
+
     // Set initial ready status
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
@@ -34,13 +39,44 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
           )
           .isReady;
     }
+
+    // Create a single stream instance to share
+    final roomId = widget.roomState.roomId;
+    if (roomId.isNotEmpty) {
+      print('DEBUG: Creating shared stream for room: $roomId');
+      _roomStream = OnlineGameService.watchRoom(roomId);
+    }
+
+    print('DEBUG: RoomLobbyScreen initialized with StreamBuilder approach');
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_roomStream == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Room: ${widget.roomState.roomName}'),
+          backgroundColor: Colors.blue[700],
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(child: Text('Error: No room stream available')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Room: ${widget.roomState.roomName}'),
+        title: StreamBuilder<RoomState>(
+          stream: _roomStream,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Text('Room: ${widget.roomState.roomName} (Error)');
+            }
+            if (!snapshot.hasData) {
+              return Text('Room: ${widget.roomState.roomName}');
+            }
+            return Text('Room: ${snapshot.data!.roomName}');
+          },
+        ),
         backgroundColor: Colors.blue[700],
         foregroundColor: Colors.white,
         elevation: 0,
@@ -54,58 +90,159 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
       ),
       body: BlocConsumer<OnlineGameController, OnlineGameStates>(
         listener: (context, state) {
+          print('DEBUG: RoomLobbyScreen received state: ${state.runtimeType}');
+
           if (state is OnlineGameErrorState) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.error), backgroundColor: Colors.red),
             );
+          } else if (state is OnlineGameLoadingState &&
+              state.message.contains('start')) {
+            // Game is starting
+            setState(() {
+              _isStartingGame = true;
+            });
           } else if (state is OnlineGamePlayingState) {
-            // Navigate to online game screen
+            // Navigate to online game screen with the same controller
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => OnlineGameScreen()),
+              MaterialPageRoute(
+                builder: (context) => BlocProvider.value(
+                  value: context.read<OnlineGameController>(),
+                  child: const OnlineGameScreen(),
+                ),
+              ),
             );
           }
         },
         builder: (context, state) {
-          if (state is OnlineGameLoadingState) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(state.message),
-                ],
-              ),
-            );
-          }
+          return StreamBuilder<RoomState>(
+            stream: _roomStream,
+            builder: (context, snapshot) {
+              print(
+                'DEBUG: StreamBuilder update - hasData: ${snapshot.hasData}, hasError: ${snapshot.hasError}',
+              );
+              print(
+                'DEBUG: StreamBuilder connection state: ${snapshot.connectionState}',
+              );
+              if (snapshot.hasError) {
+                print('DEBUG: StreamBuilder error: ${snapshot.error}');
+              }
 
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView(
+              if (snapshot.hasError) {
+                print('DEBUG: StreamBuilder error: ${snapshot.error}');
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildRoomInfo(),
-                      const SizedBox(height: 24),
-                      _buildPlayersList(),
-                      const SizedBox(height: 24),
-                      _buildReadySection(),
+                      const Icon(Icons.error, color: Colors.red, size: 64),
+                      const SizedBox(height: 16),
+                      Text('Error: ${snapshot.error}'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => setState(() {}),
+                        child: const Text('Retry'),
+                      ),
                     ],
                   ),
+                );
+              }
+
+              if (!snapshot.hasData) {
+                print('DEBUG: StreamBuilder waiting for data...');
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Loading room...'),
+                    ],
+                  ),
+                );
+              }
+
+              final roomState = snapshot.data!;
+              print(
+                'DEBUG: StreamBuilder received room state: ${roomState.roomName}',
+              );
+              print('DEBUG: Players count: ${roomState.players.length}');
+              print('DEBUG: Can start: ${roomState.canStart}');
+
+              // Check if current user is still in the room
+              final currentUser = FirebaseAuth.instance.currentUser;
+              if (currentUser != null) {
+                final isInRoom = roomState.players.any(
+                  (p) => p.userId == currentUser.uid,
+                );
+
+                if (!isInRoom) {
+                  print(
+                    'DEBUG: Current user is no longer in the room, navigating back',
+                  );
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('You were removed from the room'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      Navigator.pop(context);
+                    }
+                  });
+                  return const Center(
+                    child: Text('You were removed from the room'),
+                  );
+                }
+
+                // Update ready status based on current user
+                try {
+                  final myPlayer = roomState.players.firstWhere(
+                    (p) => p.userId == currentUser.uid,
+                    orElse: () => roomState.players.first,
+                  );
+                  if (_isReady != myPlayer.isReady) {
+                    print(
+                      'DEBUG: Updating ready status from ${_isReady} to ${myPlayer.isReady}',
+                    );
+                    setState(() {
+                      _isReady = myPlayer.isReady;
+                    });
+                  }
+                } catch (e) {
+                  print('DEBUG: Error finding my player: $e');
+                }
+              }
+
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        children: [
+                          _buildRoomInfo(roomState),
+                          const SizedBox(height: 24),
+                          _buildPlayersList(roomState),
+                          const SizedBox(height: 24),
+                          _buildReadySection(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildStartButton(state, roomState),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                _buildStartButton(state),
-              ],
-            ),
+              );
+            },
           );
         },
       ),
     );
   }
 
-  Widget _buildRoomInfo() {
+  Widget _buildRoomInfo(RoomState roomState) {
     return Card(
       elevation: 4,
       child: Padding(
@@ -119,14 +256,14 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    widget.roomState.roomName,
+                    roomState.roomName,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.blue[700],
                     ),
                   ),
                 ),
-                if (widget.roomState.isPrivate)
+                if (roomState.isPrivate)
                   const Chip(
                     label: Text('Private'),
                     backgroundColor: Colors.orange,
@@ -136,7 +273,7 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Room ID: ${widget.roomState.roomId}',
+              'Room ID: ${roomState.roomId}',
               style: const TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -145,7 +282,7 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Players: ${widget.roomState.players.length}/${widget.roomState.maxPlayers}',
+              'Players: ${roomState.players.length}/${roomState.maxPlayers}',
               style: const TextStyle(fontSize: 16),
             ),
           ],
@@ -154,7 +291,7 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
     );
   }
 
-  Widget _buildPlayersList() {
+  Widget _buildPlayersList(RoomState roomState) {
     return Card(
       elevation: 4,
       child: Padding(
@@ -170,8 +307,8 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ...widget.roomState.players.map(
-              (player) => _buildPlayerTile(player),
+            ...roomState.players.map(
+              (player) => _buildPlayerTile(player, roomState),
             ),
           ],
         ),
@@ -179,8 +316,8 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
     );
   }
 
-  Widget _buildPlayerTile(RoomPlayer player) {
-    final isHost = widget.roomState.hostId == player.userId;
+  Widget _buildPlayerTile(RoomPlayer player, RoomState roomState) {
+    final isHost = roomState.hostId == player.userId;
     final currentUser = FirebaseAuth.instance.currentUser;
     final isMe = currentUser != null && player.userId == currentUser.uid;
 
@@ -255,13 +392,19 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
               subtitle: Text(_isReady ? 'Ready to play!' : 'Click when ready'),
               value: _isReady,
               onChanged: (value) async {
+                print('DEBUG: Ready switch changed to: $value');
                 setState(() {
                   _isReady = value;
                 });
                 // Update ready status directly using the service
                 try {
+                  print(
+                    'DEBUG: Calling OnlineGameService.setPlayerReady($value)',
+                  );
                   await OnlineGameService.setPlayerReady(value);
+                  print('DEBUG: setPlayerReady completed successfully');
                 } catch (e) {
+                  print('DEBUG: Error in setPlayerReady: $e');
                   // Revert the UI state if the service call fails
                   if (mounted) {
                     setState(() {
@@ -292,9 +435,9 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
     );
   }
 
-  Widget _buildStartButton(OnlineGameStates state) {
-    final isHost = widget.roomState.isHost;
-    final canStart = widget.roomState.canStart;
+  Widget _buildStartButton(OnlineGameStates state, RoomState roomState) {
+    final isHost = roomState.isHost;
+    final canStart = roomState.canStart;
 
     return Card(
       elevation: 4,
@@ -306,9 +449,15 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _startGame,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start Game'),
+                  onPressed: _isStartingGame ? null : _startGame,
+                  icon: _isStartingGame
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_arrow),
+                  label: Text(_isStartingGame ? 'Starting...' : 'Start Game'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
@@ -388,7 +537,50 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
   }
 
   void _startGame() {
-    context.read<OnlineGameController>().add(StartOnlineGame());
+    try {
+      print('DEBUG: Starting game...');
+
+      // Set the flag immediately to prevent multiple taps
+      setState(() {
+        _isStartingGame = true;
+      });
+
+      final controller = context.read<OnlineGameController>();
+      print('DEBUG: Controller state: ${controller.state.runtimeType}');
+      print('DEBUG: Controller is closed: ${controller.isClosed}');
+
+      // Check if the controller is still active
+      if (!controller.isClosed) {
+        print('DEBUG: Adding StartOnlineGame event to controller');
+        controller.add(StartOnlineGame());
+      } else {
+        print('DEBUG: Controller is closed, cannot start game');
+        // Reset the flag if controller is closed
+        setState(() {
+          _isStartingGame = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot start game - controller is closed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('DEBUG: Error starting game: $e');
+      // Reset the flag on error
+      setState(() {
+        _isStartingGame = false;
+      });
+      if (mounted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error starting game: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _leaveRoom() {
@@ -405,13 +597,17 @@ class _RoomLobbyScreenState extends State<RoomLobbyScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
+              print('DEBUG: Leaving room...');
+
               // Leave the room directly using the service
               try {
                 await OnlineGameService.leaveRoom();
+                print('DEBUG: Successfully left room');
                 if (mounted) {
                   Navigator.pop(context);
                 }
               } catch (e) {
+                print('DEBUG: Error leaving room: $e');
                 // Only show error if widget is still mounted and context is valid
                 if (mounted && context.mounted) {
                   try {

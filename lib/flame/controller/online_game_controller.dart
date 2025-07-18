@@ -154,13 +154,22 @@ class OnlineGameController
     Emitter<OnlineGameStates> emit,
   ) async {
     try {
+      print('DEBUG: _onStartOnlineGame called');
+      print('DEBUG: Emitting loading state for game start');
+      emit(OnlineGameLoadingState(message: 'Starting game...'));
+
+      print('DEBUG: Calling OnlineGameService.startGame()');
       final gameId = await OnlineGameService.startGame();
+      print('DEBUG: startGame returned: $gameId');
 
       if (gameId != null) {
+        print('DEBUG: Game started successfully with ID: $gameId');
         _gameStartTime = DateTime.now();
         // Start watching the game
+        print('DEBUG: Adding WatchGame event for game: $gameId');
         add(WatchGame(gameId));
       } else {
+        print('DEBUG: startGame returned null, emitting error');
         emit(
           OnlineGameErrorState(
             error: 'Failed to start game',
@@ -169,6 +178,7 @@ class OnlineGameController
         );
       }
     } catch (e) {
+      print('DEBUG: Error in _onStartOnlineGame: $e');
       emit(
         OnlineGameErrorState(
           error: 'Error starting game: $e',
@@ -225,13 +235,16 @@ class OnlineGameController
 
     _roomSubscription = OnlineGameService.watchRoom(event.roomId).listen(
       (roomState) {
-        print('DEBUG: Room state received from stream: ${roomState.roomName}');
+        print(
+          'DEBUG: CONTROLLER - Room state received from stream: ${roomState.roomName}',
+        );
+        print('DEBUG: CONTROLLER - Stream update timestamp: ${DateTime.now()}');
         if (roomState != null) {
           // Process the room state directly in the stream listener
-          print('DEBUG: Processing room state update');
-          _processRoomStateUpdate(roomState);
+          print('DEBUG: CONTROLLER - Processing room state update');
+          _processRoomStateUpdate(roomState, emit);
         } else {
-          print('DEBUG: Room state is null');
+          print('DEBUG: CONTROLLER - Room state is null');
         }
       },
       onError: (error) {
@@ -247,12 +260,19 @@ class OnlineGameController
     );
   }
 
-  // Process room state update without emit parameter
-  void _processRoomStateUpdate(RoomState roomState) {
+  // Process room state update with emit parameter
+  void _processRoomStateUpdate(
+    RoomState roomState,
+    Emitter<OnlineGameStates> emit,
+  ) {
     print('DEBUG: Room state update received: ${roomState.roomName}');
     print('DEBUG: Room status: ${roomState.status}');
     print('DEBUG: Players: ${roomState.players.length}');
     print('DEBUG: Can start: ${roomState.canStart}');
+    print('DEBUG: All players ready status:');
+    for (final player in roomState.players) {
+      print('DEBUG: - ${player.displayName}: ${player.isReady}');
+    }
 
     final currentUser = FirebaseAuth.instance.currentUser;
     print('DEBUG: Current user: ${currentUser?.uid}');
@@ -269,30 +289,44 @@ class OnlineGameController
 
     if (roomState.status == GameStatus.waiting) {
       if (roomState.canStart && isHost) {
-        print('DEBUG: Emitting WaitingForPlayersState');
-        emit(
-          WaitingForPlayersState(
-            roomState: roomState,
-            isHost: isHost,
-            readyPlayers: roomState.players
-                .where((p) => p.isReady)
-                .map((p) => p.displayName)
-                .toList(),
-            notReadyPlayers: roomState.players
-                .where((p) => !p.isReady)
-                .map((p) => p.displayName)
-                .toList(),
-          ),
-        );
+        // Only emit if we're not already in WaitingForPlayersState
+        if (state is! WaitingForPlayersState) {
+          print('DEBUG: Emitting WaitingForPlayersState');
+          if (!emit.isDone) {
+            emit(
+              WaitingForPlayersState(
+                roomState: roomState,
+                isHost: isHost,
+                readyPlayers: roomState.players
+                    .where((p) => p.isReady)
+                    .map((p) => p.displayName)
+                    .toList(),
+                notReadyPlayers: roomState.players
+                    .where((p) => !p.isReady)
+                    .map((p) => p.displayName)
+                    .toList(),
+              ),
+            );
+          }
+        } else {
+          print('DEBUG: Already in WaitingForPlayersState, skipping emission');
+        }
       } else {
-        print('DEBUG: Emitting RoomLobbyState');
-        emit(
-          RoomLobbyState(
-            roomState: roomState,
-            isHost: isHost,
-            isReady: isReady,
-          ),
-        );
+        // Only emit if we're not already in RoomLobbyState
+        if (state is! RoomLobbyState) {
+          print('DEBUG: Emitting RoomLobbyState');
+          if (!emit.isDone) {
+            emit(
+              RoomLobbyState(
+                roomState: roomState,
+                isHost: isHost,
+                isReady: isReady,
+              ),
+            );
+          }
+        } else {
+          print('DEBUG: Already in RoomLobbyState, skipping emission');
+        }
       }
     } else if (roomState.status == GameStatus.playing) {
       // Game is already started, watch for game state
@@ -607,6 +641,8 @@ class OnlineGameController
 
   @override
   Future<void> close() {
+    print('DEBUG: OnlineGameController.close() called');
+    print('DEBUG: Controller state before close: ${state.runtimeType}');
     _disconnectFromCurrentRoom();
     return super.close();
   }
