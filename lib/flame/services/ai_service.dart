@@ -10,8 +10,21 @@ import '../../flame/models/game_state.dart';
 enum AIDifficulty { easy, medium, hard }
 
 class AIService {
-  static const String _apiKey = 'EM0CslaVtzEsqKb6wNCk-4628bc90f1fb9205d2d0abf780b59f878985d392ff52eca5dc175fe755fa7352';
-  static const String _apiUrl = 'https://api.openai.com/v1/chat/completions';
+  /// API credentials are supplied at build time and are never committed:
+  ///
+  ///   flutter run --dart-define=QUORIDOR_AI_API_KEY=...
+  ///
+  /// When no key is provided the remote strategy call is skipped entirely and
+  /// the offline heuristic AI is used, so the game is fully playable without
+  /// any credentials.
+  static const String _apiKey = String.fromEnvironment('QUORIDOR_AI_API_KEY');
+  static const String _apiUrl = String.fromEnvironment(
+    'QUORIDOR_AI_API_URL',
+    defaultValue: 'https://api.openai.com/v1/chat/completions',
+  );
+
+  /// Whether the remote strategy service is configured for this build.
+  static bool get isRemoteStrategyEnabled => _apiKey.isNotEmpty;
 
   // Generate AI move using OpenAI strategy analysis
   static Future<GameMove?> generateMove(
@@ -39,6 +52,8 @@ class AIService {
     GameState gameState,
     AIDifficulty difficulty,
   ) async {
+    if (!isRemoteStrategyEnabled) return null;
+
     final gameAnalysis = _analyzeGameState(gameState);
     final prompt = _buildStrategyPrompt(gameAnalysis, difficulty);
 
@@ -177,7 +192,6 @@ Provide your recommendation as a JSON object.
     GameState gameState,
     AIDifficulty difficulty,
   ) {
-    final currentPlayer = gameState.currentPlayer;
     final pathLengths = Pathfinding.calculatePathLengths(gameState);
 
     // Basic AI logic based on difficulty

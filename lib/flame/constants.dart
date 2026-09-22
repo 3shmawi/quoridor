@@ -17,7 +17,11 @@ class GameConstants {
   static const int darkCellColor = 0xFFE5E7EB;
   static const int player1Color = 0xFF6F61EF;
   static const int player2Color = 0xFF39D2C0;
-  static const int wallColor = 0xFF15161E;
+  /// Placed walls. The old near-black wall was almost invisible against the
+  /// dark board, which was a large part of why walls read as confusing, so the
+  /// colour now follows the theme and stays high contrast in both.
+  static const int wallColor = 0xFF6B4423;
+  static const int wallColorDark = 0xFFF2A93B;
   static const int validMoveColor = 0xFFEE8B60;
 
   // Player starting positions

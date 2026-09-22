@@ -1,9 +1,12 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
+import 'dart:async';
 import 'dart:math' show pi;
 
+import '../../flame/board_component.dart';
 import '../../flame/game/quoridor_game.dart';
+import '../../flame/services/audio_service.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/ai_service.dart';
 import '../../flame/services/firebase_service.dart';
@@ -58,6 +61,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _game.onGameStateChanged = _handleGameStateChanged;
     _game.onGameMessage = _showGameMessage;
     _game.onGameWon = _showConfetti;
+    _game.onInteractionChanged = () {
+      if (mounted) setState(() {});
+    };
     isInitializedProvider.value = _game.isInitialized;
   }
 
@@ -181,6 +187,19 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _showGameMessage(
       _showValidMoves ? 'Valid moves shown' : 'Valid moves hidden',
     );
+    closeMenu();
+  }
+
+  void _toggleSound() {
+    final audio = AudioService.instance;
+    setState(() {
+      audio.enabled.value = !audio.enabled.value;
+    });
+    if (!audio.enabled.value) {
+      // Silence anything mid-playback so the toggle takes effect immediately.
+      unawaited(audio.stopAll());
+    }
+    _showGameMessage(audio.enabled.value ? 'Sound on' : 'Sound off');
     closeMenu();
   }
 
@@ -465,6 +484,17 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                               () => isDarkModeNotifier.value =
                                   !isDarkModeNotifier.value,
                             ),
+                            _buildSwitchItem(
+                              AudioService.instance.enabled.value
+                                  ? Icons.volume_up
+                                  : Icons.volume_off,
+                              'Sound Effects',
+                              AudioService.instance.isUnavailable
+                                  ? 'Unavailable on this device'
+                                  : 'Move and wall sounds',
+                              AudioService.instance.enabled.value,
+                              _toggleSound,
+                            ),
                           ]),
 
                           const SizedBox(height: 24),
@@ -529,36 +559,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   valueListenable: isInitializedProvider,
                   builder: (context, value, child) {
                     if (!value) return const SizedBox.shrink();
-                    return Row(
-                      spacing: 16,
-                      children: [
-                        Expanded(
-                          child: PlayerInfoWidget(
-                            playerId: 1,
-                            name: 'Player 1',
-                            wallsRemaining:
-                                _game.gameState.player1.wallsRemaining,
-                            isCurrentPlayer:
-                                _game.gameState.currentPlayer.id == 1,
-                            isAI: false,
-                          ),
-                        ),
-                        Expanded(
-                          child: PlayerInfoWidget(
-                            playerId: 2,
-                            name: 'Player 2',
-                            wallsRemaining:
-                                _game.gameState.player2.wallsRemaining,
-                            isCurrentPlayer:
-                                _game.gameState.currentPlayer.id == 2,
-                            isAI: _game.gameState.player2.isAI,
-                          ),
-                        ),
-                      ],
-                    );
+                    return _buildTurnControls();
                   },
                 ),
-
                 if (_showMessage)
                   AnimatedBuilder(
                     animation: _messageController,
@@ -864,6 +867,301 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       case AIDifficulty.hard:
         return 'Expert-level AI';
     }
+  }
+
+  // --- Turn controls -------------------------------------------------------
+
+  /// The strip under the board: who is playing, and what a tap will do.
+  ///
+  /// Walls used to be placed by tapping an invisible strip near a cell edge,
+  /// which most players never discovered. The board now has two explicit
+  /// modes, and wall placement is a visible, reversible three-step action:
+  /// pick a slot, rotate if needed, then confirm.
+  Widget _buildTurnControls() {
+    final state = _game.gameState;
+    final isAITurn = state.currentPlayer.isAI && !state.isGameOver;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildPlayerStrip(),
+        const SizedBox(height: 12),
+        _buildModeSelector(enabled: !isAITurn && !state.isGameOver),
+        if (_game.boardMode == BoardInteractionMode.wall && !isAITurn) ...[
+          const SizedBox(height: 12),
+          _buildWallControls(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPlayerStrip() {
+    final state = _game.gameState;
+    return Row(
+      children: [
+        Expanded(
+          child: _buildPlayerChip(
+            label: 'You',
+            color: const Color(0xFF6F61EF),
+            walls: state.player1.wallsRemaining,
+            isActive: state.currentPlayerId == 1,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildPlayerChip(
+            label: state.player2.isAI ? 'AI' : 'Player 2',
+            color: const Color(0xFF39D2C0),
+            walls: state.player2.wallsRemaining,
+            isActive: state.currentPlayerId == 2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlayerChip({
+    required String label,
+    required Color color,
+    required int walls,
+    required bool isActive,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isActive ? color.withValues(alpha: 0.14) : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: color.withValues(alpha: isActive ? 0.9 : 0.25),
+          width: isActive ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                Text(
+                  '$walls walls left',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isActive)
+            Icon(Icons.play_arrow_rounded, color: color, size: 20),
+        ],
+      ),
+    );
+  }
+
+  /// Big, obvious switch between moving the pawn and placing a wall.
+  Widget _buildModeSelector({required bool enabled}) {
+    final state = _game.gameState;
+    final hasWalls = state.currentPlayer.hasWallsRemaining;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildModeButton(
+            icon: Icons.directions_walk_rounded,
+            label: 'Move',
+            selected: _game.boardMode == BoardInteractionMode.move,
+            enabled: enabled,
+            onTap: () => _setBoardMode(BoardInteractionMode.move),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildModeButton(
+            icon: Icons.fence_rounded,
+            label: hasWalls
+                ? 'Wall (${state.currentPlayer.wallsRemaining})'
+                : 'No walls',
+            selected: _game.boardMode == BoardInteractionMode.wall,
+            enabled: enabled && hasWalls,
+            onTap: () => _setBoardMode(BoardInteractionMode.wall),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModeButton({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = selected ? scheme.primary : scheme.surface;
+    final foreground = selected ? scheme.onPrimary : scheme.onSurface;
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: enabled ? onTap : null,
+          child: Container(
+            // 52px keeps the target comfortably above the 48dp minimum.
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected
+                    ? scheme.primary
+                    : scheme.outline.withValues(alpha: 0.4),
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 20, color: foreground),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: foreground,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Rotate / place / cancel for the wall being lined up, plus a live reason
+  /// when the chosen slot is illegal.
+  Widget _buildWallControls() {
+    final pending = _game.pendingWall;
+    final result = _game.pendingWallResult;
+    final scheme = Theme.of(context).colorScheme;
+
+    final Color statusColor;
+    final IconData statusIcon;
+    final String statusText;
+
+    if (pending == null) {
+      statusColor = scheme.onSurface.withValues(alpha: 0.7);
+      statusIcon = Icons.touch_app_rounded;
+      statusText = 'Tap between two squares to aim the wall';
+    } else if (result?.isValid ?? false) {
+      statusColor = const Color(0xFF16A34A);
+      statusIcon = Icons.check_circle_rounded;
+      statusText = 'Ready — tap Place to confirm';
+    } else {
+      statusColor = const Color(0xFFDC2626);
+      statusIcon = Icons.error_rounded;
+      statusText = result?.message ?? 'That wall cannot go there';
+    }
+
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(statusIcon, size: 18, color: statusColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  _game.rotatePendingWall();
+                  setState(() {});
+                },
+                icon: const Icon(Icons.rotate_90_degrees_cw_rounded, size: 18),
+                label: const Text('Rotate'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: FilledButton.icon(
+                onPressed: _game.canCommitPendingWall
+                    ? () {
+                        _game.commitPendingWall();
+                        setState(() {});
+                      }
+                    : null,
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: const Text('Place wall'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _setBoardMode(BoardInteractionMode mode) {
+    setState(() {
+      _game.boardMode = mode;
+    });
+    _showGameMessage(
+      mode == BoardInteractionMode.wall
+          ? 'Wall mode: tap between squares, then Place'
+          : 'Move mode: tap a highlighted square',
+    );
   }
 
   Widget _buildMessageToast() {

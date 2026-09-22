@@ -1,338 +1,322 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:quoridor/theme.dart';
 
-import '../flame/constants.dart';
-import '../flame/models/game_state.dart';
+import 'board/board_metrics.dart';
+import 'constants.dart';
+import 'models/game_state.dart';
+import 'services/game_service.dart';
 import 'wall_component.dart';
+
+/// What a tap on the board means right now.
+///
+/// Walls used to share the pawn's tap handler and were triggered by hitting a
+/// narrow strip near a cell edge, which players could not see and mostly
+/// discovered by accident. Splitting the two intents into explicit modes makes
+/// every tap unambiguous and lets the board advertise what it expects.
+enum BoardInteractionMode { move, wall }
 
 class BoardComponent extends PositionComponent {
   GameState _gameState;
+
+  /// Highlights the squares the current player can step onto.
   bool showValidMoves = true;
-  bool enableSound = true;
-  bool enableVibration = true;
+
+  BoardInteractionMode _mode = BoardInteractionMode.move;
 
   Function(Position)? onMoveAttempted;
   Function(Wall)? onWallPlaceAttempted;
 
-  Position? _selectedPawn;
-  List<Position> _validMoves = [];
-  Position? _hoverPosition;
-  Wall? _previewWall;
-  Wall? _lastTappedWall;
+  /// Fires whenever something the surrounding UI renders has changed, so the
+  /// page can rebuild its controls (mode, ghost wall, validity message).
+  VoidCallback? onInteractionChanged;
+
+  List<Position> _validMoves = const [];
+
+  /// The wall the player is lining up but has not committed yet.
+  Wall? _pendingWall;
+  WallPlacementResult? _pendingResult;
+  WallOrientation _orientation = WallOrientation.horizontal;
 
   late final WallComponent _wallComponent;
 
-  static const double _cellSize = GameConstants.cellSize;
-  static const double _wallThickness = GameConstants.wallThickness;
-  static const double _boardPadding = GameConstants.boardPadding;
-  static const double cellSpacing = GameConstants.cellSpacing;
-
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
-  final Map<String, String> _soundAssets = {
-    'move_p1': 'sounds/move_player1.wav',
-    'move_p2': 'sounds/move_player2.wav',
-    'wall_p1': 'sounds/wall_player1.wav',
-    'wall_p2': 'sounds/wall_player2.wav',
-    'win': 'sounds/win.wav',
-  };
+  BoardMetrics _metrics = BoardMetrics.fit(Size.zero);
+  Vector2 _metricsSource = Vector2.zero();
 
   BoardComponent(this._gameState) {
-    size = Vector2(300, 300);
-
     _wallComponent = WallComponent(_gameState);
     add(_wallComponent);
+    _refreshValidMoves();
   }
 
-  @override
-  void onRemove() {
-    _audioPlayer.dispose();
-    super.onRemove();
+  BoardInteractionMode get mode => _mode;
+
+  /// The wall currently being lined up, if any.
+  Wall? get pendingWall => _pendingWall;
+
+  /// Validity of [pendingWall], including the reason when it is illegal.
+  WallPlacementResult? get pendingWallResult => _pendingResult;
+
+  bool get canCommitPendingWall => _pendingResult?.isValid ?? false;
+
+  BoardMetrics get metrics => _metrics;
+
+  set mode(BoardInteractionMode value) {
+    if (_mode == value) return;
+    _mode = value;
+    _clearPendingWall();
+    _refreshValidMoves();
+    _wallComponent.showSlots = value == BoardInteractionMode.wall;
+    onInteractionChanged?.call();
   }
 
   void updateGameState(GameState newGameState) {
     _gameState = newGameState;
-    _selectedPawn = null;
-    _validMoves.clear();
-    _hoverPosition = null;
-    _previewWall = null;
-    _lastTappedWall = null;
     _wallComponent.gameState = newGameState;
+    _clearPendingWall();
+    _refreshValidMoves();
+
+    // A player with no walls left can only move.
+    if (_mode == BoardInteractionMode.wall &&
+        !newGameState.currentPlayer.hasWallsRemaining) {
+      _mode = BoardInteractionMode.move;
+      _wallComponent.showSlots = false;
+    }
+    onInteractionChanged?.call();
   }
 
   @override
   void render(Canvas canvas) {
+    _ensureMetrics();
+    _drawBoardSurface(canvas);
+    _drawGoalRows(canvas);
     _drawGrid(canvas);
     _drawValidMoves(canvas);
     _drawPawns(canvas);
-    _drawSelection(canvas);
-    _drawGoalLines(canvas);
   }
 
-  void _triggerFeedback({String? soundKey}) async {
-    if (enableSound && soundKey != null && _soundAssets.containsKey(soundKey)) {
-      try {
-        await _audioPlayer.play(AssetSource(_soundAssets[soundKey]!));
-      } catch (e) {
-        print('Error playing sound: \$e');
-      }
-    }
+  /// Recomputes geometry when the component's size changes.
+  void _ensureMetrics() {
+    if (_metricsSource == size) return;
+    _metricsSource = size.clone();
+    _metrics = BoardMetrics.fit(Size(size.x, size.y));
+    _wallComponent.metrics = _metrics;
   }
+
+  // --- Input -------------------------------------------------------------
 
   void handleTap(Vector2 position) {
+    _ensureMetrics();
     final offset = Offset(position.x, position.y);
-    final cellPosition = _getPositionFromOffset(offset);
-    final wall = _getWallFromOffset(offset);
 
-    print('Tap detected at screen position: (${position.x}, ${position.y})');
-    print('Converted to board offset: (${offset.dx}, ${offset.dy})');
-
-    // If a player is selected, prioritize movement
-    if (_selectedPawn != null) {
-      if (cellPosition != null) {
-        print('Player selected, checking move:');
-        print(
-          '- Selected pawn position: row=${_selectedPawn!.row}, col=${_selectedPawn!.col}',
-        );
-        print(
-          '- Target position: row=${cellPosition.row}, col=${cellPosition.col}',
-        );
-        print('- Is valid move: ${_validMoves.contains(cellPosition)}');
-
-        if (_validMoves.contains(cellPosition)) {
-          print('- Moving to valid position');
-          onMoveAttempted?.call(cellPosition);
-          _triggerFeedback(
-            soundKey: _gameState.currentPlayer.id == 1 ? 'move_p1' : 'move_p2',
-          );
-          _selectedPawn = null;
-          _validMoves.clear();
-          return;
-        } else {
-          print('- Invalid move, clearing selection');
-          _selectedPawn = null;
-          _validMoves.clear();
-          return;
-        }
-      }
-    }
-
-    // If no player is selected, check for player selection first
-    if (cellPosition != null) {
-      final currentPlayerPosition = _gameState.currentPlayer.position;
-      final otherPlayerPosition = _gameState.otherPlayer.position;
-
-      print('Cell tap detected:');
-      print(
-        '- Cell position: row=${cellPosition.row}, col=${cellPosition.col}',
-      );
-      print(
-        '- Current player position: row=${currentPlayerPosition.row}, col=${currentPlayerPosition.col}',
-      );
-      print(
-        '- Other player position: row=${otherPlayerPosition.row}, col=${otherPlayerPosition.col}',
-      );
-
-      // Check if we're tapping on either player
-      if (cellPosition == currentPlayerPosition ||
-          cellPosition == otherPlayerPosition) {
-        print('- Tapped on player at position');
-        _handlePositionTap(cellPosition);
-        return;
-      }
-    }
-
-    // If we're not selecting a player or moving, check for wall placement
-    if (wall != null) {
-      print('Wall tap detected:');
-      print(
-        '- Wall position: row=${wall.position.row}, col=${wall.position.col}',
-      );
-      print('- Wall orientation: ${wall.orientation}');
-      _handleWallTap(wall);
-    } else if (cellPosition != null) {
-      // If we're tapping on a cell (not a player), handle as a move
-      print('Cell tap detected (not a player):');
-      print(
-        '- Cell position: row=${cellPosition.row}, col=${cellPosition.col}',
-      );
-      print(
-        '- Is valid move: ${_gameState.getValidMoves(_gameState.currentPlayer.position).contains(cellPosition)}',
-      );
-      print('- Current player: ${_gameState.currentPlayer.id}');
-      print('- Walls remaining: ${_gameState.currentPlayer.wallsRemaining}');
-
-      _handlePositionTap(cellPosition);
-    }
-  }
-
-  void _handlePositionTap(Position position) {
-    final currentPlayerPosition = _gameState.currentPlayer.position;
-    final playerId = _gameState.currentPlayer.id;
-
-    print('Position tap handling:');
-    print(
-      '- Current player position: row=${currentPlayerPosition.row}, col=${currentPlayerPosition.col}',
-    );
-    print('- Selected position: row=${position.row}, col=${position.col}');
-    print('- Is current player position: ${position == currentPlayerPosition}');
-    print('- Is already selected: ${_selectedPawn == position}');
-
-    // Clear wall preview when tapping on a position
-    _previewWall = null;
-    _lastTappedWall = null;
-    _wallComponent.previewWall = null;
-
-    if (position == currentPlayerPosition) {
-      if (_selectedPawn == position) {
-        print('- Deselecting current player');
-        _selectedPawn = null;
-        _validMoves.clear();
-      } else {
-        print('- Selecting current player');
-        _selectedPawn = position;
-        _validMoves = _gameState.getValidMoves(position);
-        print('- Valid moves: ${_validMoves.length}');
-      }
-    }
-  }
-
-  void _handleWallTap(Wall wall) {
-    final playerId = _gameState.currentPlayer.id;
-
-    print('Wall tap handling:');
-    print('- Current player: $playerId');
-    print('- Walls remaining: ${_gameState.currentPlayer.wallsRemaining}');
-    print(
-      '- Wall position: row=${wall.position.row}, col=${wall.position.col}',
-    );
-    print('- Wall orientation: ${wall.orientation}');
-
-    if (_previewWall == null || _previewWall != wall) {
-      _previewWall = wall;
-      _lastTappedWall = wall;
-      _wallComponent.previewWall = wall;
-      _wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
-      print('- Preview wall set');
-    } else if (_previewWall == wall && _lastTappedWall == wall) {
-      if (_gameState.currentPlayer.hasWallsRemaining) {
-        print('- Attempting to place wall');
-        onWallPlaceAttempted?.call(wall);
-        _triggerFeedback(soundKey: playerId == 1 ? 'wall_p1' : 'wall_p2');
-        _previewWall = null;
-        _lastTappedWall = null;
-        _wallComponent.previewWall = null;
-      } else {
-        print('- Cannot place wall: No walls remaining');
-      }
+    if (_mode == BoardInteractionMode.wall) {
+      _handleWallTap(offset);
     } else {
-      print('- Clearing wall preview');
-      _previewWall = null;
-      _lastTappedWall = null;
-      _wallComponent.previewWall = null;
+      _handleMoveTap(offset);
     }
+  }
+
+  void _handleMoveTap(Offset offset) {
+    final tapped = _metrics.positionAt(offset);
+    if (tapped == null) return;
+
+    // Pawns no longer have to be selected before moving: the legal squares are
+    // always on screen, so one tap on a highlighted square is the whole move.
+    if (_validMoves.contains(tapped)) {
+      onMoveAttempted?.call(tapped);
+    }
+  }
+
+  void _handleWallTap(Offset offset) {
+    // Any tap on the board snaps to the closest slot, so the player never has
+    // to hit a thin target.
+    final slot = _metrics.nearestIntersection(offset);
+    final candidate = BoardMetrics.wallAtIntersection(
+      slot.row,
+      slot.col,
+      _orientation,
+    );
+
+    _setPendingWall(candidate);
+  }
+
+  /// Flips the pending wall between horizontal and vertical, keeping it on the
+  /// same slot.
+  void rotatePendingWall() {
+    _orientation = _orientation == WallOrientation.horizontal
+        ? WallOrientation.vertical
+        : WallOrientation.horizontal;
+
+    final current = _pendingWall;
+    if (current == null) {
+      onInteractionChanged?.call();
+      return;
+    }
+
+    final slot = BoardMetrics.intersectionOfWall(current);
+    _setPendingWall(
+      BoardMetrics.wallAtIntersection(slot.row, slot.col, _orientation),
+    );
+  }
+
+  void _setPendingWall(Wall wall) {
+    _pendingWall = wall;
+    _pendingResult = GameService.validateWallPlacement(
+      _gameState,
+      _gameState.currentPlayer,
+      wall,
+    );
+
+    _wallComponent.previewWall = wall;
+    _wallComponent.isValid = _pendingResult!.isValid;
+    onInteractionChanged?.call();
+  }
+
+  /// Commits the pending wall. Returns false when there is nothing legal to
+  /// place, leaving the ghost on screen so the player can adjust it.
+  bool commitPendingWall() {
+    final wall = _pendingWall;
+    if (wall == null || !(_pendingResult?.isValid ?? false)) return false;
+
+    onWallPlaceAttempted?.call(wall);
+    return true;
+  }
+
+  void cancelPendingWall() {
+    _clearPendingWall();
+    onInteractionChanged?.call();
+  }
+
+  void _clearPendingWall() {
+    _pendingWall = null;
+    _pendingResult = null;
+    _wallComponent.previewWall = null;
   }
 
   void handleHover(Vector2 position) {
-    final offset = Offset(position.x, position.y);
-    _hoverPosition = _getPositionFromOffset(offset);
-    final wall = _getWallFromOffset(offset);
-    if (wall != null) {
-      _wallComponent.previewWall = wall;
-      _wallComponent.isValid = _gameState.currentPlayer.hasWallsRemaining;
-    } else {
-      _wallComponent.previewWall = null;
+    if (_mode != BoardInteractionMode.wall) return;
+    _ensureMetrics();
+    _handleWallTap(Offset(position.x, position.y));
+  }
+
+  void _refreshValidMoves() {
+    _validMoves = _gameState.isGameOver
+        ? const []
+        : _gameState.getValidMoves(_gameState.currentPlayer.position);
+  }
+
+  // --- Rendering ---------------------------------------------------------
+
+  bool get _isDark => isDarkModeNotifier.value;
+
+  void _drawBoardSurface(Canvas canvas) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        _metrics.boardRect,
+        Radius.circular(_metrics.cellSize * 0.25),
+      ),
+      Paint()
+        ..color = _isDark ? const Color(0xFF16202B) : const Color(0xFFFFFFFF)
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  /// Tints each player's target row so the direction of play is obvious at a
+  /// glance instead of being a thin line at the board edge.
+  void _drawGoalRows(Canvas canvas) {
+    void tintRow(int row, Color color) {
+      final rect = Rect.fromLTRB(
+        _metrics.cellRect(Position(row, 0)).left - _metrics.spacing,
+        _metrics.cellRect(Position(row, 0)).top - _metrics.spacing,
+        _metrics.cellRect(Position(row, GameConstants.boardSize - 1)).right +
+            _metrics.spacing,
+        _metrics.cellRect(Position(row, 0)).bottom + _metrics.spacing,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          rect,
+          Radius.circular(_metrics.cellSize * 0.2),
+        ),
+        Paint()
+          ..color = color.withValues(alpha: 0.16)
+          ..style = PaintingStyle.fill,
+      );
     }
+
+    // Player 1 runs to the top row, player 2 to the bottom row.
+    tintRow(GameConstants.player1Goal, const Color(GameConstants.player1Color));
+    tintRow(GameConstants.player2Goal, const Color(GameConstants.player2Color));
   }
 
   void _drawGrid(Canvas canvas) {
     final lightPaint = Paint()
-      ..color = isDarkModeNotifier.value
-          ? const Color(0xFF2C3E50) // Dark mode light cell
-          : const Color(GameConstants.lightCellColor)
+      ..color = _isDark ? const Color(0xFF2C3E50) : const Color(GameConstants.lightCellColor)
       ..style = PaintingStyle.fill;
 
     final darkPaint = Paint()
-      ..color = isDarkModeNotifier.value
-          ? const Color(0xFF1A2530) // Dark mode dark cell
-          : const Color(GameConstants.darkCellColor)
+      ..color = _isDark ? const Color(0xFF1A2530) : const Color(GameConstants.darkCellColor)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = isDarkModeNotifier.value
-          ? const Color(0xFF34495E) // Dark mode border
-          : const Color(0xFFB0BEC5)
+      ..color = _isDark ? const Color(0xFF34495E) : const Color(0xFFB0BEC5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
-    final cellSpacing = 4.0; // Space between cells
+    final radius = Radius.circular(_metrics.cellSize * 0.16);
 
     for (int row = 0; row < GameConstants.boardSize; row++) {
       for (int col = 0; col < GameConstants.boardSize; col++) {
-        final rect = Rect.fromLTWH(
-          _boardPadding + col * (_cellSize + cellSpacing),
-          _boardPadding + row * (_cellSize + cellSpacing),
-          _cellSize,
-          _cellSize,
+        final rrect = RRect.fromRectAndRadius(
+          _metrics.cellRect(Position(row, col)),
+          radius,
         );
-
-        // Checkerboard pattern
-        final isLight = (row + col) % 2 == 0;
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-          isLight ? lightPaint : darkPaint,
-        );
-
-        // Cell border
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-          borderPaint,
-        );
+        canvas.drawRRect(rrect, (row + col) % 2 == 0 ? lightPaint : darkPaint);
+        canvas.drawRRect(rrect, borderPaint);
       }
     }
   }
 
   void _drawValidMoves(Canvas canvas) {
-    if (!showValidMoves || _validMoves.isEmpty) return;
+    if (!showValidMoves ||
+        _mode != BoardInteractionMode.move ||
+        _validMoves.isEmpty) {
+      return;
+    }
 
-    final paint = Paint()
-      ..color = const Color(GameConstants.validMoveColor).withOpacity(0.3)
+    final color = _gameState.currentPlayerId == 1
+        ? const Color(GameConstants.player1Color)
+        : const Color(GameConstants.player2Color);
+
+    final fill = Paint()
+      ..color = color.withValues(alpha: 0.18)
       ..style = PaintingStyle.fill;
 
-    for (final position in _validMoves) {
-      final rect = Rect.fromLTWH(
-        _boardPadding + position.col * (_cellSize + cellSpacing),
-        _boardPadding + position.row * (_cellSize + cellSpacing),
-        _cellSize,
-        _cellSize,
-      );
+    final ring = Paint()
+      ..color = color.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _metrics.cellSize * 0.07;
 
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-        paint,
-      );
+    for (final position in _validMoves) {
+      final center = _metrics.cellCenter(position);
+      canvas.drawCircle(center, _metrics.cellSize * 0.28, fill);
+      canvas.drawCircle(center, _metrics.cellSize * 0.28, ring);
     }
   }
 
   void _drawPawns(Canvas canvas) {
-    // Draw player 1
     _drawPawn(
       canvas,
       _gameState.player1.position,
       const Color(GameConstants.player1Color),
-      _gameState.player1.id == _gameState.currentPlayerId,
-      _selectedPawn == _gameState.player1.position,
+      '1',
+      _gameState.currentPlayerId == 1,
     );
-
-    // Draw player 2
     _drawPawn(
       canvas,
       _gameState.player2.position,
       const Color(GameConstants.player2Color),
-      _gameState.player2.id == _gameState.currentPlayerId,
-      _selectedPawn == _gameState.player2.position,
+      '2',
+      _gameState.currentPlayerId == 2,
     );
   }
 
@@ -340,22 +324,20 @@ class BoardComponent extends PositionComponent {
     Canvas canvas,
     Position position,
     Color color,
+    String label,
     bool isCurrentPlayer,
-    bool isSelected,
   ) {
-    final center = _getCellCenter(position);
-    final radius = _cellSize * 0.4;
+    final center = _metrics.cellCenter(position);
+    final radius = _metrics.cellSize * 0.36;
 
-    // Draw shadow
     canvas.drawCircle(
-      Offset(center.dx + 2, center.dy + 2),
+      center.translate(0, radius * 0.12),
       radius,
       Paint()
-        ..color = Colors.black.withOpacity(0.3)
+        ..color = Colors.black.withValues(alpha: 0.28)
         ..style = PaintingStyle.fill,
     );
 
-    // Draw pawn
     canvas.drawCircle(
       center,
       radius,
@@ -364,62 +346,41 @@ class BoardComponent extends PositionComponent {
         ..style = PaintingStyle.fill,
     );
 
-    // Draw border
     canvas.drawCircle(
       center,
       radius,
       Paint()
-        ..color = isCurrentPlayer ? Colors.white : Colors.black.withOpacity(0.3)
+        ..color = isCurrentPlayer
+            ? Colors.white
+            : Colors.black.withValues(alpha: 0.3)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0,
+        ..strokeWidth = radius * 0.12,
     );
 
-    // Draw highlight for current player
+    // A halo marks whose turn it is.
     if (isCurrentPlayer) {
       canvas.drawCircle(
         center,
-        radius + 4,
+        radius * 1.22,
         Paint()
-          ..color = color.withOpacity(0.3)
+          ..color = color.withValues(alpha: 0.45)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0,
+          ..strokeWidth = radius * 0.1,
       );
     }
 
-    // Draw selection highlight
-    if (isSelected) {
-      canvas.drawCircle(
-        center,
-        radius + 6,
-        Paint()
-          ..color = const Color(GameConstants.validMoveColor)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3.0,
-      );
-    }
-
-    // Draw player number
-    final playerNumber = position == _gameState.player1.position ? '1' : '2';
-    final textStyle = TextStyle(
-      color: Colors.white,
-      fontSize: radius * 1.2,
-      fontWeight: FontWeight.bold,
-      shadows: [
-        Shadow(
-          color: Colors.black.withOpacity(0.5),
-          offset: const Offset(1, 1),
-          blurRadius: 2,
-        ),
-      ],
-    );
-
-    final textSpan = TextSpan(text: playerNumber, style: textStyle);
     final textPainter = TextPainter(
-      text: textSpan,
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: radius,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       textDirection: TextDirection.ltr,
-    );
+    )..layout();
 
-    textPainter.layout();
     textPainter.paint(
       canvas,
       Offset(
@@ -427,153 +388,5 @@ class BoardComponent extends PositionComponent {
         center.dy - textPainter.height / 2,
       ),
     );
-  }
-
-  void _drawSelection(Canvas canvas) {
-    if (_selectedPawn != null) {
-      final paint = Paint()
-        ..color = const Color(GameConstants.validMoveColor).withOpacity(0.3)
-        ..style = PaintingStyle.fill;
-
-      final rect = Rect.fromLTWH(
-        _boardPadding + _selectedPawn!.col * (_cellSize + cellSpacing),
-        _boardPadding + _selectedPawn!.row * (_cellSize + cellSpacing),
-        _cellSize,
-        _cellSize,
-      );
-
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-        paint,
-      );
-    }
-  }
-
-  void _drawGoalLines(Canvas canvas) {
-    final player1GoalPaint = Paint()
-      ..color = const Color(GameConstants.player1Color).withOpacity(0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = GameConstants.goalLineThickness;
-
-    final player2GoalPaint = Paint()
-      ..color = const Color(GameConstants.player2Color).withOpacity(0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = GameConstants.goalLineThickness;
-
-    // Player 1 goal (bottom row)
-    final p1StartX = _boardPadding;
-    final p1EndX =
-        _boardPadding +
-        (GameConstants.boardSize - 1) *
-            (_cellSize + GameConstants.cellSpacing) +
-        _cellSize;
-    final p1Y =
-        _boardPadding +
-        (GameConstants.boardSize - 1) *
-            (_cellSize + GameConstants.cellSpacing) +
-        _cellSize;
-
-    canvas.drawLine(
-      Offset(p1StartX, p1Y),
-      Offset(p1EndX, p1Y),
-      player1GoalPaint,
-    );
-
-    // Player 2 goal (top row)
-    final p2StartX = _boardPadding;
-    final p2EndX =
-        _boardPadding +
-        (GameConstants.boardSize - 1) *
-            (_cellSize + GameConstants.cellSpacing) +
-        _cellSize;
-    final p2Y = _boardPadding;
-
-    canvas.drawLine(
-      Offset(p2StartX, p2Y),
-      Offset(p2EndX, p2Y),
-      player2GoalPaint,
-    );
-  }
-
-  Offset _getCellCenter(Position position) {
-    return Offset(
-      _boardPadding + position.col * (_cellSize + cellSpacing) + _cellSize / 2,
-      _boardPadding + position.row * (_cellSize + cellSpacing) + _cellSize / 2,
-    );
-  }
-
-  Position? _getPositionFromOffset(Offset offset) {
-    final localX = offset.dx - _boardPadding;
-    final localY = offset.dy - _boardPadding;
-
-    if (localX < 0 || localY < 0) return null;
-
-    final cellCol = (localX / (_cellSize + cellSpacing)).floor();
-    final cellRow = (localY / (_cellSize + cellSpacing)).floor();
-
-    print('Cell position calculation:');
-    print('- Local coordinates: ($localX, $localY)');
-    print('- Cell size: $_cellSize');
-    print('- Cell spacing: $cellSpacing');
-    print('- Calculated cell: row=$cellRow, col=$cellCol');
-
-    if (cellRow >= 0 &&
-        cellRow < GameConstants.boardSize &&
-        cellCol >= 0 &&
-        cellCol < GameConstants.boardSize) {
-      return Position(cellRow, cellCol);
-    }
-    return null;
-  }
-
-  Wall? _getWallFromOffset(Offset offset) {
-    final localX = offset.dx - _boardPadding;
-    final localY = offset.dy - _boardPadding;
-
-    if (localX < 0 || localY < 0) return null;
-
-    final cellCol = (localX / (_cellSize + cellSpacing)).floor();
-    final cellRow = (localY / (_cellSize + cellSpacing)).floor();
-
-    final cellX = localX % (_cellSize + cellSpacing);
-    final cellY = localY % (_cellSize + cellSpacing);
-
-    // Increased threshold for easier wall placement
-    const edgeThreshold = 0.4; // 40% of cell size for wall placement
-    final threshold = _cellSize * edgeThreshold;
-
-    print('Wall position calculation:');
-    print('- Local coordinates: ($localX, $localY)');
-    print('- Cell coordinates: ($cellX, $cellY)');
-    print('- Cell position: row=$cellRow, col=$cellCol');
-    print('- Edge threshold: $threshold');
-
-    // Check horizontal walls
-    if (cellY < threshold && cellRow > 0) {
-      print(
-        '- Detected horizontal wall above at row: ${cellRow}, col: $cellCol',
-      );
-      return Wall(Position(cellRow, cellCol), WallOrientation.horizontal);
-    } else if (cellY > _cellSize - threshold &&
-        cellRow < GameConstants.boardSize - 1) {
-      print(
-        '- Detected horizontal wall below at row: ${cellRow + 1}, col: $cellCol',
-      );
-      return Wall(Position(cellRow + 1, cellCol), WallOrientation.horizontal);
-    }
-
-    // Check vertical walls
-    if (cellX < threshold && cellCol > 0) {
-      print('- Detected vertical wall left at row: $cellRow, col: ${cellCol}');
-      return Wall(Position(cellRow, cellCol), WallOrientation.vertical);
-    } else if (cellX > _cellSize - threshold &&
-        cellCol < GameConstants.boardSize - 1) {
-      print(
-        '- Detected vertical wall right at row: $cellRow, col: ${cellCol + 1}',
-      );
-      return Wall(Position(cellRow, cellCol + 1), WallOrientation.vertical);
-    }
-
-    return null;
   }
 }

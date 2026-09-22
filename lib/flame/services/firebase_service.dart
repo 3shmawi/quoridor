@@ -5,8 +5,23 @@ import '../../flame/constants.dart';
 import '../../flame/models/game_state.dart';
 
 class FirebaseService {
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static final FirebaseAuth _auth = FirebaseAuth.instance;
+  /// Whether Firebase started successfully.
+  ///
+  /// Startup no longer blocks on Firebase, so every entry point here has to
+  /// cope with the backend being absent: on a blocked or offline network the
+  /// game stays fully playable and only save/resume is unavailable.
+  static bool _ready = false;
+
+  static bool get isReady => _ready;
+
+  /// Called once startup has initialised (or failed to initialise) Firebase.
+  static void markReady({required bool available}) => _ready = available;
+
+  static FirebaseFirestore? get _firestore =>
+      _ready ? FirebaseFirestore.instance : null;
+
+  static FirebaseAuth? get _auth =>
+      _ready ? FirebaseAuth.instance : null;
 
   // Collections
   static const String _gamesCollection = 'games';
@@ -14,8 +29,10 @@ class FirebaseService {
 
   // Authentication
   static Future<User?> signInAnonymously() async {
+    final auth = _auth;
+    if (auth == null) return null;
     try {
-      final userCredential = await _auth.signInAnonymously();
+      final userCredential = await auth.signInAnonymously();
       return userCredential.user;
     } catch (e) {
       print('Anonymous sign in failed: $e');
@@ -23,16 +40,16 @@ class FirebaseService {
     }
   }
 
-  static User? get currentUser => _auth.currentUser;
+  static User? get currentUser => _auth?.currentUser;
 
   static Future<void> signOut() async {
-    await _auth.signOut();
+    await _auth?.signOut();
   }
 
   // Game operations
   static Future<String?> saveGame(GameState gameState) async {
     try {
-      final docRef = await _firestore
+      final docRef = await _firestore!
           .collection(_gamesCollection)
           .add(gameState.toJson());
 
@@ -45,7 +62,7 @@ class FirebaseService {
 
   static Future<bool> updateGame(GameState gameState) async {
     try {
-      await _firestore
+      await _firestore!
           .collection(_gamesCollection)
           .doc(gameState.gameId)
           .update(gameState.toJson());
@@ -59,7 +76,7 @@ class FirebaseService {
 
   static Future<GameState?> loadGame(String gameId) async {
     try {
-      final doc = await _firestore
+      final doc = await _firestore!
           .collection(_gamesCollection)
           .doc(gameId)
           .get();
@@ -77,7 +94,7 @@ class FirebaseService {
 
   static Future<List<GameState>> loadRecentGames({int limit = 10}) async {
     try {
-      final querySnapshot = await _firestore
+      final querySnapshot = await _firestore!
           .collection(_gamesCollection)
           .orderBy('updatedAt', descending: true)
           .limit(limit)
@@ -97,7 +114,7 @@ class FirebaseService {
     int limit = 10,
   }) async {
     try {
-      final querySnapshot = await _firestore
+      final querySnapshot = await _firestore!
           .collection(_gamesCollection)
           .where('status', isEqualTo: status.index)
           .orderBy('updatedAt', descending: true)
@@ -115,7 +132,7 @@ class FirebaseService {
 
   static Future<bool> deleteGame(String gameId) async {
     try {
-      await _firestore.collection(_gamesCollection).doc(gameId).delete();
+      await _firestore!.collection(_gamesCollection).doc(gameId).delete();
       return true;
     } catch (e) {
       print('Error deleting game: $e');
@@ -125,7 +142,8 @@ class FirebaseService {
 
   // Real-time game updates
   static Stream<GameState?> watchGame(String gameId) {
-    return _firestore.collection(_gamesCollection).doc(gameId).snapshots().map((
+    if (!_ready) return const Stream<GameState?>.empty();
+    return _firestore!.collection(_gamesCollection).doc(gameId).snapshots().map((
       doc,
     ) {
       if (doc.exists && doc.data() != null) {
@@ -143,7 +161,7 @@ class FirebaseService {
     int? totalMoves,
   }) async {
     try {
-      final userRef = _firestore.collection(_usersCollection).doc(userId);
+      final userRef = _firestore!.collection(_usersCollection).doc(userId);
 
       await userRef.set({
         'gamesPlayed': FieldValue.increment(gamesPlayed ?? 0),
@@ -158,7 +176,7 @@ class FirebaseService {
 
   static Future<Map<String, dynamic>?> getUserStats(String userId) async {
     try {
-      final doc = await _firestore
+      final doc = await _firestore!
           .collection(_usersCollection)
           .doc(userId)
           .get();
@@ -177,16 +195,16 @@ class FirebaseService {
     bool didWin,
   ) async {
     try {
-      final batch = _firestore.batch();
+      final batch = _firestore!.batch();
 
       // Save game
-      final gameRef = _firestore.collection(_gamesCollection).doc();
+      final gameRef = _firestore!.collection(_gamesCollection).doc();
       final gameData = gameState.toJson();
       gameData['gameId'] = gameRef.id;
       batch.set(gameRef, gameData);
 
       // Update user stats
-      final userRef = _firestore.collection(_usersCollection).doc(userId);
+      final userRef = _firestore!.collection(_usersCollection).doc(userId);
       batch.set(userRef, {
         'gamesPlayed': FieldValue.increment(1),
         'gamesWon': FieldValue.increment(didWin ? 1 : 0),
@@ -204,12 +222,14 @@ class FirebaseService {
 
   // Helper methods
   static String generateGameId() {
-    return _firestore.collection(_gamesCollection).doc().id;
+    // Falls back to a local id so a game can still be created offline.
+    if (!_ready) return 'game_${DateTime.now().millisecondsSinceEpoch}';
+    return _firestore!.collection(_gamesCollection).doc().id;
   }
 
   static Future<bool> gameExists(String gameId) async {
     try {
-      final doc = await _firestore
+      final doc = await _firestore!
           .collection(_gamesCollection)
           .doc(gameId)
           .get();
@@ -225,13 +245,13 @@ class FirebaseService {
   static Future<void> cleanupOldGames() async {
     try {
       final cutoffDate = DateTime.now().subtract(const Duration(days: 30));
-      final querySnapshot = await _firestore
+      final querySnapshot = await _firestore!
           .collection(_gamesCollection)
           .where('updatedAt', isLessThan: cutoffDate.millisecondsSinceEpoch)
           .limit(100)
           .get();
 
-      final batch = _firestore.batch();
+      final batch = _firestore!.batch();
       for (final doc in querySnapshot.docs) {
         batch.delete(doc.reference);
       }

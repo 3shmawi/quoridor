@@ -131,34 +131,38 @@ class GameService {
     Player player,
     Wall wall,
   ) {
-    if (!player.hasWallsRemaining) return false;
+    return validateWallPlacement(gameState, player, wall).isValid;
+  }
 
-    // Check bounds
-    if (wall.position.row < 0 || wall.position.col < 0) return false;
-
-    if (wall.orientation == WallOrientation.horizontal) {
-      if (wall.position.row >= GameConstants.boardSize ||
-          wall.position.col >= GameConstants.boardSize - 1) {
-        return false;
-      }
-    } else {
-      if (wall.position.row >= GameConstants.boardSize - 1 ||
-          wall.position.col >= GameConstants.boardSize) {
-        return false;
-      }
+  /// Checks a wall placement and explains why it was rejected.
+  ///
+  /// The UI uses the reason to tell the player what is wrong *before* they
+  /// commit the wall, instead of silently refusing the tap.
+  static WallPlacementResult validateWallPlacement(
+    GameState gameState,
+    Player player,
+    Wall wall,
+  ) {
+    if (!player.hasWallsRemaining) {
+      return const WallPlacementResult(WallRejection.noWallsLeft);
     }
 
-    // Check for overlapping walls
+    if (!isWallInBounds(wall)) {
+      return const WallPlacementResult(WallRejection.outOfBounds);
+    }
+
     for (final existingWall in gameState.walls) {
       if (_wallsOverlap(wall, existingWall)) {
-        return false;
+        return const WallPlacementResult(WallRejection.overlaps);
+      }
+      if (_wallsCross(wall, existingWall)) {
+        return const WallPlacementResult(WallRejection.crosses);
       }
     }
 
-    // Create temporary game state with the wall
+    // A wall may never seal a player off from their goal row.
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
 
-    // Check if both players still have valid paths
     final player1Path = Pathfinding.findShortestPath(
       tempGameState,
       tempGameState.player1.position,
@@ -171,8 +175,34 @@ class GameService {
       tempGameState.player2.goalRow,
     );
 
-    // Wall is valid if both players still have a path to their goal
-    return player1Path != null && player2Path != null;
+    if (player1Path == null || player2Path == null) {
+      return const WallPlacementResult(WallRejection.blocksPlayer);
+    }
+
+    return const WallPlacementResult(WallRejection.none);
+  }
+
+  /// Whether a wall sits on a real groove between cells.
+  ///
+  /// A horizontal wall at (r, c) lies above row r and covers columns c and
+  /// c+1, so r must be an interior row. A vertical wall at (r, c) lies to the
+  /// left of column c and covers rows r and r+1, so c must be an interior
+  /// column. Walls on the board's outer edge are meaningless: they would sit
+  /// on top of the boundary and block nothing.
+  static bool isWallInBounds(Wall wall) {
+    final row = wall.position.row;
+    final col = wall.position.col;
+
+    if (wall.orientation == WallOrientation.horizontal) {
+      return row >= 1 &&
+          row <= GameConstants.boardSize - 1 &&
+          col >= 0 &&
+          col <= GameConstants.boardSize - 2;
+    }
+    return col >= 1 &&
+        col <= GameConstants.boardSize - 1 &&
+        row >= 0 &&
+        row <= GameConstants.boardSize - 2;
   }
 
   static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
@@ -224,20 +254,35 @@ class GameService {
     return validWalls;
   }
 
+  /// Two walls of the same orientation overlap when they share the same
+  /// groove and their two-cell spans touch.
   static bool _wallsOverlap(Wall wall1, Wall wall2) {
     if (wall1.orientation != wall2.orientation) return false;
 
     if (wall1.orientation == WallOrientation.horizontal) {
       return wall1.position.row == wall2.position.row &&
-          (wall1.position.col == wall2.position.col ||
-              wall1.position.col == wall2.position.col + 1 ||
-              wall1.position.col == wall2.position.col - 1);
-    } else {
-      return wall1.position.col == wall2.position.col &&
-          (wall1.position.row == wall2.position.row ||
-              wall1.position.row == wall2.position.row + 1 ||
-              wall1.position.row == wall2.position.row - 1);
+          (wall1.position.col - wall2.position.col).abs() <= 1;
     }
+    return wall1.position.col == wall2.position.col &&
+        (wall1.position.row - wall2.position.row).abs() <= 1;
+  }
+
+  /// A horizontal and a vertical wall may not cross at the same intersection.
+  ///
+  /// Each wall is centred on a grid intersection: a horizontal wall at (r, c)
+  /// is centred on (r, c + 1) and a vertical wall at (r, c) on (r + 1, c).
+  /// Sharing that centre would make the two walls intersect, which the rules
+  /// forbid.
+  static bool _wallsCross(Wall wall1, Wall wall2) {
+    if (wall1.orientation == wall2.orientation) return false;
+
+    final horizontal = wall1.orientation == WallOrientation.horizontal
+        ? wall1
+        : wall2;
+    final vertical = identical(horizontal, wall1) ? wall2 : wall1;
+
+    return horizontal.position.row == vertical.position.row + 1 &&
+        horizontal.position.col + 1 == vertical.position.col;
   }
 
   static GamePhase _determineGamePhase(GameState gameState) {
@@ -272,6 +317,43 @@ class GameAnalysis {
 }
 
 enum GamePhase { opening, midgame, endgame }
+
+/// Why a wall placement was refused.
+enum WallRejection {
+  none,
+  noWallsLeft,
+  outOfBounds,
+  overlaps,
+  crosses,
+  blocksPlayer,
+}
+
+/// The outcome of checking a wall placement, with a message for the player.
+class WallPlacementResult {
+  final WallRejection rejection;
+
+  const WallPlacementResult(this.rejection);
+
+  bool get isValid => rejection == WallRejection.none;
+
+  /// Short explanation suitable for showing directly in the UI.
+  String get message {
+    switch (rejection) {
+      case WallRejection.none:
+        return 'Wall can be placed here';
+      case WallRejection.noWallsLeft:
+        return 'You have no walls left';
+      case WallRejection.outOfBounds:
+        return 'Walls must sit between cells';
+      case WallRejection.overlaps:
+        return 'Another wall is already here';
+      case WallRejection.crosses:
+        return 'Walls cannot cross each other';
+      case WallRejection.blocksPlayer:
+        return 'This would leave a player with no way to their goal';
+    }
+  }
+}
 
 // Utility class for game creation and management
 class GameManager {
