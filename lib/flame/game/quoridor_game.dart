@@ -1,73 +1,16 @@
-import 'package:audioplayers/audioplayers.dart';
+import 'dart:async';
+
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../board_component.dart';
+import '../services/audio_service.dart';
 import '../constants.dart';
 import '../models/game_state.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
-
-class PlayerInfoWidget extends StatelessWidget {
-  final int playerId;
-  final String name;
-  final int wallsRemaining;
-  final bool isCurrentPlayer;
-  final bool isAI;
-
-  const PlayerInfoWidget({
-    super.key,
-    required this.playerId,
-    required this.name,
-    required this.wallsRemaining,
-    required this.isCurrentPlayer,
-    required this.isAI,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = playerId == 1 ? Colors.deepPurple : Colors.teal;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
-        ),
-        border: Border.all(color: color.withOpacity(0.3), width: 2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                isAI ? "🤖 AI" : name,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: color,
-                ),
-              ),
-              if (isCurrentPlayer) const Spacer(),
-              if (isCurrentPlayer)
-                CircleAvatar(radius: 6, backgroundColor: color),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Walls: $wallsRemaining',
-            style: TextStyle(color: color.withOpacity(0.8)),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 final isInitializedProvider = ValueNotifier(false);
 
@@ -77,9 +20,21 @@ class QuoridorGame extends FlameGame
   late BoardComponent _boardComponent;
   bool _isInitialized = false;
 
+  /// Guards the game-over announcement so the win sound and confetti fire once
+  /// per game rather than on every state update that follows the win.
+  bool _announcedGameOver = false;
+
+  /// How many moves have already had their sound played, so replays of the
+  /// same state never retrigger effects.
+  int _soundedMoveCount = 0;
+
   Function(GameState)? onGameStateChanged;
   Function(String)? onGameMessage;
   VoidCallback? onGameWon;
+
+  /// Fires when the board's interaction state changes (mode, pending wall),
+  /// so the surrounding page can rebuild its controls.
+  VoidCallback? onInteractionChanged;
 
   @override
   Future<void> onLoad() async {
@@ -90,6 +45,11 @@ class QuoridorGame extends FlameGame
     _boardComponent = BoardComponent(_gameState!);
     _boardComponent.onMoveAttempted = _handleMoveAttempt;
     _boardComponent.onWallPlaceAttempted = _handleWallPlaceAttempt;
+    _boardComponent.onInteractionChanged = () => onInteractionChanged?.call();
+
+    // Load the sound effects once, up front, so the first move does not stall
+    // on asset resolution.
+    unawaited(AudioService.instance.initialize());
 
     // Position board in center
     _boardComponent.position = Vector2(0, 0);
@@ -100,21 +60,30 @@ class QuoridorGame extends FlameGame
     _isInitialized = true;
   }
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
   @override
   Color backgroundColor() => Colors.transparent;
 
-  void _updateUI() async {
-    if (_gameState!.isGameOver) {
+  void _updateUI() {
+    if (_gameState!.isGameOver && !_announcedGameOver) {
+      _announcedGameOver = true;
       onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
       onGameWon?.call();
-      await _audioPlayer.play(AssetSource("sounds/win.wav"));
+      AudioService.instance.play(GameSound.win);
     }
   }
 
   void updateGameState(GameState newGameState) {
+    final previous = _gameState;
     _gameState = newGameState;
     _boardComponent.updateGameState(newGameState);
+
+    // A new game resets the history, so the sound cursor has to follow it back.
+    if (previous != null && previous.gameId != newGameState.gameId) {
+      _soundedMoveCount = 0;
+      _announcedGameOver = false;
+    }
+    _playSoundsForNewMoves(newGameState);
+
     _updateUI();
 
     // Trigger AI move if needed
@@ -123,6 +92,38 @@ class QuoridorGame extends FlameGame
     }
 
     onGameStateChanged?.call(_gameState!);
+  }
+
+  /// Plays one effect per move that has landed since the last update.
+  ///
+  /// Driving sound from the move history means a player's move and the AI's
+  /// reply each get their own effect even though they arrive together, and it
+  /// keeps working unchanged once moves start arriving from a remote player.
+  void _playSoundsForNewMoves(GameState state) {
+    final history = state.moveHistory;
+    if (history.length <= _soundedMoveCount) {
+      _soundedMoveCount = history.length;
+      return;
+    }
+
+    final newMoves = history.sublist(_soundedMoveCount);
+    _soundedMoveCount = history.length;
+
+    for (var i = 0; i < newMoves.length; i++) {
+      final move = newMoves[i];
+      final sound = move.type == MoveType.pawnMove
+          ? GameSound.move(move.playerId)
+          : GameSound.wall(move.playerId);
+
+      if (i == 0) {
+        AudioService.instance.play(sound);
+      } else {
+        // Stagger the rest so simultaneous moves do not collide into one blip.
+        Timer(Duration(milliseconds: 220 * i), () {
+          AudioService.instance.play(sound);
+        });
+      }
+    }
   }
 
   Future<void> _executeAIMove() async {
@@ -204,6 +205,8 @@ class QuoridorGame extends FlameGame
 
   // Game control methods
   void newGame() {
+    _announcedGameOver = false;
+    _soundedMoveCount = 0;
     updateGameState(GameStateFactory.createNewGame());
     onGameMessage?.call('New game started!');
   }
@@ -217,10 +220,38 @@ class QuoridorGame extends FlameGame
     _boardComponent.showValidMoves = show;
   }
 
-  @override
-  void onRemove() {
-    _audioPlayer.dispose();
-    super.onRemove();
+  // --- Board interaction ---------------------------------------------------
+
+  BoardInteractionMode get boardMode => _boardComponent.mode;
+
+  set boardMode(BoardInteractionMode value) => _boardComponent.mode = value;
+
+  /// The wall the player is lining up, before committing it.
+  Wall? get pendingWall => _boardComponent.pendingWall;
+
+  /// Whether the pending wall is legal, with the reason when it is not.
+  WallPlacementResult? get pendingWallResult =>
+      _boardComponent.pendingWallResult;
+
+  bool get canCommitPendingWall => _boardComponent.canCommitPendingWall;
+
+  void rotatePendingWall() => _boardComponent.rotatePendingWall();
+
+  void cancelPendingWall() => _boardComponent.cancelPendingWall();
+
+  /// Commits the pending wall, reporting why nothing happened when it cannot
+  /// be placed.
+  void commitPendingWall() {
+    if (_boardComponent.pendingWall == null) {
+      onGameMessage?.call('Tap the board to choose where the wall goes');
+      return;
+    }
+
+    if (!_boardComponent.commitPendingWall()) {
+      final reason = _boardComponent.pendingWallResult?.message;
+      onGameMessage?.call(reason ?? 'That wall cannot go there');
+      HapticFeedback.lightImpact();
+    }
   }
 
   void togglePlayerMode() {
@@ -252,7 +283,6 @@ class QuoridorGame extends FlameGame
 
     // Convert screen coordinates to local board coordinates
     final localPosition = event.localPosition - _boardComponent.position;
-    print('Tap detected at: $localPosition'); // Debug log
 
     // Pass tap to board component
     _boardComponent.handleTap(localPosition);

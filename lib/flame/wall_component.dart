@@ -1,124 +1,116 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:quoridor/flame/board/board_metrics.dart';
 import 'package:quoridor/flame/constants.dart';
 import 'package:quoridor/flame/models/game_state.dart';
+import 'package:quoridor/theme.dart';
 
+/// Draws the walls that are on the board plus the wall the player is lining up.
 class WallComponent extends PositionComponent {
   GameState gameState;
+
+  /// The wall being positioned but not yet committed.
   Wall? previewWall;
+
+  /// Whether [previewWall] is a legal placement, which drives its colour.
   bool isValid = true;
 
-  static const double _cellSize = GameConstants.cellSize;
-  static const double _wallThickness = GameConstants.wallThickness;
-  static const double _boardPadding = GameConstants.boardPadding;
-  static const double cellSpacing = GameConstants.cellSpacing;
+  /// Marks every slot a wall could occupy. Shown only in wall mode, where it
+  /// tells the player that the gaps between cells are the targets.
+  bool showSlots = false;
+
+  /// Geometry shared with the board; kept in sync by [BoardComponent].
+  BoardMetrics metrics = BoardMetrics.fit(Size.zero);
 
   WallComponent(this.gameState);
 
   @override
   void render(Canvas canvas) {
+    if (showSlots) _drawSlots(canvas);
     _drawWalls(canvas);
-    if (previewWall != null) {
-      _drawPreviewWall(canvas);
+    if (previewWall != null) _drawPreviewWall(canvas);
+  }
+
+  void _drawSlots(Canvas canvas) {
+    final paint = Paint()
+      ..color = const Color(0xFF64748B).withValues(alpha: 0.45)
+      ..style = PaintingStyle.fill;
+
+    final radius = metrics.spacing * 0.42;
+
+    for (int row = 1; row < GameConstants.boardSize; row++) {
+      for (int col = 1; col < GameConstants.boardSize; col++) {
+        canvas.drawCircle(metrics.intersectionCenter(row, col), radius, paint);
+      }
     }
   }
 
   void _drawWalls(Canvas canvas) {
     final wallPaint = Paint()
-      ..color = const Color(GameConstants.wallColor)
+      ..color = Color(
+        isDarkModeNotifier.value
+            ? GameConstants.wallColorDark
+            : GameConstants.wallColor,
+      )
       ..style = PaintingStyle.fill;
 
     final shadowPaint = Paint()
-      ..color = const Color(GameConstants.wallColor).withOpacity(0.3)
+      ..color = Colors.black.withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
 
-    for (final wall in gameState.walls) {
-      final rect = _getWallRect(wall);
+    final radius = Radius.circular(metrics.wallThickness * 0.4);
 
-      // Draw shadow
+    for (final wall in gameState.walls) {
+      final rect = metrics.wallRect(wall);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect.translate(2, 2), const Radius.circular(2)),
+        RRect.fromRectAndRadius(
+          rect.translate(0, metrics.wallThickness * 0.2),
+          radius,
+        ),
         shadowPaint,
       );
-
-      // Draw wall
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-        wallPaint,
-      );
+      canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), wallPaint);
     }
   }
 
   void _drawPreviewWall(Canvas canvas) {
-    if (previewWall == null) return;
+    final wall = previewWall;
+    if (wall == null) return;
 
-    final rect = _getWallRect(previewWall!);
+    final rect = metrics.wallRect(wall);
+    final radius = Radius.circular(metrics.wallThickness * 0.4);
 
-    // Draw glow effect
-    final glowPaint = Paint()
-      ..color = isValid
-          ? const Color(0xFF00C853).withOpacity(0.4) // green glow
-          : const Color(0xFFFF0000).withOpacity(0.4) // red glow
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
-      ..style = PaintingStyle.fill;
+    // Green when the wall can be placed, red when it cannot, so the player
+    // reads the outcome before committing rather than after being refused.
+    final accent = isValid ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.inflate(4), const Radius.circular(4)),
-      glowPaint,
+      RRect.fromRectAndRadius(
+        rect.inflate(metrics.wallThickness * 0.5),
+        radius,
+      ),
+      Paint()
+        ..color = accent.withValues(alpha: 0.35)
+        ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal,
+          metrics.wallThickness * 0.6,
+        ),
     );
 
-    // Shadow
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.translate(2, 2), const Radius.circular(2)),
+      RRect.fromRectAndRadius(rect, radius),
       Paint()
-        ..color = Colors.black.withOpacity(0.2)
+        ..color = accent.withValues(alpha: 0.65)
         ..style = PaintingStyle.fill,
     );
 
-    // Preview wall fill
-    final previewPaint = Paint()
-      ..color = isValid
-          ? const Color(GameConstants.wallColor).withOpacity(0.5)
-          : const Color(0xFFFF0000).withOpacity(0.5)
-      ..style = PaintingStyle.fill;
-
-    final borderPaint = Paint()
-      ..color = isValid
-          ? const Color(GameConstants.wallColor)
-          : const Color(0xFFFF0000)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeJoin = StrokeJoin.round;
-
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-      previewPaint,
+      RRect.fromRectAndRadius(rect, radius),
+      Paint()
+        ..color = accent
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = metrics.wallThickness * 0.22
+        ..strokeJoin = StrokeJoin.round,
     );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-      borderPaint,
-    );
-  }
-
-  Rect _getWallRect(Wall wall) {
-    if (wall.orientation == WallOrientation.horizontal) {
-      return Rect.fromLTWH(
-        _boardPadding + wall.position.col * (_cellSize + cellSpacing),
-        _boardPadding +
-            wall.position.row * (_cellSize + cellSpacing) -
-            _wallThickness / 2,
-        _cellSize * 2 + cellSpacing,
-        _wallThickness,
-      );
-    } else {
-      return Rect.fromLTWH(
-        _boardPadding +
-            wall.position.col * (_cellSize + cellSpacing) -
-            _wallThickness / 2,
-        _boardPadding + wall.position.row * (_cellSize + cellSpacing),
-        _wallThickness,
-        _cellSize * 2 + cellSpacing,
-      );
-    }
   }
 }
