@@ -102,8 +102,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
               ],
             ),
           ),
@@ -165,7 +165,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -190,7 +192,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         Text(
           'Strategic Board Game',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
             fontWeight: FontWeight.w400,
           ),
         ),
@@ -240,7 +244,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     BoxShadow(
                       color: Theme.of(
                         context,
-                      ).colorScheme.primary.withOpacity(0.3),
+                      ).colorScheme.primary.withValues(alpha: 0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -305,7 +309,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           height: 50,
           decoration: BoxDecoration(
             border: Border.all(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.3),
             ),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -396,7 +402,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -426,7 +432,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.7),
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -435,7 +441,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.5),
+                        ).colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -446,7 +452,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ],
           ),
@@ -462,7 +470,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -507,7 +515,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.8),
               ),
             ),
           ),

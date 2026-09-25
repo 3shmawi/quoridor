@@ -26,7 +26,7 @@ class AppTheme {
     onError: Colors.white,
     surface: surfaceColor,
     onSurface: Color(0xFF1E293B),
-    surfaceVariant: Color(0xFFF1F5F9),
+    surfaceContainerHighest: Color(0xFFF1F5F9),
     onSurfaceVariant: Color(0xFF64748B),
     outline: Color(0xFFCBD5E1),
     shadow: Color(0xFF000000),
@@ -47,7 +47,7 @@ class AppTheme {
     onError: Color(0xFF450A0A),
     surface: darkSurfaceColor,
     onSurface: Color(0xFFE2E8F0),
-    surfaceVariant: Color(0xFF334155),
+    surfaceContainerHighest: Color(0xFF334155),
     onSurfaceVariant: Color(0xFF94A3B8),
     outline: Color(0xFF475569),
     shadow: Color(0xFF000000),
@@ -78,7 +78,7 @@ final ThemeData lightTheme = ThemeData(
   // Card theme
   cardTheme: CardThemeData(
     elevation: 2,
-    shadowColor: Colors.black.withOpacity(0.1),
+    shadowColor: Colors.black.withValues(alpha: 0.1),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
   ),
 
@@ -110,7 +110,7 @@ final ThemeData lightTheme = ThemeData(
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: AppTheme._lightColorScheme.outline.withOpacity(0.5),
+        color: AppTheme._lightColorScheme.outline.withValues(alpha: 0.5),
       ),
     ),
     focusedBorder: OutlineInputBorder(
@@ -146,7 +146,7 @@ final ThemeData darkTheme = ThemeData(
   // Card theme
   cardTheme: CardThemeData(
     elevation: 4,
-    shadowColor: Colors.black.withOpacity(0.3),
+    shadowColor: Colors.black.withValues(alpha: 0.3),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
   ),
 
@@ -178,7 +178,7 @@ final ThemeData darkTheme = ThemeData(
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: AppTheme._darkColorScheme.outline.withOpacity(0.5),
+        color: AppTheme._darkColorScheme.outline.withValues(alpha: 0.5),
       ),
     ),
     focusedBorder: OutlineInputBorder(

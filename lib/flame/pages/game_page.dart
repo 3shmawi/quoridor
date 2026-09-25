@@ -249,7 +249,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 12,
               offset: const Offset(0, -2),
             ),
@@ -263,7 +263,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                color: Theme.of(
+                  context,
+                ).colorScheme.outline.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -333,7 +335,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: InkWell(
@@ -346,7 +348,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -373,7 +377,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.7),
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -382,7 +386,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ],
           ),
@@ -406,7 +412,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             color: Theme.of(context).colorScheme.surface,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(2, 0),
               ),
@@ -660,7 +666,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               style: IconButton.styleFrom(
                 backgroundColor: Theme.of(
                   context,
-                ).colorScheme.primary.withOpacity(0.1),
+                ).colorScheme.primary.withValues(alpha: 0.1),
                 foregroundColor: Theme.of(context).colorScheme.primary,
               ),
             );
@@ -690,7 +696,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           style: IconButton.styleFrom(
             backgroundColor: Theme.of(
               context,
-            ).colorScheme.secondary.withOpacity(0.1),
+            ).colorScheme.secondary.withValues(alpha: 0.1),
             foregroundColor: Theme.of(context).colorScheme.secondary,
           ),
         ),
@@ -728,7 +734,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: ListTile(
@@ -744,13 +750,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         subtitle: Text(
           subtitle,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         trailing: Icon(
           Icons.arrow_forward_ios,
           size: 16,
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
         ),
       ),
     );
@@ -770,7 +778,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: ListTile(
@@ -785,7 +793,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         subtitle: Text(
           subtitle,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         trailing: Switch(
@@ -804,14 +814,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
       color: isSelected
-          ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
           : Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: isSelected
               ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: ListTile(
@@ -820,7 +830,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           _getDifficultyIcon(difficulty),
           color: isSelected
               ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
         ),
         title: Text(
           difficulty.name.toUpperCase(),
@@ -834,7 +844,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         subtitle: Text(
           _getDifficultyDescription(difficulty),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         trailing: isSelected
@@ -1171,7 +1183,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
