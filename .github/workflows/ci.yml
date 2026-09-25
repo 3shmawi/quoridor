@@ -31,11 +31,10 @@ jobs:
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test
 
-      # Infos are not fatal: the tree still carries pre-existing `avoid_print`
-      # lints in the service layer. Deprecations are clear, and errors and
-      # warnings do fail the build.
+      # The tree is clean, so anything analyze reports -- including infos and
+      # lints -- fails the build and stays fixed.
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze
 
       - name: Test
         run: flutter test

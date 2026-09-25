@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../flame/constants.dart';
@@ -43,7 +44,7 @@ class AIService {
       // Fallback to basic AI logic if OpenAI fails
       return _getFallbackMove(gameState, difficulty);
     } catch (e) {
-      print('AI Service Error: $e');
+      debugPrint('AI Service Error: $e');
       return _getFallbackMove(gameState, difficulty);
     }
   }
@@ -94,7 +95,7 @@ Analyze the game state and recommend the optimal move as a JSON object with the 
         return AIStrategy.fromJson(strategyJson);
       }
     } catch (e) {
-      print('OpenAI API Error: $e');
+      debugPrint('OpenAI API Error: $e');
     }
 
     return null;

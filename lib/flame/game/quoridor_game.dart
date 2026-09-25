@@ -283,7 +283,6 @@ class QuoridorGame extends FlameGame
 
     // Convert screen coordinates to local board coordinates
     final localPosition = event.localPosition - _boardComponent.position;
-    print('Tap detected at: $localPosition'); // Debug log
 
     // Pass tap to board component
     _boardComponent.handleTap(localPosition);

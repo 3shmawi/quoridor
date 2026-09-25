@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../flame/constants.dart';
 import '../../flame/models/game_state.dart';
@@ -34,7 +35,7 @@ class FirebaseService {
       final userCredential = await auth.signInAnonymously();
       return userCredential.user;
     } catch (e) {
-      print('Anonymous sign in failed: $e');
+      debugPrint('Anonymous sign in failed: $e');
       return null;
     }
   }
@@ -54,7 +55,7 @@ class FirebaseService {
 
       return docRef.id;
     } catch (e) {
-      print('Error saving game: $e');
+      debugPrint('Error saving game: $e');
       return null;
     }
   }
@@ -68,7 +69,7 @@ class FirebaseService {
 
       return true;
     } catch (e) {
-      print('Error updating game: $e');
+      debugPrint('Error updating game: $e');
       return false;
     }
   }
@@ -86,7 +87,7 @@ class FirebaseService {
 
       return null;
     } catch (e) {
-      print('Error loading game: $e');
+      debugPrint('Error loading game: $e');
       return null;
     }
   }
@@ -103,7 +104,7 @@ class FirebaseService {
           .map((doc) => GameState.fromJson(doc.data()))
           .toList();
     } catch (e) {
-      print('Error loading recent games: $e');
+      debugPrint('Error loading recent games: $e');
       return [];
     }
   }
@@ -124,7 +125,7 @@ class FirebaseService {
           .map((doc) => GameState.fromJson(doc.data()))
           .toList();
     } catch (e) {
-      print('Error loading games by status: $e');
+      debugPrint('Error loading games by status: $e');
       return [];
     }
   }
@@ -134,7 +135,7 @@ class FirebaseService {
       await _firestore!.collection(_gamesCollection).doc(gameId).delete();
       return true;
     } catch (e) {
-      print('Error deleting game: $e');
+      debugPrint('Error deleting game: $e');
       return false;
     }
   }
@@ -169,7 +170,7 @@ class FirebaseService {
         'lastActive': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating user stats: $e');
+      debugPrint('Error updating user stats: $e');
     }
   }
 
@@ -182,7 +183,7 @@ class FirebaseService {
 
       return doc.data();
     } catch (e) {
-      print('Error getting user stats: $e');
+      debugPrint('Error getting user stats: $e');
       return null;
     }
   }
@@ -214,7 +215,7 @@ class FirebaseService {
       await batch.commit();
       return true;
     } catch (e) {
-      print('Error saving game with stats: $e');
+      debugPrint('Error saving game with stats: $e');
       return false;
     }
   }
@@ -235,7 +236,7 @@ class FirebaseService {
 
       return doc.exists;
     } catch (e) {
-      print('Error checking if game exists: $e');
+      debugPrint('Error checking if game exists: $e');
       return false;
     }
   }
@@ -256,9 +257,9 @@ class FirebaseService {
       }
 
       await batch.commit();
-      print('Cleaned up ${querySnapshot.docs.length} old games');
+      debugPrint('Cleaned up ${querySnapshot.docs.length} old games');
     } catch (e) {
-      print('Error cleaning up old games: $e');
+      debugPrint('Error cleaning up old games: $e');
     }
   }
 }
