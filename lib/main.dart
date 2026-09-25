@@ -8,6 +8,7 @@ import 'package:quoridor/theme.dart';
 import 'firebase_options.dart';
 import 'flame/services/audio_service.dart';
 import 'flame/services/firebase_service.dart';
+import 'flame/services/identity_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,11 @@ Future<void> _connectFirebase() async {
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(const Duration(seconds: 10));
     FirebaseService.markReady(available: true);
+
+    // Claim a stable anonymous identity for this device. Online play needs an
+    // identity that outlives a restart so a game can be rejoined; local play
+    // never touches it, so a failure here costs nothing.
+    await IdentityService.instance.ensureSignedIn();
   } catch (error) {
     FirebaseService.markReady(available: false);
     debugPrint('Firebase unavailable, continuing offline: $error');

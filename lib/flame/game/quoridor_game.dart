@@ -28,6 +28,23 @@ class QuoridorGame extends FlameGame
   /// same state never retrigger effects.
   int _soundedMoveCount = 0;
 
+  /// Which seat this device plays, when the game is online.
+  ///
+  /// Null means a local game, where whoever is holding the phone plays both
+  /// sides. In an online game this is the difference that matters: the board
+  /// must refuse input during the opponent's turn even though that turn is
+  /// perfectly active, which a hotseat game has no reason to do.
+  int? localPlayerId;
+
+  /// Whether this device may act on the current turn.
+  bool get canActNow {
+    final state = _gameState;
+    if (state == null || state.isGameOver) return false;
+    if (state.currentPlayer.isAI) return false;
+    final seat = localPlayerId;
+    return seat == null || state.currentPlayerId == seat;
+  }
+
   Function(GameState)? onGameStateChanged;
   Function(String)? onGameMessage;
   VoidCallback? onGameWon;
@@ -146,7 +163,8 @@ class QuoridorGame extends FlameGame
   }
 
   void _handleMoveAttempt(Position newPosition) {
-    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
+    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId) ||
+        !canActNow) {
       onGameMessage?.call('It\'s not your turn!');
       return;
     }
@@ -162,7 +180,8 @@ class QuoridorGame extends FlameGame
   }
 
   void _handleWallPlaceAttempt(Wall wall) {
-    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId)) {
+    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId) ||
+        !canActNow) {
       onGameMessage?.call('It\'s not your turn!');
       return;
     }
