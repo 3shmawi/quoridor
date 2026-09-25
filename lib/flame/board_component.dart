@@ -233,10 +233,7 @@ class BoardComponent extends PositionComponent {
         _metrics.cellRect(Position(row, 0)).bottom + _metrics.spacing,
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          rect,
-          Radius.circular(_metrics.cellSize * 0.2),
-        ),
+        RRect.fromRectAndRadius(rect, Radius.circular(_metrics.cellSize * 0.2)),
         Paint()
           ..color = color.withValues(alpha: 0.16)
           ..style = PaintingStyle.fill,
@@ -250,11 +247,15 @@ class BoardComponent extends PositionComponent {
 
   void _drawGrid(Canvas canvas) {
     final lightPaint = Paint()
-      ..color = _isDark ? const Color(0xFF2C3E50) : const Color(GameConstants.lightCellColor)
+      ..color = _isDark
+          ? const Color(0xFF2C3E50)
+          : const Color(GameConstants.lightCellColor)
       ..style = PaintingStyle.fill;
 
     final darkPaint = Paint()
-      ..color = _isDark ? const Color(0xFF1A2530) : const Color(GameConstants.darkCellColor)
+      ..color = _isDark
+          ? const Color(0xFF1A2530)
+          : const Color(GameConstants.darkCellColor)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()

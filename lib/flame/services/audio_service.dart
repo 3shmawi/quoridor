@@ -97,7 +97,9 @@ class AudioService {
     } catch (error, stackTrace) {
       _failed = true;
       await _releasePlayers();
-      debugPrint('AudioService: disabling sound, initialisation failed: $error');
+      debugPrint(
+        'AudioService: disabling sound, initialisation failed: $error',
+      );
       assert(() {
         debugPrintStack(stackTrace: stackTrace);
         return true;

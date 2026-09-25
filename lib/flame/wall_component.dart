@@ -85,7 +85,10 @@ class WallComponent extends PositionComponent {
     final accent = isValid ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.inflate(metrics.wallThickness * 0.5), radius),
+      RRect.fromRectAndRadius(
+        rect.inflate(metrics.wallThickness * 0.5),
+        radius,
+      ),
       Paint()
         ..color = accent.withValues(alpha: 0.35)
         ..maskFilter = MaskFilter.blur(

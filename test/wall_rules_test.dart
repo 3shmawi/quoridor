@@ -13,13 +13,17 @@ void main() {
     test('accepts a wall on an interior groove', () {
       final state = freshGame();
       expect(
-        check(state, const Wall(Position(4, 3), WallOrientation.horizontal))
-            .isValid,
+        check(
+          state,
+          const Wall(Position(4, 3), WallOrientation.horizontal),
+        ).isValid,
         isTrue,
       );
       expect(
-        check(state, const Wall(Position(3, 4), WallOrientation.vertical))
-            .isValid,
+        check(
+          state,
+          const Wall(Position(3, 4), WallOrientation.vertical),
+        ).isValid,
         isTrue,
       );
     });
@@ -68,13 +72,17 @@ void main() {
       final state = freshGame()
         ..walls.add(const Wall(Position(4, 3), WallOrientation.horizontal));
       expect(
-        check(state, const Wall(Position(4, 4), WallOrientation.horizontal))
-            .rejection,
+        check(
+          state,
+          const Wall(Position(4, 4), WallOrientation.horizontal),
+        ).rejection,
         WallRejection.overlaps,
       );
       expect(
-        check(state, const Wall(Position(4, 2), WallOrientation.horizontal))
-            .rejection,
+        check(
+          state,
+          const Wall(Position(4, 2), WallOrientation.horizontal),
+        ).rejection,
         WallRejection.overlaps,
       );
     });
@@ -83,8 +91,10 @@ void main() {
       final state = freshGame()
         ..walls.add(const Wall(Position(4, 3), WallOrientation.horizontal));
       expect(
-        check(state, const Wall(Position(4, 5), WallOrientation.horizontal))
-            .isValid,
+        check(
+          state,
+          const Wall(Position(4, 5), WallOrientation.horizontal),
+        ).isValid,
         isTrue,
       );
     });
@@ -105,8 +115,10 @@ void main() {
       final state = freshGame()
         ..walls.add(const Wall(Position(4, 3), WallOrientation.horizontal));
       expect(
-        check(state, const Wall(Position(3, 6), WallOrientation.vertical))
-            .isValid,
+        check(
+          state,
+          const Wall(Position(3, 6), WallOrientation.vertical),
+        ).isValid,
         isTrue,
       );
     });
@@ -135,8 +147,10 @@ void main() {
     test('allows a wall that only lengthens the path', () {
       final state = freshGame();
       expect(
-        check(state, const Wall(Position(1, 4), WallOrientation.horizontal))
-            .isValid,
+        check(
+          state,
+          const Wall(Position(1, 4), WallOrientation.horizontal),
+        ).isValid,
         isTrue,
       );
     });

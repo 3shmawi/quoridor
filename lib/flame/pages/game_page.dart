@@ -969,8 +969,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-          if (isActive)
-            Icon(Icons.play_arrow_rounded, color: color, size: 20),
+          if (isActive) Icon(Icons.play_arrow_rounded, color: color, size: 20),
         ],
       ),
     );

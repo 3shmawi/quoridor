@@ -20,8 +20,7 @@ class FirebaseService {
   static FirebaseFirestore? get _firestore =>
       _ready ? FirebaseFirestore.instance : null;
 
-  static FirebaseAuth? get _auth =>
-      _ready ? FirebaseAuth.instance : null;
+  static FirebaseAuth? get _auth => _ready ? FirebaseAuth.instance : null;
 
   // Collections
   static const String _gamesCollection = 'games';
@@ -143,14 +142,14 @@ class FirebaseService {
   // Real-time game updates
   static Stream<GameState?> watchGame(String gameId) {
     if (!_ready) return const Stream<GameState?>.empty();
-    return _firestore!.collection(_gamesCollection).doc(gameId).snapshots().map((
-      doc,
-    ) {
-      if (doc.exists && doc.data() != null) {
-        return GameState.fromJson(doc.data()!);
-      }
-      return null;
-    });
+    return _firestore!.collection(_gamesCollection).doc(gameId).snapshots().map(
+      (doc) {
+        if (doc.exists && doc.data() != null) {
+          return GameState.fromJson(doc.data()!);
+        }
+        return null;
+      },
+    );
   }
 
   // User statistics
