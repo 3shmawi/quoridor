@@ -1,5 +1,6 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:async';
 import 'dart:math' show pi;
@@ -7,6 +8,8 @@ import 'dart:math' show pi;
 import '../../flame/board_component.dart';
 import '../../flame/game/quoridor_game.dart';
 import '../../flame/services/audio_service.dart';
+import '../../flame/services/online/online_game_controller.dart';
+import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/ai_service.dart';
 import '../../flame/services/firebase_service.dart';
@@ -30,6 +33,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   bool _showMessage = false;
   bool _showValidMoves = true;
   AIDifficulty _currentDifficulty = AIDifficulty.medium;
+
+  /// Non-null while an online game is in progress.
+  OnlineGameController? _online;
+
+  bool get _isOnline => _online != null;
 
   @override
   void initState() {
@@ -75,9 +83,86 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _detachOnline(abandon: false);
     _messageController.dispose();
     _confettiController.dispose();
     super.dispose();
+  }
+
+  // --- Online play ---------------------------------------------------------
+
+  /// Opens the lobby and, if the player starts or joins a game, hands the
+  /// board over to it.
+  Future<void> _startOnlineGame() async {
+    closeMenu();
+
+    final controller = await Navigator.of(context).push<OnlineGameController>(
+      MaterialPageRoute(builder: (_) => const OnlineLobbyPage()),
+    );
+
+    if (controller == null || !mounted) {
+      controller?.dispose();
+      return;
+    }
+
+    _detachOnline(abandon: true);
+    _online = controller;
+
+    // The server's board is the one being rendered from here on.
+    _game.localPlayerId = controller.localPlayerId;
+    _game.onSubmitMove = controller.submitMove;
+    controller.onRemoteUpdate = _game.updateGameState;
+    controller.onGameOver = _handleOnlineGameOver;
+    controller.addListener(_handleOnlineChanged);
+
+    final board = controller.game?.board;
+    if (board != null) _game.updateGameState(board);
+
+    setState(() {});
+    _showGameMessage(
+      controller.connection == OnlineConnectionState.waitingForOpponent
+          ? 'Share code ${controller.roomCode} to invite a friend'
+          : 'Connected — good luck',
+    );
+  }
+
+  void _handleOnlineChanged() {
+    if (!mounted) return;
+
+    final message = _online?.message;
+    if (message != null) {
+      _showGameMessage(message);
+      _online?.consumeMessage();
+    }
+    setState(() {});
+  }
+
+  void _handleOnlineGameOver(bool didWin) {
+    if (!mounted) return;
+    if (didWin) _showConfetti();
+    _showGameMessage(didWin ? 'You win!' : 'Your opponent wins');
+  }
+
+  /// Tears down any online session and returns the board to local play.
+  void _detachOnline({required bool abandon}) {
+    final controller = _online;
+    if (controller == null) return;
+
+    _online = null;
+    controller.removeListener(_handleOnlineChanged);
+    unawaited(controller.leave(abandon: abandon));
+    controller.dispose();
+
+    _game.localPlayerId = null;
+    _game.onSubmitMove = null;
+  }
+
+  Future<void> _leaveOnlineGame() async {
+    closeMenu();
+    _detachOnline(abandon: true);
+    _game.newGame();
+    setState(() {});
+    _showGameMessage('Left the online game');
   }
 
   void _handleGameStateChanged(GameState gameState) {
@@ -174,6 +259,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _newGame() {
+    if (_isOnline) {
+      _showGameMessage('Leave the online game first');
+      closeMenu();
+      return;
+    }
     _game.newGame();
     _showGameMessage('New game started!');
     closeMenu();
@@ -243,7 +333,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.4,
+        height: MediaQuery.of(context).size.height * 0.55,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -297,6 +387,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       }
                       Navigator.pop(context);
                       _showGameMessage('Playing against AI');
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildModeCard(
+                    icon: Icons.public,
+                    title: 'Play Online',
+                    subtitle: 'Invite a friend with a code, or join theirs',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _startOnlineGame();
                     },
                   ),
                   const SizedBox(height: 16),
@@ -449,6 +549,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildMenuSection('Game Controls', [
+                            if (_isOnline)
+                              _buildMenuItem(
+                                Icons.logout_rounded,
+                                'Leave Online Game',
+                                'Return to playing on this device',
+                                _leaveOnlineGame,
+                              )
+                            else
+                              _buildMenuItem(
+                                Icons.public,
+                                'Play Online',
+                                'Invite a friend with a code',
+                                _startOnlineGame,
+                              ),
                             _buildMenuItem(
                               Icons.refresh,
                               'New Game',
@@ -561,6 +675,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     gameFactory: () => _game,
                   ),
                 ),
+                if (_isOnline) _buildOnlineBanner(),
                 ValueListenableBuilder(
                   valueListenable: isInitializedProvider,
                   builder: (context, value, child) {
@@ -881,6 +996,102 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     }
   }
 
+  // --- Online banner -------------------------------------------------------
+
+  /// A single strip that says what the online game is doing right now.
+  ///
+  /// The states it distinguishes are the ones a player can act on: waiting for
+  /// someone to join (so show the code to share), the opponent having gone
+  /// quiet, having lost contact ourselves, or simply whose turn it is.
+  Widget _buildOnlineBanner() {
+    final online = _online;
+    if (online == null) return const SizedBox.shrink();
+
+    final scheme = Theme.of(context).colorScheme;
+
+    late final Color color;
+    late final IconData icon;
+    late final String text;
+    Widget? action;
+
+    switch (online.connection) {
+      case OnlineConnectionState.connecting:
+        color = scheme.onSurface.withValues(alpha: 0.7);
+        icon = Icons.sync_rounded;
+        text = 'Connecting…';
+
+      case OnlineConnectionState.waitingForOpponent:
+        color = const Color(0xFFD97706);
+        icon = Icons.hourglass_top_rounded;
+        text = 'Waiting for an opponent — code ${online.roomCode}';
+        action = TextButton.icon(
+          onPressed: () => _copyRoomCode(online.roomCode),
+          icon: const Icon(Icons.copy_rounded, size: 16),
+          label: const Text('Copy'),
+        );
+
+      case OnlineConnectionState.opponentAway:
+        color = const Color(0xFFD97706);
+        icon = Icons.cloud_off_rounded;
+        text =
+            '${online.session?.opponent?.displayName ?? 'Opponent'} '
+            'has gone quiet';
+
+      case OnlineConnectionState.offline:
+        color = const Color(0xFFDC2626);
+        icon = Icons.wifi_off_rounded;
+        text = 'Lost contact with the game';
+
+      case OnlineConnectionState.ended:
+        color = scheme.onSurface.withValues(alpha: 0.7);
+        icon = Icons.flag_rounded;
+        text = 'Game over';
+
+      case OnlineConnectionState.live:
+        final yourTurn = online.isLocalTurn;
+        color = yourTurn ? const Color(0xFF16A34A) : scheme.primary;
+        icon = yourTurn
+            ? Icons.play_circle_outline_rounded
+            : Icons.more_horiz_rounded;
+        text = yourTurn
+            ? 'Your turn'
+            : '${online.session?.opponent?.displayName ?? 'Opponent'} '
+                  'is thinking…';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (action != null) action,
+        ],
+      ),
+    );
+  }
+
+  Future<void> _copyRoomCode(String? code) async {
+    if (code == null) return;
+    await Clipboard.setData(ClipboardData(text: code));
+    if (mounted) _showGameMessage('Code $code copied');
+  }
+
   // --- Turn controls -------------------------------------------------------
 
   /// The strip under the board: who is playing, and what a tap will do.
@@ -891,7 +1102,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   /// pick a slot, rotate if needed, then confirm.
   Widget _buildTurnControls() {
     final state = _game.gameState;
-    final isAITurn = state.currentPlayer.isAI && !state.isGameOver;
+    final online = _online;
+
+    // Online, the opponent's turn is active but not ours, so the controls
+    // must be disabled even though the game is perfectly playable.
+    final isAITurn = online != null
+        ? !online.isLocalTurn
+        : state.currentPlayer.isAI && !state.isGameOver;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

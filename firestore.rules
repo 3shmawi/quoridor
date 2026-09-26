@@ -38,6 +38,11 @@ service cloud.firestore {
         return signedIn() && seatOf(data, request.auth.uid) != null;
       }
 
+      // The seat the caller does not occupy.
+      function otherSeat(data, uid) {
+        return seatOf(data, uid) == 1 ? 2 : 1;
+      }
+
       // A new game seats its creator as player 1 and starts empty.
       function isWellFormedNewGame() {
         return signedIn()
@@ -77,6 +82,26 @@ service cloud.firestore {
           && incoming().status in ['active', 'finished'];
       }
 
+      // Heartbeat: a player may refresh their own presence and nothing else.
+      //
+      // Presence writes happen every few seconds, so they must not be able to
+      // touch the board, the turn, the counter or the other player's seat --
+      // otherwise the heartbeat becomes a way around every other rule here.
+      function isValidPresenceUpdate() {
+        return isPlayer(existing())
+          && incoming().diff(existing()).affectedKeys().hasOnly(['players', 'updatedAt'])
+          && incoming().moveCount == existing().moveCount
+          && incoming().status == existing().status
+          && incoming().currentPlayerId == existing().currentPlayerId
+          && incoming().roomCode == existing().roomCode
+          && incoming().board == existing().board
+          // Only your own seat may change, and it stays yours.
+          && incoming().players[string(seatOf(existing(), request.auth.uid))].uid
+             == request.auth.uid
+          && incoming().players[string(otherSeat(existing(), request.auth.uid))]
+             == existing().players[string(otherSeat(existing(), request.auth.uid))];
+      }
+
       // Either player may abandon a game they are in.
       function isValidAbandon() {
         return isPlayer(existing())
@@ -94,7 +119,10 @@ service cloud.firestore {
       allow list: if signedIn();
 
       allow create: if isWellFormedNewGame();
-      allow update: if isValidJoin() || isValidMove() || isValidAbandon();
+      allow update: if isValidJoin()
+                    || isValidMove()
+                    || isValidPresenceUpdate()
+                    || isValidAbandon();
 
       // Games are never deleted by clients; cleanup is a scheduled job.
       allow delete: if false;

@@ -1,12 +1,12 @@
 # Online multiplayer — design plan
 
-Status: **phases 0 and 1 are implemented; phase 2 onwards is still a plan.**
+Status: **phases 0, 1 and 2 are implemented; phase 3 onwards is still a plan.**
 
-What exists today is the foundation, not a playable online game: a device
-identity, the stored data model, Security Rules, and a service that can create,
-join, watch and play a game. There is no lobby UI yet, so nothing in the app
-surfaces it — that is phase 2. The sections below describe the whole design;
-see [Implementation status](#implementation-status) for what is built.
+Online play is now reachable from the app: a player can create a game, share a
+six-character code, have a friend join it, play a full game, and rejoin one in
+progress. Clocks, resign and draw are not built. The sections below describe
+the whole design; see [Implementation status](#implementation-status) for what
+is built and what has and has not been verified.
 
 ## 1. What we are building
 
@@ -239,8 +239,8 @@ rule engine, and the audio service. That is the point of the split.
 |---|---|---|---|
 | 0 | Anonymous auth on launch; stable per-device identity | small | **done** |
 | 1 | Data model, Security Rules, `OnlineGameService`, private room codes | large | **done** |
-| 2 | Lobby UI, reconnect, presence | medium | next |
-| 3 | Clocks, resign, draw, timeout settlement Function | medium | |
+| 2 | Lobby UI, reconnect, presence | medium | **done** |
+| 3 | Clocks, resign, draw, timeout settlement Function | medium | next |
 | 4 | Public matchmaking queue + pairing Function | medium | |
 | 5 | Cloud Function move validation (TypeScript rule port) + revoke client writes | large | |
 | 6 | Ranked play, ELO — only once 5 is done | — | |
@@ -264,7 +264,7 @@ are what I would ship and measure before committing to the rest.
 
 ## Implementation status
 
-### Built (phases 0 and 1)
+### Built (phases 0, 1 and 2)
 
 | Piece | Where |
 |---|---|
@@ -275,6 +275,10 @@ are what I would ship and measure before committing to the rest.
 | Create / join / watch / submit move / abandon | `lib/flame/services/online/online_game_service.dart` |
 | Security Rules and the room-code index | `firestore.rules`, `firestore.indexes.json` |
 | `localPlayerId` so the board refuses input on the opponent's turn | `lib/flame/game/quoridor_game.dart` |
+| Session lifecycle, presence heartbeat, connection state | `lib/flame/services/online/online_game_controller.dart` |
+| Create / join by code / rejoin in progress | `lib/flame/pages/online_lobby_page.dart` |
+| Online banner, turn gating, leave game | `lib/flame/pages/game_page.dart` |
+| Security Rules tests against the emulator | `test/rules/` |
 
 Decisions worth recording, because the code now depends on them:
 
@@ -291,25 +295,42 @@ Decisions worth recording, because the code now depends on them:
 - **The rules are checked twice**, by the submitting client before the write
   and again by the receiving client when the move arrives. Security Rules
   cannot express pathfinding, so they enforce structure and turn order only.
+- **The local board follows the server, not the tap.** A move is not applied
+  optimistically: it is submitted, and the board changes when the change comes
+  back. A refused move therefore never appears to have happened, which is what
+  keeps two clients from drifting apart.
+- **The heartbeat is its own Security Rule.** Presence writes land every ten
+  seconds, so `isValidPresenceUpdate` pins them to the writer's own seat and
+  forbids them touching the board, status, turn or counter — otherwise the
+  heartbeat would be a way around every other rule. Four tests cover that.
+- **Presence timeout is three missed heartbeats** (35s against a 10s beat), so
+  one slow round trip does not show a false "opponent away".
+
+### What has actually been verified
+
+Being precise about this matters, because the gap is real:
+
+- **Verified.** The Security Rules, against the Firestore emulator — 30 tests
+  covering creates, joins, moves, the move counter, presence, the append-only
+  move log, and reads by non-players. These run in CI.
+- **Verified.** The pure client layers: room codes, seat and turn resolution,
+  the wire format. 62 Dart tests in total.
+- **Verified.** That the lobby and the game screen render, and that local play
+  is unaffected.
+- **Not verified.** The end-to-end flow against a live Firestore: create, share
+  the code, join from a second device, play a game to a win. The client
+  transactions are exercised only by the rules tests' stand-ins, not by the Dart
+  code itself. **This needs a real two-device run before anyone would call it
+  shippable.**
 
 ### Not built yet
 
-Everything from phase 2 on. Most immediately missing:
-
-- **A lobby.** No screen creates or joins a game, so online play is not
-  reachable from the app. This is the whole of phase 2 and the next thing to
-  build.
-- **Presence and reconnect.** `connected` and `lastSeen` are in the schema and
-  written on join, but nothing heartbeats them and nothing reacts to a
-  disconnect.
 - **Clocks.** Deliberately left out rather than half-implemented: they must be
   server-referenced to be either fair or cheat-resistant, which is phase 3.
 - **Resign and draw.** `abandon` exists as a blunt instrument; the proper
   outcome flow is phase 3.
-- **Integration tests against the emulator.** The pure layers — codec, room
-  codes, session — are unit tested. The Firestore transactions are not, because
-  that needs the Firestore emulator in CI. Worth adding when phase 2 makes the
-  flow reachable end to end.
+- **Abandoned-game cleanup.** Nothing removes games nobody returns to.
+- **Public matchmaking**, server-side validation, ranked play — phases 4 to 6.
 
 ### Deploying the rules
 
@@ -319,4 +340,16 @@ The rules are not live until they are pushed to the project:
 firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-Until then the default rules apply, and online play will be refused.
+Until then the project's existing rules apply, and online play will be refused.
+Anonymous authentication must also be enabled in the Firebase console
+(Authentication → Sign-in method → Anonymous).
+
+### Running the rules tests
+
+```bash
+cd test/rules && npm install && cd ../..
+npx firebase-tools emulators:exec --only firestore \
+  --project quoridor-rules-test "cd test/rules && npm test"
+```
+
+Requires Node and a JRE, since the Firestore emulator runs on the JVM.

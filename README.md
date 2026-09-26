@@ -110,6 +110,15 @@ flutter test
 flutter analyze
 ```
 
+The Firestore Security Rules have their own suite, run against the emulator.
+It needs Node and a JRE:
+
+```bash
+cd test/rules && npm install && cd ../..
+npx firebase-tools emulators:exec --only firestore \
+  --project quoridor-rules-test "cd test/rules && npm test"
+```
+
 ## Configuration
 
 ### The AI opponent
@@ -161,10 +170,11 @@ lib/
     │   ├── audio_service.dart   Pooled, preloaded sound effects
     │   ├── identity_service.dart Anonymous per-device identity
     │   ├── firebase_service.dart Save / load games
-    │   └── online/              Online play (no UI yet — see the plan)
+    │   └── online/              Online play
     │       ├── room_code.dart
     │       ├── online_game_codec.dart
-    │       └── online_game_service.dart
+    │       ├── online_game_service.dart
+    │       └── online_game_controller.dart
     └── pages/
         ├── game_page.dart       Game screen, turn controls, settings drawer
         └── menu_page.dart       Saved games
@@ -187,10 +197,16 @@ rules before making a fork public.
 
 ## Online multiplayer
 
-The groundwork is in place — device identity, the data model, Security Rules
-and a service that can create, join, watch and play a game — but **there is no
-lobby yet, so online play is not reachable from the app**. That screen is the
-next piece of work.
+Play a friend on another device. **Play Online** in the game-mode sheet gives
+you a six-character code; share it and they join with it. Games in progress can
+be rejoined from the same screen.
+
+The code alphabet leaves out `I`, `L` and `0`, and the join field folds a typed
+`0` onto `O` and `I` or `L` onto `1`, so a code read aloud over the phone still
+works.
+
+Clocks, resign and draw are not built yet — see the plan for what is and is not
+done, and for what has actually been verified.
 
 Deploying the Security Rules is a separate step from shipping the app; until
 they are pushed, online play is refused:
@@ -212,7 +228,7 @@ what is and is not built.
 - [x] Responsive board that scales to the device
 - [x] Wall placement with live validity feedback
 - [x] Online groundwork: identity, data model, Security Rules, game service
-- [ ] Online lobby: create, join by code, reconnect
+- [x] Online lobby: create, join by code, rejoin, presence
 - [ ] Clocks, resign and draw
 - [ ] Public matchmaking
 - [ ] Server-authoritative move validation

@@ -53,6 +53,15 @@ class QuoridorGame extends FlameGame
   /// so the surrounding page can rebuild its controls.
   VoidCallback? onInteractionChanged;
 
+  /// When set, a validated move is handed to this instead of being applied
+  /// locally.
+  ///
+  /// This is what makes an online game different from a local one: the board
+  /// shown here follows the server's copy rather than advancing on its own, so
+  /// a move the server refuses never appears to have happened. Returning false
+  /// leaves the board exactly as it was.
+  Future<bool> Function(GameMove move)? onSubmitMove;
+
   @override
   Future<void> onLoad() async {
     // Initialize game state
@@ -203,6 +212,16 @@ class QuoridorGame extends FlameGame
   }
 
   Future<void> _processMove(GameMove move) async {
+    final submit = onSubmitMove;
+    if (submit != null) {
+      // Online: the server decides. The board updates when the change comes
+      // back through the game listener, not here.
+      HapticFeedback.selectionClick();
+      final accepted = await submit(move);
+      if (!accepted) HapticFeedback.lightImpact();
+      return;
+    }
+
     try {
       final newGameState = await GameManager.processPlayerMove(
         _gameState!,

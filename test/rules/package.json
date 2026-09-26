@@ -1,0 +1,14 @@
+{
+  "name": "quoridor-firestore-rules-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Security Rules tests for online Quoridor games, run against the Firestore emulator.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test rules.test.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0"
+  }
+}
