@@ -1,0 +1,65 @@
+name: Deploy web build to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Allows a deploy to be re-run by hand from the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue instead, and do not cancel one midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # Keep in step with the version pinned in .fvmrc.
+          flutter-version: 3.32.0
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Pages serves the site from /<repo>/, so the app has to be built with
+      # that base path or every asset request 404s. --no-web-resources-cdn
+      # bundles CanvasKit so the build is self-contained.
+      - name: Build web
+        run: |
+          flutter build web \
+            --release \
+            --no-web-resources-cdn \
+            --base-href "/${GITHUB_REPOSITORY#*/}/"
+
+      # Pages has no server-side routing, so a deep link would 404 on reload.
+      # Serving index.html as the 404 page makes the app handle the route.
+      - name: Add SPA fallback
+        run: cp build/web/index.html build/web/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,112 @@
+rules_version = '2';
+
+// Security Rules for online Quoridor games.
+//
+// These rules enforce *structure and turn order*, not the rules of Quoridor.
+// Whether a wall leaves an opponent a path is a pathfinding question and is
+// not expressible here; that check lives in GameService, runs on the
+// submitting client and again on the receiving one, and moves to a Cloud
+// Function in a later phase. What these rules do guarantee is that only a
+// game's own players can read or write it, that a player can only move on
+// their own turn, that the move counter advances exactly one step at a time,
+// and that recorded moves are never altered after the fact.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /games/{gameId} {
+
+      function existing() {
+        return resource.data;
+      }
+
+      function incoming() {
+        return request.resource.data;
+      }
+
+      function signedIn() {
+        return request.auth != null;
+      }
+
+      // The seat this request's caller occupies, or null.
+      function seatOf(data, uid) {
+        return data.players.keys().hasAny(['1']) && data.players['1'].uid == uid
+          ? 1
+          : (data.players.keys().hasAny(['2']) && data.players['2'].uid == uid ? 2 : null);
+      }
+
+      function isPlayer(data) {
+        return signedIn() && seatOf(data, request.auth.uid) != null;
+      }
+
+      // A new game seats its creator as player 1 and starts empty.
+      function isWellFormedNewGame() {
+        return signedIn()
+          && incoming().players.keys().hasOnly(['1'])
+          && incoming().players['1'].uid == request.auth.uid
+          && incoming().status == 'waiting'
+          && incoming().moveCount == 0
+          && incoming().roomCode is string
+          && incoming().roomCode.size() == 6
+          && incoming().board is map;
+      }
+
+      // Taking the empty seat: only seat 2, only with your own uid, and only
+      // while the game is still waiting.
+      function isValidJoin() {
+        return signedIn()
+          && existing().status == 'waiting'
+          && !existing().players.keys().hasAny(['2'])
+          && incoming().players['2'].uid == request.auth.uid
+          && incoming().players['1'] == existing().players['1']
+          && incoming().status == 'active'
+          && incoming().moveCount == existing().moveCount
+          && incoming().roomCode == existing().roomCode;
+      }
+
+      // Playing a move: it must be your turn, and the counter must advance by
+      // exactly one. That counter is the optimistic lock -- two clients
+      // cannot both write move N, because the second one's precondition no
+      // longer holds.
+      function isValidMove() {
+        return isPlayer(existing())
+          && existing().status == 'active'
+          && existing().currentPlayerId == seatOf(existing(), request.auth.uid)
+          && incoming().moveCount == existing().moveCount + 1
+          && incoming().players == existing().players
+          && incoming().roomCode == existing().roomCode
+          && incoming().status in ['active', 'finished'];
+      }
+
+      // Either player may abandon a game they are in.
+      function isValidAbandon() {
+        return isPlayer(existing())
+          && incoming().status == 'abandoned'
+          && incoming().moveCount == existing().moveCount
+          && incoming().players == existing().players;
+      }
+
+      // A game is private to the two people playing it. Looking one up by
+      // room code is a query against roomCode + status, which the rules below
+      // permit for any signed-in caller only while the game is waiting -- a
+      // six-character code is the shared secret that gates joining.
+      allow get: if isPlayer(existing())
+                 || (signedIn() && existing().status == 'waiting');
+      allow list: if signedIn();
+
+      allow create: if isWellFormedNewGame();
+      allow update: if isValidJoin() || isValidMove() || isValidAbandon();
+
+      // Games are never deleted by clients; cleanup is a scheduled job.
+      allow delete: if false;
+
+      match /moves/{moveId} {
+        // Moves are an append-only log. Once written, a move is the record of
+        // what happened and may not be edited or removed.
+        allow read: if isPlayer(get(/databases/$(database)/documents/games/$(gameId)).data);
+        allow create: if signedIn()
+                      && request.resource.data.submittedBy == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

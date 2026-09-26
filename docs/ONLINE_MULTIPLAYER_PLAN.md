@@ -1,8 +1,12 @@
 # Online multiplayer — design plan
 
-Status: **proposal, not yet implemented.** This document is the plan we agreed
-to write up before building anything, so that the first line of networking code
-lands against a decided architecture.
+Status: **phases 0 and 1 are implemented; phase 2 onwards is still a plan.**
+
+What exists today is the foundation, not a playable online game: a device
+identity, the stored data model, Security Rules, and a service that can create,
+join, watch and play a game. There is no lobby UI yet, so nothing in the app
+surfaces it — that is phase 2. The sections below describe the whole design;
+see [Implementation status](#implementation-status) for what is built.
 
 ## 1. What we are building
 
@@ -231,15 +235,15 @@ rule engine, and the audio service. That is the point of the split.
 
 ## 6. Phasing
 
-| Phase | Deliverable | Rough size |
-|---|---|---|
-| 0 | Anonymous auth on launch; stable per-device identity | small |
-| 1 | Data model, Security Rules, `OnlineGameService`, private room codes | large |
-| 2 | Lobby UI, reconnect, presence | medium |
-| 3 | Clocks, resign, draw, timeout settlement Function | medium |
-| 4 | Public matchmaking queue + pairing Function | medium |
-| 5 | Cloud Function move validation (TypeScript rule port) + revoke client writes | large |
-| 6 | Ranked play, ELO — only once 5 is done | — |
+| Phase | Deliverable | Rough size | Status |
+|---|---|---|---|
+| 0 | Anonymous auth on launch; stable per-device identity | small | **done** |
+| 1 | Data model, Security Rules, `OnlineGameService`, private room codes | large | **done** |
+| 2 | Lobby UI, reconnect, presence | medium | next |
+| 3 | Clocks, resign, draw, timeout settlement Function | medium | |
+| 4 | Public matchmaking queue + pairing Function | medium | |
+| 5 | Cloud Function move validation (TypeScript rule port) + revoke client writes | large | |
+| 6 | Ranked play, ELO — only once 5 is done | — | |
 
 Phases 0–2 are the smallest thing that is actually playable with a friend, and
 are what I would ship and measure before committing to the rest.
@@ -257,3 +261,62 @@ are what I would ship and measure before committing to the rest.
   TTL cleanup in the same phase as the clock, not later.
 - **Deferred anti-cheat.** Known and accepted for v1, as long as ranked play
   waits for phase 5.
+
+## Implementation status
+
+### Built (phases 0 and 1)
+
+| Piece | Where |
+|---|---|
+| Anonymous auth, stable device identity, generated display name | `lib/flame/services/identity_service.dart` |
+| Room codes: generation, normalizing, validation | `lib/flame/services/online/room_code.dart` |
+| Session model, seat resolution, turn ownership | `lib/flame/models/online_session.dart` |
+| Wire format for games and moves | `lib/flame/services/online/online_game_codec.dart` |
+| Create / join / watch / submit move / abandon | `lib/flame/services/online/online_game_service.dart` |
+| Security Rules and the room-code index | `firestore.rules`, `firestore.indexes.json` |
+| `localPlayerId` so the board refuses input on the opponent's turn | `lib/flame/game/quoridor_game.dart` |
+
+Decisions worth recording, because the code now depends on them:
+
+- **Room code alphabet excludes `I`, `L` and `0`.** Codes get read aloud, so
+  `normalize` folds a typed `0` onto `O` and a typed `I` or `L` onto `1`. A
+  player who mishears a code still joins the right game.
+- **Seat 2 is written with the dotted path `players.2`.** Writing a nested
+  `players` map would replace the whole object and wipe player 1.
+- **Move documents are zero-padded to six digits.** Lexical ordering is the
+  only ordering Firestore gives for free, and this makes it match play order.
+- **`moveCount` is asserted inside the transaction**, not read beforehand.
+  That assertion is the entire concurrency story: two clients cannot both
+  write move N.
+- **The rules are checked twice**, by the submitting client before the write
+  and again by the receiving client when the move arrives. Security Rules
+  cannot express pathfinding, so they enforce structure and turn order only.
+
+### Not built yet
+
+Everything from phase 2 on. Most immediately missing:
+
+- **A lobby.** No screen creates or joins a game, so online play is not
+  reachable from the app. This is the whole of phase 2 and the next thing to
+  build.
+- **Presence and reconnect.** `connected` and `lastSeen` are in the schema and
+  written on join, but nothing heartbeats them and nothing reacts to a
+  disconnect.
+- **Clocks.** Deliberately left out rather than half-implemented: they must be
+  server-referenced to be either fair or cheat-resistant, which is phase 3.
+- **Resign and draw.** `abandon` exists as a blunt instrument; the proper
+  outcome flow is phase 3.
+- **Integration tests against the emulator.** The pure layers — codec, room
+  codes, session — are unit tested. The Firestore transactions are not, because
+  that needs the Firestore emulator in CI. Worth adding when phase 2 makes the
+  flow reachable end to end.
+
+### Deploying the rules
+
+The rules are not live until they are pushed to the project:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Until then the default rules apply, and online play will be refused.

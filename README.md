@@ -7,6 +7,11 @@ never quite sealing them in, because that is against the rules.
 Play against an AI opponent or against a friend on the same device. Runs on
 Android, iOS, web, macOS, Windows and Linux from one codebase.
 
+**[▶ Play it in your browser](https://3shmawi.github.io/quoridor/)** — the web
+build is deployed to GitHub Pages from `main` on every push.
+
+[![CI](https://github.com/3shmawi/quoridor/actions/workflows/ci.yml/badge.svg)](https://github.com/3shmawi/quoridor/actions/workflows/ci.yml)
+[![Pages](https://github.com/3shmawi/quoridor/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/3shmawi/quoridor/actions/workflows/deploy-pages.yml)
 [![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-blue)](#)
 [![Flutter](https://img.shields.io/badge/Flutter-3.32-02569B?logo=flutter)](https://flutter.dev)
 [![Engine](https://img.shields.io/badge/Flame-1.29-orange)](https://flame-engine.org)
@@ -154,7 +159,12 @@ lib/
     │   ├── game_service.dart    Move validation and execution (pure, no UI)
     │   ├── ai_service.dart      AI opponent
     │   ├── audio_service.dart   Pooled, preloaded sound effects
-    │   └── firebase_service.dart Save / load games
+    │   ├── identity_service.dart Anonymous per-device identity
+    │   ├── firebase_service.dart Save / load games
+    │   └── online/              Online play (no UI yet — see the plan)
+    │       ├── room_code.dart
+    │       ├── online_game_codec.dart
+    │       └── online_game_service.dart
     └── pages/
         ├── game_page.dart       Game screen, turn controls, settings drawer
         └── menu_page.dart       Saved games
@@ -175,12 +185,37 @@ Those are designed to be shipped inside client apps and are not secrets, but
 they are only safe if your Firestore Security Rules are restrictive. Check your
 rules before making a fork public.
 
+## Online multiplayer
+
+The groundwork is in place — device identity, the data model, Security Rules
+and a service that can create, join, watch and play a game — but **there is no
+lobby yet, so online play is not reachable from the app**. That screen is the
+next piece of work.
+
+Deploying the Security Rules is a separate step from shipping the app; until
+they are pushed, online play is refused:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Anonymous authentication must also be enabled in the Firebase console
+(Authentication → Sign-in method → Anonymous).
+
+See [`docs/ONLINE_MULTIPLAYER_PLAN.md`](docs/ONLINE_MULTIPLAYER_PLAN.md) for
+the architecture, the Firebase/Supabase decision, the stored data model, and
+what is and is not built.
+
 ## Roadmap
 
 - [x] Local two-player and AI games
 - [x] Responsive board that scales to the device
 - [x] Wall placement with live validity feedback
-- [ ] Online multiplayer — [design plan](docs/ONLINE_MULTIPLAYER_PLAN.md)
+- [x] Online groundwork: identity, data model, Security Rules, game service
+- [ ] Online lobby: create, join by code, reconnect
+- [ ] Clocks, resign and draw
+- [ ] Public matchmaking
+- [ ] Server-authoritative move validation
 - [ ] Ranked play
 
 ## Credits
