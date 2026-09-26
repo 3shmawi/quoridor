@@ -379,6 +379,116 @@ class OnlineGameService {
     }
   }
 
+  /// Refreshes this player's presence on [gameId].
+  ///
+  /// Written as dotted paths so only this player's own seat is touched; the
+  /// Security Rules refuse a presence write that reaches anything else.
+  Future<void> heartbeat(String gameId, int seat) async {
+    final games = _games;
+    if (games == null) return;
+    try {
+      await games.doc(gameId).update({
+        'players.$seat.connected': true,
+        'players.$seat.lastSeen': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      // A missed heartbeat is not worth surfacing: the next one covers it,
+      // and the opponent simply sees this player as away until then.
+      debugPrint('OnlineGameService: heartbeat failed: $error');
+    }
+  }
+
+  /// Marks this player as away, for a clean exit rather than a timeout.
+  Future<void> markAway(String gameId, int seat) async {
+    final games = _games;
+    if (games == null) return;
+    try {
+      await games.doc(gameId).update({
+        'players.$seat.connected': false,
+        'players.$seat.lastSeen': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      debugPrint('OnlineGameService: markAway failed: $error');
+    }
+  }
+
+  /// Reads a game once, for resuming a session.
+  Future<OnlineResult<OnlineSession>> resume(String gameId) async {
+    final games = _games;
+    final identity = await IdentityService.instance.ensureSignedIn();
+    if (games == null || identity == null) {
+      return const OnlineResult.failed(OnlineFailure.unavailable);
+    }
+
+    try {
+      final snapshot = await games.doc(gameId).get();
+      final data = snapshot.data();
+      if (data == null) {
+        return const OnlineResult.failed(OnlineFailure.gameNotFound);
+      }
+
+      final game = OnlineGameCodec.decodeGame(snapshot.id, data);
+      final session = OnlineSession.forUid(game, identity.uid);
+      if (!session.isParticipant) {
+        return const OnlineResult.failed(OnlineFailure.gameNotFound);
+      }
+      return OnlineResult.success(session);
+    } catch (error) {
+      debugPrint('OnlineGameService: resume failed: $error');
+      return OnlineResult.failed(OnlineFailure.backendError, '$error');
+    }
+  }
+
+  /// Games this player is still in, newest first. Used to offer a rejoin.
+  Future<List<OnlineGame>> myActiveGames({int limit = 5}) async {
+    final games = _games;
+    final identity = IdentityService.instance.current;
+    if (games == null || identity == null) return const [];
+
+    final results = <String, OnlineGame>{};
+
+    // Firestore has no OR across fields, so each seat is a separate query.
+    for (final seat in [1, 2]) {
+      try {
+        final snapshot = await games
+            .where(
+              FieldPath(['players', '$seat', 'uid']),
+              isEqualTo: identity.uid,
+            )
+            .where(
+              'status',
+              whereIn: [
+                OnlineGameStatus.waiting.name,
+                OnlineGameStatus.active.name,
+              ],
+            )
+            .limit(limit)
+            .get();
+
+        for (final doc in snapshot.docs) {
+          try {
+            results[doc.id] = OnlineGameCodec.decodeGame(doc.id, doc.data());
+          } catch (_) {
+            // Skip a game we cannot read rather than losing the whole list.
+          }
+        }
+      } catch (error) {
+        debugPrint('OnlineGameService: myActiveGames seat $seat: $error');
+      }
+    }
+
+    final list = results.values.toList()
+      ..sort((a, b) {
+        final aTime = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bTime = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bTime.compareTo(aTime);
+      });
+
+    return list.take(limit).toList();
+  }
+
   /// Replays the stored move list, which is the authoritative record.
   ///
   /// Used to verify the cached board and, later, to rebuild a game on

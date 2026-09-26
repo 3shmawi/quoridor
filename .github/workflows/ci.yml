@@ -43,3 +43,36 @@ jobs:
       # game builds with no API key configured.
       - name: Build web
         run: flutter build web --release --no-web-resources-cdn
+
+  rules:
+    name: Firestore Security Rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: test/rules/package.json
+
+      # The Firestore emulator runs on the JVM.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install rules test dependencies
+        working-directory: test/rules
+        run: npm install
+
+      # The rules are the boundary that has to hold even against a modified
+      # client, so they get tested against the real emulator rather than
+      # trusted by inspection.
+      - name: Test rules against the Firestore emulator
+        run: >
+          npx --yes firebase-tools@13 emulators:exec
+          --only firestore
+          --project quoridor-rules-test
+          "cd test/rules && npm test"

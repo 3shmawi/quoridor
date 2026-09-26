@@ -53,6 +53,15 @@ class QuoridorGame extends FlameGame
   /// so the surrounding page can rebuild its controls.
   VoidCallback? onInteractionChanged;
 
+  /// When set, a validated move is handed to this instead of being applied
+  /// locally.
+  ///
+  /// This is what makes an online game different from a local one: the board
+  /// shown here follows the server's copy rather than advancing on its own, so
+  /// a move the server refuses never appears to have happened. Returning false
+  /// leaves the board exactly as it was.
+  Future<bool> Function(GameMove move)? onSubmitMove;
+
   @override
   Future<void> onLoad() async {
     // Initialize game state
@@ -203,6 +212,16 @@ class QuoridorGame extends FlameGame
   }
 
   Future<void> _processMove(GameMove move) async {
+    final submit = onSubmitMove;
+    if (submit != null) {
+      // Online: the server decides. The board updates when the change comes
+      // back through the game listener, not here.
+      HapticFeedback.selectionClick();
+      final accepted = await submit(move);
+      if (!accepted) HapticFeedback.lightImpact();
+      return;
+    }
+
     try {
       final newGameState = await GameManager.processPlayerMove(
         _gameState!,
@@ -237,40 +256,6 @@ class QuoridorGame extends FlameGame
 
   void showValidMoves(bool show) {
     _boardComponent.showValidMoves = show;
-  }
-
-  // --- Board interaction ---------------------------------------------------
-
-  BoardInteractionMode get boardMode => _boardComponent.mode;
-
-  set boardMode(BoardInteractionMode value) => _boardComponent.mode = value;
-
-  /// The wall the player is lining up, before committing it.
-  Wall? get pendingWall => _boardComponent.pendingWall;
-
-  /// Whether the pending wall is legal, with the reason when it is not.
-  WallPlacementResult? get pendingWallResult =>
-      _boardComponent.pendingWallResult;
-
-  bool get canCommitPendingWall => _boardComponent.canCommitPendingWall;
-
-  void rotatePendingWall() => _boardComponent.rotatePendingWall();
-
-  void cancelPendingWall() => _boardComponent.cancelPendingWall();
-
-  /// Commits the pending wall, reporting why nothing happened when it cannot
-  /// be placed.
-  void commitPendingWall() {
-    if (_boardComponent.pendingWall == null) {
-      onGameMessage?.call('Tap the board to choose where the wall goes');
-      return;
-    }
-
-    if (!_boardComponent.commitPendingWall()) {
-      final reason = _boardComponent.pendingWallResult?.message;
-      onGameMessage?.call(reason ?? 'That wall cannot go there');
-      HapticFeedback.lightImpact();
-    }
   }
 
   void togglePlayerMode() {

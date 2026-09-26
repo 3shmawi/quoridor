@@ -8,21 +8,11 @@ import 'models/game_state.dart';
 import 'services/game_service.dart';
 import 'wall_component.dart';
 
-/// What a tap on the board means right now.
-///
-/// Walls used to share the pawn's tap handler and were triggered by hitting a
-/// narrow strip near a cell edge, which players could not see and mostly
-/// discovered by accident. Splitting the two intents into explicit modes makes
-/// every tap unambiguous and lets the board advertise what it expects.
-enum BoardInteractionMode { move, wall }
-
 class BoardComponent extends PositionComponent {
   GameState _gameState;
 
   /// Highlights the squares the current player can step onto.
   bool showValidMoves = true;
-
-  BoardInteractionMode _mode = BoardInteractionMode.move;
 
   Function(Position)? onMoveAttempted;
   Function(Wall)? onWallPlaceAttempted;
@@ -36,8 +26,6 @@ class BoardComponent extends PositionComponent {
   /// The wall the player is lining up but has not committed yet.
   Wall? _pendingWall;
   WallPlacementResult? _pendingResult;
-  WallOrientation _orientation = WallOrientation.horizontal;
-
   late final WallComponent _wallComponent;
 
   BoardMetrics _metrics = BoardMetrics.fit(Size.zero);
@@ -49,8 +37,6 @@ class BoardComponent extends PositionComponent {
     _refreshValidMoves();
   }
 
-  BoardInteractionMode get mode => _mode;
-
   /// The wall currently being lined up, if any.
   Wall? get pendingWall => _pendingWall;
 
@@ -61,27 +47,12 @@ class BoardComponent extends PositionComponent {
 
   BoardMetrics get metrics => _metrics;
 
-  set mode(BoardInteractionMode value) {
-    if (_mode == value) return;
-    _mode = value;
-    _clearPendingWall();
-    _refreshValidMoves();
-    _wallComponent.showSlots = value == BoardInteractionMode.wall;
-    onInteractionChanged?.call();
-  }
-
   void updateGameState(GameState newGameState) {
     _gameState = newGameState;
     _wallComponent.gameState = newGameState;
     _clearPendingWall();
     _refreshValidMoves();
-
-    // A player with no walls left can only move.
-    if (_mode == BoardInteractionMode.wall &&
-        !newGameState.currentPlayer.hasWallsRemaining) {
-      _mode = BoardInteractionMode.move;
-      _wallComponent.showSlots = false;
-    }
+    _wallComponent.showSlots = newGameState.currentPlayer.hasWallsRemaining;
     onInteractionChanged?.call();
   }
 
@@ -109,54 +80,54 @@ class BoardComponent extends PositionComponent {
     _ensureMetrics();
     final offset = Offset(position.x, position.y);
 
-    if (_mode == BoardInteractionMode.wall) {
-      _handleWallTap(offset);
-    } else {
-      _handleMoveTap(offset);
-    }
-  }
-
-  void _handleMoveTap(Offset offset) {
+    // Moving takes priority, but only on a square that is actually offered:
+    // the legal squares are the few glowing circles, so a tap on one is never
+    // ambiguous. Every other tap on the board is aiming a wall.
     final tapped = _metrics.positionAt(offset);
-    if (tapped == null) return;
-
-    // Pawns no longer have to be selected before moving: the legal squares are
-    // always on screen, so one tap on a highlighted square is the whole move.
-    if (_validMoves.contains(tapped)) {
-      onMoveAttempted?.call(tapped);
+    if (tapped != null && _validMoves.contains(tapped)) {
+      final center = _metrics.cellCenter(tapped);
+      if ((offset - center).distance <= _metrics.cellSize * 0.5) {
+        _clearPendingWall();
+        onMoveAttempted?.call(tapped);
+        return;
+      }
     }
+
+    if (_gameState.currentPlayer.hasWallsRemaining) _aimWall(offset);
   }
 
-  void _handleWallTap(Offset offset) {
-    // Any tap on the board snaps to the closest slot, so the player never has
-    // to hit a thin target.
+  /// Places, rotates or moves the wall being lined up, from one tap.
+  ///
+  /// The slot is the nearest gap between cells, and the orientation is
+  /// whichever groove the tap sits closer to — so nudging the tap towards the
+  /// other groove turns the wall, and there is no rotate button to find.
+  /// Tapping the same wall a second time commits it.
+  void _aimWall(Offset offset) {
     final slot = _metrics.nearestIntersection(offset);
+    final centre = _metrics.intersectionCenter(slot.row, slot.col);
+
+    final orientation =
+        (offset.dy - centre.dy).abs() <= (offset.dx - centre.dx).abs()
+        ? WallOrientation.horizontal
+        : WallOrientation.vertical;
+
     final candidate = BoardMetrics.wallAtIntersection(
       slot.row,
       slot.col,
-      _orientation,
+      orientation,
     );
 
-    _setPendingWall(candidate);
-  }
-
-  /// Flips the pending wall between horizontal and vertical, keeping it on the
-  /// same slot.
-  void rotatePendingWall() {
-    _orientation = _orientation == WallOrientation.horizontal
-        ? WallOrientation.vertical
-        : WallOrientation.horizontal;
-
-    final current = _pendingWall;
-    if (current == null) {
+    // Second tap on the same wall confirms it.
+    if (_pendingWall == candidate) {
+      if (_pendingResult?.isValid ?? false) {
+        onWallPlaceAttempted?.call(candidate);
+        _clearPendingWall();
+      }
       onInteractionChanged?.call();
       return;
     }
 
-    final slot = BoardMetrics.intersectionOfWall(current);
-    _setPendingWall(
-      BoardMetrics.wallAtIntersection(slot.row, slot.col, _orientation),
-    );
+    _setPendingWall(candidate);
   }
 
   void _setPendingWall(Wall wall) {
@@ -172,16 +143,6 @@ class BoardComponent extends PositionComponent {
     onInteractionChanged?.call();
   }
 
-  /// Commits the pending wall. Returns false when there is nothing legal to
-  /// place, leaving the ghost on screen so the player can adjust it.
-  bool commitPendingWall() {
-    final wall = _pendingWall;
-    if (wall == null || !(_pendingResult?.isValid ?? false)) return false;
-
-    onWallPlaceAttempted?.call(wall);
-    return true;
-  }
-
   void cancelPendingWall() {
     _clearPendingWall();
     onInteractionChanged?.call();
@@ -194,9 +155,14 @@ class BoardComponent extends PositionComponent {
   }
 
   void handleHover(Vector2 position) {
-    if (_mode != BoardInteractionMode.wall) return;
     _ensureMetrics();
-    _handleWallTap(Offset(position.x, position.y));
+    final offset = Offset(position.x, position.y);
+    final tapped = _metrics.positionAt(offset);
+    if (tapped != null && _validMoves.contains(tapped)) {
+      _wallComponent.previewWall = null;
+      return;
+    }
+    if (_gameState.currentPlayer.hasWallsRemaining) _aimWall(offset);
   }
 
   void _refreshValidMoves() {
@@ -278,11 +244,7 @@ class BoardComponent extends PositionComponent {
   }
 
   void _drawValidMoves(Canvas canvas) {
-    if (!showValidMoves ||
-        _mode != BoardInteractionMode.move ||
-        _validMoves.isEmpty) {
-      return;
-    }
+    if (!showValidMoves || _validMoves.isEmpty) return;
 
     final color = _gameState.currentPlayerId == 1
         ? const Color(GameConstants.player1Color)

@@ -26,13 +26,13 @@ build is deployed to GitHub Pages from `main` on every push.
 
 ## Screenshots
 
-| Choose a game mode | Move mode | Wall mode |
+| Choose a game mode | The board | Aiming a wall |
 |---|---|---|
-| ![Game mode selection](docs/screenshots/01-game-mode.png) | ![Move mode showing legal squares](docs/screenshots/02-move-mode.png) | ![Wall mode showing wall slots](docs/screenshots/03-wall-mode.png) |
+| ![Game mode selection](docs/screenshots/01-game-mode.png) | ![The board, with reachable squares ringed](docs/screenshots/02-board.png) | ![A wall previewed in green](docs/screenshots/03-wall-aim.png) |
 
-| Aiming a wall | Wall placed | Settings |
-|---|---|---|
-| ![Wall preview validated as legal](docs/screenshots/04-wall-aim.png) | ![A placed wall on the board](docs/screenshots/05-walls-placed.png) | ![Settings drawer](docs/screenshots/06-menu.png) |
+| Wall placed | Settings |
+|---|---|
+| ![A placed wall on the board](docs/screenshots/04-wall-placed.png) | ![Settings drawer](docs/screenshots/05-menu.png) |
 
 All screenshots are from the web build, captured at phone size.
 
@@ -57,18 +57,18 @@ are tinted on the board in the owner's colour.
 
 ### The controls
 
-The board is in one of two modes at a time, chosen with the two buttons under
-the board:
+There are none — the board is the whole interface.
 
-- **Move** — every square you can legally step to is ringed in your colour. Tap
-  one to go there. That is the whole move; there is no pawn to select first.
-- **Wall (n)** — small dots appear at every slot a wall can occupy. Tap
-  anywhere near where you want the wall and it snaps to the nearest slot, then
-  use **Rotate** to flip it between horizontal and vertical. The preview is
-  green when the wall is legal and red when it is not, with the reason spelled
-  out above the buttons ("Walls cannot cross each other", "This would leave a
-  player with no way to their goal"). Nothing is committed until you tap
-  **Place wall**.
+- **To move**, tap one of the squares ringed in your colour. Those are exactly
+  the squares you can legally reach, so there is no pawn to select first and
+  nothing to read.
+- **To place a wall**, tap the gap between two squares. Faint dots mark every
+  gap a wall can go in. The wall appears green if it can go there and red if it
+  cannot, and a second tap on the same spot places it. Aiming slightly nearer
+  the other gap turns the wall, so there is no rotate button either.
+
+Under the board is a single line with each player's name and how many walls
+they have left; the player to move is the bold one.
 
 ## Running it
 
@@ -108,6 +108,15 @@ flutter run -d macos     # or windows, linux
 ```bash
 flutter test
 flutter analyze
+```
+
+The Firestore Security Rules have their own suite, run against the emulator.
+It needs Node and a JRE:
+
+```bash
+cd test/rules && npm install && cd ../..
+npx firebase-tools emulators:exec --only firestore \
+  --project quoridor-rules-test "cd test/rules && npm test"
 ```
 
 ## Configuration
@@ -161,10 +170,11 @@ lib/
     │   ├── audio_service.dart   Pooled, preloaded sound effects
     │   ├── identity_service.dart Anonymous per-device identity
     │   ├── firebase_service.dart Save / load games
-    │   └── online/              Online play (no UI yet — see the plan)
+    │   └── online/              Online play
     │       ├── room_code.dart
     │       ├── online_game_codec.dart
-    │       └── online_game_service.dart
+    │       ├── online_game_service.dart
+    │       └── online_game_controller.dart
     └── pages/
         ├── game_page.dart       Game screen, turn controls, settings drawer
         └── menu_page.dart       Saved games
@@ -187,10 +197,16 @@ rules before making a fork public.
 
 ## Online multiplayer
 
-The groundwork is in place — device identity, the data model, Security Rules
-and a service that can create, join, watch and play a game — but **there is no
-lobby yet, so online play is not reachable from the app**. That screen is the
-next piece of work.
+Play a friend on another device. **Play Online** in the game-mode sheet gives
+you a six-character code; share it and they join with it. Games in progress can
+be rejoined from the same screen.
+
+The code alphabet leaves out `I`, `L` and `0`, and the join field folds a typed
+`0` onto `O` and `I` or `L` onto `1`, so a code read aloud over the phone still
+works.
+
+Clocks, resign and draw are not built yet — see the plan for what is and is not
+done, and for what has actually been verified.
 
 Deploying the Security Rules is a separate step from shipping the app; until
 they are pushed, online play is refused:
@@ -212,7 +228,7 @@ what is and is not built.
 - [x] Responsive board that scales to the device
 - [x] Wall placement with live validity feedback
 - [x] Online groundwork: identity, data model, Security Rules, game service
-- [ ] Online lobby: create, join by code, reconnect
+- [x] Online lobby: create, join by code, rejoin, presence
 - [ ] Clocks, resign and draw
 - [ ] Public matchmaking
 - [ ] Server-authoritative move validation

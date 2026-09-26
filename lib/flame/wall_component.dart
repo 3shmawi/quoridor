@@ -15,9 +15,12 @@ class WallComponent extends PositionComponent {
   /// Whether [previewWall] is a legal placement, which drives its colour.
   bool isValid = true;
 
-  /// Marks every slot a wall could occupy. Shown only in wall mode, where it
-  /// tells the player that the gaps between cells are the targets.
-  bool showSlots = false;
+  /// Marks every slot a wall could occupy.
+  ///
+  /// These are always on while the player still has walls: they are what makes
+  /// wall placement discoverable without a mode to switch into, and they are
+  /// kept faint so the board still reads as a board.
+  bool showSlots = true;
 
   /// Geometry shared with the board; kept in sync by [BoardComponent].
   BoardMetrics metrics = BoardMetrics.fit(Size.zero);
@@ -33,10 +36,10 @@ class WallComponent extends PositionComponent {
 
   void _drawSlots(Canvas canvas) {
     final paint = Paint()
-      ..color = const Color(0xFF64748B).withValues(alpha: 0.45)
+      ..color = const Color(0xFF64748B).withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
 
-    final radius = metrics.spacing * 0.42;
+    final radius = metrics.spacing * 0.3;
 
     for (int row = 1; row < GameConstants.boardSize; row++) {
       for (int col = 1; col < GameConstants.boardSize; col++) {

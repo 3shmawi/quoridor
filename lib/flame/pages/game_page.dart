@@ -1,12 +1,15 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:async';
 import 'dart:math' show pi;
 
-import '../../flame/board_component.dart';
+import '../constants.dart';
 import '../../flame/game/quoridor_game.dart';
 import '../../flame/services/audio_service.dart';
+import '../../flame/services/online/online_game_controller.dart';
+import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/ai_service.dart';
 import '../../flame/services/firebase_service.dart';
@@ -30,6 +33,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   bool _showMessage = false;
   bool _showValidMoves = true;
   AIDifficulty _currentDifficulty = AIDifficulty.medium;
+
+  /// Non-null while an online game is in progress.
+  OnlineGameController? _online;
+
+  bool get _isOnline => _online != null;
 
   @override
   void initState() {
@@ -75,9 +83,86 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _detachOnline(abandon: false);
     _messageController.dispose();
     _confettiController.dispose();
     super.dispose();
+  }
+
+  // --- Online play ---------------------------------------------------------
+
+  /// Opens the lobby and, if the player starts or joins a game, hands the
+  /// board over to it.
+  Future<void> _startOnlineGame() async {
+    closeMenu();
+
+    final controller = await Navigator.of(context).push<OnlineGameController>(
+      MaterialPageRoute(builder: (_) => const OnlineLobbyPage()),
+    );
+
+    if (controller == null || !mounted) {
+      controller?.dispose();
+      return;
+    }
+
+    _detachOnline(abandon: true);
+    _online = controller;
+
+    // The server's board is the one being rendered from here on.
+    _game.localPlayerId = controller.localPlayerId;
+    _game.onSubmitMove = controller.submitMove;
+    controller.onRemoteUpdate = _game.updateGameState;
+    controller.onGameOver = _handleOnlineGameOver;
+    controller.addListener(_handleOnlineChanged);
+
+    final board = controller.game?.board;
+    if (board != null) _game.updateGameState(board);
+
+    setState(() {});
+    _showGameMessage(
+      controller.connection == OnlineConnectionState.waitingForOpponent
+          ? 'Share code ${controller.roomCode} to invite a friend'
+          : 'Connected — good luck',
+    );
+  }
+
+  void _handleOnlineChanged() {
+    if (!mounted) return;
+
+    final message = _online?.message;
+    if (message != null) {
+      _showGameMessage(message);
+      _online?.consumeMessage();
+    }
+    setState(() {});
+  }
+
+  void _handleOnlineGameOver(bool didWin) {
+    if (!mounted) return;
+    if (didWin) _showConfetti();
+    _showGameMessage(didWin ? 'You win!' : 'Your opponent wins');
+  }
+
+  /// Tears down any online session and returns the board to local play.
+  void _detachOnline({required bool abandon}) {
+    final controller = _online;
+    if (controller == null) return;
+
+    _online = null;
+    controller.removeListener(_handleOnlineChanged);
+    unawaited(controller.leave(abandon: abandon));
+    controller.dispose();
+
+    _game.localPlayerId = null;
+    _game.onSubmitMove = null;
+  }
+
+  Future<void> _leaveOnlineGame() async {
+    closeMenu();
+    _detachOnline(abandon: true);
+    _game.newGame();
+    setState(() {});
+    _showGameMessage('Left the online game');
   }
 
   void _handleGameStateChanged(GameState gameState) {
@@ -174,6 +259,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _newGame() {
+    if (_isOnline) {
+      _showGameMessage('Leave the online game first');
+      closeMenu();
+      return;
+    }
     _game.newGame();
     _showGameMessage('New game started!');
     closeMenu();
@@ -243,7 +333,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.4,
+        height: MediaQuery.of(context).size.height * 0.55,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -297,6 +387,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       }
                       Navigator.pop(context);
                       _showGameMessage('Playing against AI');
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildModeCard(
+                    icon: Icons.public,
+                    title: 'Play Online',
+                    subtitle: 'Invite a friend with a code, or join theirs',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _startOnlineGame();
                     },
                   ),
                   const SizedBox(height: 16),
@@ -449,6 +549,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildMenuSection('Game Controls', [
+                            if (_isOnline)
+                              _buildMenuItem(
+                                Icons.logout_rounded,
+                                'Leave Online Game',
+                                'Return to playing on this device',
+                                _leaveOnlineGame,
+                              )
+                            else
+                              _buildMenuItem(
+                                Icons.public,
+                                'Play Online',
+                                'Invite a friend with a code',
+                                _startOnlineGame,
+                              ),
                             _buildMenuItem(
                               Icons.refresh,
                               'New Game',
@@ -561,11 +675,12 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     gameFactory: () => _game,
                   ),
                 ),
+                if (_isOnline) _buildOnlineBanner(),
                 ValueListenableBuilder(
                   valueListenable: isInitializedProvider,
                   builder: (context, value, child) {
                     if (!value) return const SizedBox.shrink();
-                    return _buildTurnControls();
+                    return _buildStatusLine();
                   },
                 ),
                 if (_showMessage)
@@ -881,297 +996,163 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     }
   }
 
-  // --- Turn controls -------------------------------------------------------
+  // --- Online banner -------------------------------------------------------
 
-  /// The strip under the board: who is playing, and what a tap will do.
+  /// A single strip that says what the online game is doing right now.
   ///
-  /// Walls used to be placed by tapping an invisible strip near a cell edge,
-  /// which most players never discovered. The board now has two explicit
-  /// modes, and wall placement is a visible, reversible three-step action:
-  /// pick a slot, rotate if needed, then confirm.
-  Widget _buildTurnControls() {
-    final state = _game.gameState;
-    final isAITurn = state.currentPlayer.isAI && !state.isGameOver;
+  /// The states it distinguishes are the ones a player can act on: waiting for
+  /// someone to join (so show the code to share), the opponent having gone
+  /// quiet, having lost contact ourselves, or simply whose turn it is.
+  Widget _buildOnlineBanner() {
+    final online = _online;
+    if (online == null) return const SizedBox.shrink();
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildPlayerStrip(),
-        const SizedBox(height: 12),
-        _buildModeSelector(enabled: !isAITurn && !state.isGameOver),
-        if (_game.boardMode == BoardInteractionMode.wall && !isAITurn) ...[
-          const SizedBox(height: 12),
-          _buildWallControls(),
+    final scheme = Theme.of(context).colorScheme;
+
+    late final Color color;
+    late final IconData icon;
+    late final String text;
+    Widget? action;
+
+    switch (online.connection) {
+      case OnlineConnectionState.connecting:
+        color = scheme.onSurface.withValues(alpha: 0.7);
+        icon = Icons.sync_rounded;
+        text = 'Connecting…';
+
+      case OnlineConnectionState.waitingForOpponent:
+        color = const Color(0xFFD97706);
+        icon = Icons.hourglass_top_rounded;
+        text = 'Waiting for an opponent — code ${online.roomCode}';
+        action = TextButton.icon(
+          onPressed: () => _copyRoomCode(online.roomCode),
+          icon: const Icon(Icons.copy_rounded, size: 16),
+          label: const Text('Copy'),
+        );
+
+      case OnlineConnectionState.opponentAway:
+        color = const Color(0xFFD97706);
+        icon = Icons.cloud_off_rounded;
+        text =
+            '${online.session?.opponent?.displayName ?? 'Opponent'} '
+            'has gone quiet';
+
+      case OnlineConnectionState.offline:
+        color = const Color(0xFFDC2626);
+        icon = Icons.wifi_off_rounded;
+        text = 'Lost contact with the game';
+
+      case OnlineConnectionState.ended:
+        color = scheme.onSurface.withValues(alpha: 0.7);
+        icon = Icons.flag_rounded;
+        text = 'Game over';
+
+      case OnlineConnectionState.live:
+        final yourTurn = online.isLocalTurn;
+        color = yourTurn ? const Color(0xFF16A34A) : scheme.primary;
+        icon = yourTurn
+            ? Icons.play_circle_outline_rounded
+            : Icons.more_horiz_rounded;
+        text = yourTurn
+            ? 'Your turn'
+            : '${online.session?.opponent?.displayName ?? 'Opponent'} '
+                  'is thinking…';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (action != null) action,
         ],
-      ],
+      ),
     );
   }
 
-  Widget _buildPlayerStrip() {
+  Future<void> _copyRoomCode(String? code) async {
+    if (code == null) return;
+    await Clipboard.setData(ClipboardData(text: code));
+    if (mounted) _showGameMessage('Code $code copied');
+  }
+
+  // --- Status line ---------------------------------------------------------
+
+  /// One line under the board: who is playing and how many walls each has.
+  ///
+  /// Deliberately the only chrome on this screen. The board says everything
+  /// else on its own — the squares you can reach glow, the gaps a wall can go
+  /// in are dotted, and a wall being aimed is green or red.
+  Widget _buildStatusLine() {
     final state = _game.gameState;
+
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
-          child: _buildPlayerChip(
-            label: 'You',
-            color: const Color(0xFF6F61EF),
-            walls: state.player1.wallsRemaining,
-            isActive: state.currentPlayerId == 1,
-          ),
+        _buildPlayerStatus(
+          label: 'You',
+          color: const Color(GameConstants.player1Color),
+          walls: state.player1.wallsRemaining,
+          isActive: state.currentPlayerId == 1,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildPlayerChip(
-            label: state.player2.isAI ? 'AI' : 'Player 2',
-            color: const Color(0xFF39D2C0),
-            walls: state.player2.wallsRemaining,
-            isActive: state.currentPlayerId == 2,
-          ),
+        _buildPlayerStatus(
+          label: state.player2.isAI ? 'AI' : 'Player 2',
+          color: const Color(GameConstants.player2Color),
+          walls: state.player2.wallsRemaining,
+          isActive: state.currentPlayerId == 2,
+          trailing: true,
         ),
       ],
     );
   }
 
-  Widget _buildPlayerChip({
+  Widget _buildPlayerStatus({
     required String label,
     required Color color,
     required int walls,
     required bool isActive,
+    bool trailing = false,
   }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    final dot = Container(
+      width: 10,
+      height: 10,
       decoration: BoxDecoration(
-        color: isActive ? color.withValues(alpha: 0.14) : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: color.withValues(alpha: isActive ? 0.9 : 0.25),
-          width: isActive ? 2 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                Text(
-                  '$walls walls left',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isActive) Icon(Icons.play_arrow_rounded, color: color, size: 20),
-        ],
+        color: color.withValues(alpha: isActive ? 1 : 0.35),
+        shape: BoxShape.circle,
       ),
     );
-  }
 
-  /// Big, obvious switch between moving the pawn and placing a wall.
-  Widget _buildModeSelector({required bool enabled}) {
-    final state = _game.gameState;
-    final hasWalls = state.currentPlayer.hasWallsRemaining;
+    final text = Text(
+      '$label · $walls',
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+        color: Theme.of(
+          context,
+        ).colorScheme.onSurface.withValues(alpha: isActive ? 1 : 0.5),
+      ),
+    );
 
     return Row(
-      children: [
-        Expanded(
-          child: _buildModeButton(
-            icon: Icons.directions_walk_rounded,
-            label: 'Move',
-            selected: _game.boardMode == BoardInteractionMode.move,
-            enabled: enabled,
-            onTap: () => _setBoardMode(BoardInteractionMode.move),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildModeButton(
-            icon: Icons.fence_rounded,
-            label: hasWalls
-                ? 'Wall (${state.currentPlayer.wallsRemaining})'
-                : 'No walls',
-            selected: _game.boardMode == BoardInteractionMode.wall,
-            enabled: enabled && hasWalls,
-            onTap: () => _setBoardMode(BoardInteractionMode.wall),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildModeButton({
-    required IconData icon,
-    required String label,
-    required bool selected,
-    required bool enabled,
-    required VoidCallback onTap,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    final background = selected ? scheme.primary : scheme.surface;
-    final foreground = selected ? scheme.onPrimary : scheme.onSurface;
-
-    return Opacity(
-      opacity: enabled ? 1 : 0.4,
-      child: Material(
-        color: background,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: enabled ? onTap : null,
-          child: Container(
-            // 52px keeps the target comfortably above the 48dp minimum.
-            height: 52,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: selected
-                    ? scheme.primary
-                    : scheme.outline.withValues(alpha: 0.4),
-                width: selected ? 2 : 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 20, color: foreground),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: foreground,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Rotate / place / cancel for the wall being lined up, plus a live reason
-  /// when the chosen slot is illegal.
-  Widget _buildWallControls() {
-    final pending = _game.pendingWall;
-    final result = _game.pendingWallResult;
-    final scheme = Theme.of(context).colorScheme;
-
-    final Color statusColor;
-    final IconData statusIcon;
-    final String statusText;
-
-    if (pending == null) {
-      statusColor = scheme.onSurface.withValues(alpha: 0.7);
-      statusIcon = Icons.touch_app_rounded;
-      statusText = 'Tap between two squares to aim the wall';
-    } else if (result?.isValid ?? false) {
-      statusColor = const Color(0xFF16A34A);
-      statusIcon = Icons.check_circle_rounded;
-      statusText = 'Ready — tap Place to confirm';
-    } else {
-      statusColor = const Color(0xFFDC2626);
-      statusIcon = Icons.error_rounded;
-      statusText = result?.message ?? 'That wall cannot go there';
-    }
-
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(statusIcon, size: 18, color: statusColor),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: statusColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  _game.rotatePendingWall();
-                  setState(() {});
-                },
-                icon: const Icon(Icons.rotate_90_degrees_cw_rounded, size: 18),
-                label: const Text('Rotate'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: FilledButton.icon(
-                onPressed: _game.canCommitPendingWall
-                    ? () {
-                        _game.commitPendingWall();
-                        setState(() {});
-                      }
-                    : null,
-                icon: const Icon(Icons.check_rounded, size: 18),
-                label: const Text('Place wall'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _setBoardMode(BoardInteractionMode mode) {
-    setState(() {
-      _game.boardMode = mode;
-    });
-    _showGameMessage(
-      mode == BoardInteractionMode.wall
-          ? 'Wall mode: tap between squares, then Place'
-          : 'Move mode: tap a highlighted square',
+      children: trailing
+          ? [text, const SizedBox(width: 8), dot]
+          : [dot, const SizedBox(width: 8), text],
     );
   }
 
@@ -1236,15 +1217,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             ),
             _buildInfoSection(
               '🚶 Movement',
-              'Move up, down, left, or right. Jump over your opponent if they\'re in your way.',
+              'The squares you can reach are ringed in your colour — tap one to move there. You may jump over your opponent if they are in your way.',
             ),
             _buildInfoSection(
               '🧱 Walls',
-              'Each player has 10 walls. Place them strategically but don\'t completely block your opponent\'s path.',
+              'Each player has 10. Tap a gap between squares to line a wall up — it turns green if it can go there, red if it cannot. Tap the same spot again to place it. Aim slightly nearer the other gap to turn the wall.\n\nA wall may make your opponent\'s route longer, but never seal it off completely.',
             ),
             _buildInfoSection(
               '🏆 Winning',
-              'Player 1 (purple) wins by reaching the bottom row.\nPlayer 2 (teal) wins by reaching the top row.',
+              'Player 1 (purple) starts at the bottom and wins by reaching the top row.\nPlayer 2 (teal) starts at the top and wins by reaching the bottom row.\n\nEach goal row is tinted in that player\'s colour.',
             ),
           ],
         ),
