@@ -19,7 +19,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "players.1.uid",
+          "fieldPath": "players.`1`.uid",
           "order": "ASCENDING"
         },
         {
@@ -33,7 +33,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "players.2.uid",
+          "fieldPath": "players.`2`.uid",
           "order": "ASCENDING"
         },
         {

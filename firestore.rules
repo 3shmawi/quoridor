@@ -27,15 +27,21 @@ service cloud.firestore {
         return request.auth != null;
       }
 
-      // The seat this request's caller occupies, or null.
+      // The seat this request's caller occupies, or 0 when they hold none.
+      //
+      // Every branch returns an int on purpose: a ternary that mixed an int
+      // with null compiled, but with a warning, and relying on a fuzzy type
+      // in a security boundary is not worth the brevity.
       function seatOf(data, uid) {
-        return data.players.keys().hasAny(['1']) && data.players['1'].uid == uid
+        return (data.players.keys().hasAny(['1']) && data.players['1'].uid == uid)
           ? 1
-          : (data.players.keys().hasAny(['2']) && data.players['2'].uid == uid ? 2 : null);
+          : ((data.players.keys().hasAny(['2']) && data.players['2'].uid == uid)
+              ? 2
+              : 0);
       }
 
       function isPlayer(data) {
-        return signedIn() && seatOf(data, request.auth.uid) != null;
+        return signedIn() && seatOf(data, request.auth.uid) != 0;
       }
 
       // The seat the caller does not occupy.

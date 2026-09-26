@@ -453,7 +453,10 @@ class OnlineGameService {
     for (final seat in [1, 2]) {
       try {
         final snapshot = await games
-            .where('players.$seat.uid', isEqualTo: identity.uid)
+            .where(
+              FieldPath(['players', '$seat', 'uid']),
+              isEqualTo: identity.uid,
+            )
             .where(
               'status',
               whereIn: [
