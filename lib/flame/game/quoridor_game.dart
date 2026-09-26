@@ -258,40 +258,6 @@ class QuoridorGame extends FlameGame
     _boardComponent.showValidMoves = show;
   }
 
-  // --- Board interaction ---------------------------------------------------
-
-  BoardInteractionMode get boardMode => _boardComponent.mode;
-
-  set boardMode(BoardInteractionMode value) => _boardComponent.mode = value;
-
-  /// The wall the player is lining up, before committing it.
-  Wall? get pendingWall => _boardComponent.pendingWall;
-
-  /// Whether the pending wall is legal, with the reason when it is not.
-  WallPlacementResult? get pendingWallResult =>
-      _boardComponent.pendingWallResult;
-
-  bool get canCommitPendingWall => _boardComponent.canCommitPendingWall;
-
-  void rotatePendingWall() => _boardComponent.rotatePendingWall();
-
-  void cancelPendingWall() => _boardComponent.cancelPendingWall();
-
-  /// Commits the pending wall, reporting why nothing happened when it cannot
-  /// be placed.
-  void commitPendingWall() {
-    if (_boardComponent.pendingWall == null) {
-      onGameMessage?.call('Tap the board to choose where the wall goes');
-      return;
-    }
-
-    if (!_boardComponent.commitPendingWall()) {
-      final reason = _boardComponent.pendingWallResult?.message;
-      onGameMessage?.call(reason ?? 'That wall cannot go there');
-      HapticFeedback.lightImpact();
-    }
-  }
-
   void togglePlayerMode() {
     // Switch between AI and human player 2
     final newGameState = GameState(

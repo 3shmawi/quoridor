@@ -26,13 +26,13 @@ build is deployed to GitHub Pages from `main` on every push.
 
 ## Screenshots
 
-| Choose a game mode | Move mode | Wall mode |
+| Choose a game mode | The board | Aiming a wall |
 |---|---|---|
-| ![Game mode selection](docs/screenshots/01-game-mode.png) | ![Move mode showing legal squares](docs/screenshots/02-move-mode.png) | ![Wall mode showing wall slots](docs/screenshots/03-wall-mode.png) |
+| ![Game mode selection](docs/screenshots/01-game-mode.png) | ![The board, with reachable squares ringed](docs/screenshots/02-board.png) | ![A wall previewed in green](docs/screenshots/03-wall-aim.png) |
 
-| Aiming a wall | Wall placed | Settings |
-|---|---|---|
-| ![Wall preview validated as legal](docs/screenshots/04-wall-aim.png) | ![A placed wall on the board](docs/screenshots/05-walls-placed.png) | ![Settings drawer](docs/screenshots/06-menu.png) |
+| Wall placed | Settings |
+|---|---|
+| ![A placed wall on the board](docs/screenshots/04-wall-placed.png) | ![Settings drawer](docs/screenshots/05-menu.png) |
 
 All screenshots are from the web build, captured at phone size.
 
@@ -57,18 +57,18 @@ are tinted on the board in the owner's colour.
 
 ### The controls
 
-The board is in one of two modes at a time, chosen with the two buttons under
-the board:
+There are none — the board is the whole interface.
 
-- **Move** — every square you can legally step to is ringed in your colour. Tap
-  one to go there. That is the whole move; there is no pawn to select first.
-- **Wall (n)** — small dots appear at every slot a wall can occupy. Tap
-  anywhere near where you want the wall and it snaps to the nearest slot, then
-  use **Rotate** to flip it between horizontal and vertical. The preview is
-  green when the wall is legal and red when it is not, with the reason spelled
-  out above the buttons ("Walls cannot cross each other", "This would leave a
-  player with no way to their goal"). Nothing is committed until you tap
-  **Place wall**.
+- **To move**, tap one of the squares ringed in your colour. Those are exactly
+  the squares you can legally reach, so there is no pawn to select first and
+  nothing to read.
+- **To place a wall**, tap the gap between two squares. Faint dots mark every
+  gap a wall can go in. The wall appears green if it can go there and red if it
+  cannot, and a second tap on the same spot places it. Aiming slightly nearer
+  the other gap turns the wall, so there is no rotate button either.
+
+Under the board is a single line with each player's name and how many walls
+they have left; the player to move is the bold one.
 
 ## Running it
 
