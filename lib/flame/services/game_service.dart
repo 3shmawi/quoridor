@@ -372,8 +372,9 @@ class GameManager {
 
   static Future<GameState> processPlayerMove(
     GameState gameState,
-    GameMove move,
-  ) async {
+    GameMove move, {
+    AIDifficulty aiDifficulty = AIDifficulty.medium,
+  }) async {
     // Execute player move
     var newGameState = GameService.executeMove(gameState, move);
 
@@ -381,7 +382,7 @@ class GameManager {
     if (!newGameState.isGameOver && newGameState.currentPlayer.isAI) {
       newGameState = await GameService.executeAITurn(
         newGameState,
-        AIDifficulty.medium,
+        aiDifficulty,
       );
     }
 

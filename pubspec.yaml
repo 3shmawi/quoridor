@@ -38,7 +38,6 @@ dependencies:
   flame: ^1.29.0
   firebase_auth: ^5.6.0
   cloud_firestore: ^5.6.9
-  http: ^1.4.0
   audioplayers: ^6.4.0
   confetti: ^0.8.0
 
