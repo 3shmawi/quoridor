@@ -29,9 +29,107 @@ class GameConstants {
   static const Position player1Start = Position(8, 4);
   static const Position player2Start = Position(0, 4);
 
+  /// Players three and four come in from the sides, so their goal is the
+  /// opposite column rather than a row.
+  static const Position player3Start = Position(4, 0);
+  static const Position player4Start = Position(4, 8);
+
   // Goal rows
   static const int player1Goal = 0;
   static const int player2Goal = 8;
+
+  /// How many walls each player holds, by how many are playing.
+  ///
+  /// The board does not grow with the players, so a fixed ten each would let
+  /// three or four people wall it into a maze nobody can cross. The totals
+  /// here keep roughly the same number of walls on the board however many are
+  /// playing, which is how the boxed game handles it.
+  static int wallsFor(int playerCount) {
+    switch (playerCount) {
+      case 3:
+        return 7;
+      case 4:
+        return 5;
+      default:
+        return maxWallsPerPlayer;
+    }
+  }
+
+  /// The seat colours, indexed by seat number.
+  static const int player3Color = 0xFFF2A93B;
+  static const int player4Color = 0xFFEE5D8A;
+
+  static int colorForSeat(int seat) {
+    switch (seat) {
+      case 1:
+        return player1Color;
+      case 2:
+        return player2Color;
+      case 3:
+        return player3Color;
+      default:
+        return player4Color;
+    }
+  }
+}
+
+/// The side of the board a player is trying to reach.
+///
+/// This replaces a plain goal row. Players one and two race up and down, so a
+/// row was enough for them, but three and four cross the board sideways and
+/// have no goal row at all — which is why every part of the game that asked
+/// "is this pawn on its goal row?" had to learn to ask this instead.
+enum GoalEdge {
+  top,
+  bottom,
+  left,
+  right;
+
+  /// Whether [position] is on this edge.
+  bool contains(Position position) {
+    const last = GameConstants.boardSize - 1;
+    switch (this) {
+      case GoalEdge.top:
+        return position.row == 0;
+      case GoalEdge.bottom:
+        return position.row == last;
+      case GoalEdge.left:
+        return position.col == 0;
+      case GoalEdge.right:
+        return position.col == last;
+    }
+  }
+
+  /// The edge a player starting on this one is aiming for.
+  GoalEdge get opposite {
+    switch (this) {
+      case GoalEdge.top:
+        return GoalEdge.bottom;
+      case GoalEdge.bottom:
+        return GoalEdge.top;
+      case GoalEdge.left:
+        return GoalEdge.right;
+      case GoalEdge.right:
+        return GoalEdge.left;
+    }
+  }
+
+  /// Where each seat starts, and so which edge it defends.
+  static GoalEdge homeOfSeat(int seat) {
+    switch (seat) {
+      case 1:
+        return GoalEdge.bottom;
+      case 2:
+        return GoalEdge.top;
+      case 3:
+        return GoalEdge.left;
+      default:
+        return GoalEdge.right;
+    }
+  }
+
+  /// Where each seat is trying to get to.
+  static GoalEdge goalOfSeat(int seat) => homeOfSeat(seat).opposite;
 }
 
 class Position {
@@ -88,7 +186,36 @@ class Wall {
   );
 }
 
-enum GameStatus { playing, player1Won, player2Won, draw }
+/// How a game stands.
+///
+/// Seats three and four are appended rather than slotted in beside the first
+/// two, because the index of each value is what gets written to saved games
+/// and to the server — renumbering them would make every game in flight read
+/// back as something else.
+enum GameStatus {
+  playing,
+  player1Won,
+  player2Won,
+  draw,
+  player3Won,
+  player4Won;
+
+  /// The status meaning [seat] has won.
+  static GameStatus wonBy(int seat) {
+    switch (seat) {
+      case 1:
+        return GameStatus.player1Won;
+      case 2:
+        return GameStatus.player2Won;
+      case 3:
+        return GameStatus.player3Won;
+      case 4:
+        return GameStatus.player4Won;
+      default:
+        return GameStatus.playing;
+    }
+  }
+}
 
 enum MoveType { pawnMove, wallPlace }
 

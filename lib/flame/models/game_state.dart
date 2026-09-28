@@ -3,8 +3,13 @@ import 'player.dart';
 
 class GameState {
   final String gameId;
-  final Player player1;
-  final Player player2;
+
+  /// Everyone at the board, in seat order.
+  ///
+  /// Two entries for the classic game, three or four for the bigger ones.
+  /// Nothing outside this list decides how many are playing.
+  final List<Player> players;
+
   final List<Wall> walls;
   int currentPlayerId;
   GameStatus status;
@@ -14,37 +19,68 @@ class GameState {
 
   GameState({
     required this.gameId,
-    required this.player1,
-    required this.player2,
+    List<Player>? players,
+    Player? player1,
+    Player? player2,
     List<Wall>? walls,
     this.currentPlayerId = 1,
     this.status = GameStatus.playing,
     DateTime? createdAt,
     DateTime? updatedAt,
     List<GameMove>? moveHistory,
-  }) : walls = walls ?? [],
+  }) : players =
+           players ??
+           [
+             if (player1 != null) player1,
+             if (player2 != null) player2,
+           ],
+       walls = walls ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
        moveHistory = moveHistory ?? [];
 
-  Player get currentPlayer => currentPlayerId == 1 ? player1 : player2;
-  Player get otherPlayer => currentPlayerId == 1 ? player2 : player1;
+  /// How many are playing.
+  int get playerCount => players.length;
+
+  /// The first two seats, which the two-player game is written in terms of.
+  Player get player1 => players[0];
+  Player get player2 => players[1];
+
+  Player get currentPlayer => playerById(currentPlayerId);
+
+  /// The seat after [currentPlayerId], which in a two-player game is the
+  /// opponent. With more players this is simply whoever is next to move.
+  Player get otherPlayer => playerById(nextPlayerId);
+
+  /// Everyone except [id].
+  List<Player> opponentsOf(int id) =>
+      players.where((player) => player.id != id).toList();
+
+  Player playerById(int id) => players.firstWhere((player) => player.id == id);
+
+  /// Whose turn it is after this one, going round the table in seat order.
+  int get nextPlayerId {
+    final index = players.indexWhere((player) => player.id == currentPlayerId);
+    return players[(index + 1) % players.length].id;
+  }
 
   bool get isGameOver => status != GameStatus.playing;
 
-  String? get winner {
-    switch (status) {
-      case GameStatus.player1Won:
-        return player1.name;
-      case GameStatus.player2Won:
-        return player2.name;
-      default:
-        return null;
+  /// The seat that won, or null while the game is still on.
+  int? get winnerId {
+    for (final player in players) {
+      if (status == GameStatus.wonBy(player.id)) return player.id;
     }
+    return null;
+  }
+
+  String? get winner {
+    final id = winnerId;
+    return id == null ? null : playerById(id).name;
   }
 
   void switchTurn() {
-    currentPlayerId = currentPlayerId == 1 ? 2 : 1;
+    currentPlayerId = nextPlayerId;
     updatedAt = DateTime.now();
   }
 
@@ -60,10 +96,11 @@ class GameState {
   }
 
   void checkWinCondition() {
-    if (player1.hasReachedGoal) {
-      status = GameStatus.player1Won;
-    } else if (player2.hasReachedGoal) {
-      status = GameStatus.player2Won;
+    for (final player in players) {
+      if (player.hasReachedGoal) {
+        status = GameStatus.wonBy(player.id);
+        break;
+      }
     }
     updatedAt = DateTime.now();
   }
@@ -73,9 +110,8 @@ class GameState {
     updatedAt = DateTime.now();
   }
 
-  bool isPositionOccupied(Position position) {
-    return player1.position == position || player2.position == position;
-  }
+  bool isPositionOccupied(Position position) =>
+      players.any((player) => player.position == position);
 
   bool isWallBlocking(Position from, Position to) {
     // Check if there's a wall blocking movement between two adjacent positions
@@ -188,6 +224,8 @@ class GameState {
 
   Map<String, dynamic> toJson() => {
     'gameId': gameId,
+    'players': players.map((p) => p.toJson()).toList(),
+    // Still written so a save from this build opens in an older one.
     'player1': player1.toJson(),
     'player2': player2.toJson(),
     'walls': walls.map((w) => w.toJson()).toList(),
@@ -200,8 +238,7 @@ class GameState {
 
   static GameState fromJson(Map<String, dynamic> json) => GameState(
     gameId: json['gameId'] as String,
-    player1: Player.fromJson(json['player1']),
-    player2: Player.fromJson(json['player2']),
+    players: _playersFrom(json),
     walls: (json['walls'] as List).map((w) => Wall.fromJson(w)).toList(),
     currentPlayerId: json['currentPlayerId'] as int,
     status: GameStatus.values[json['status'] as int],
@@ -211,6 +248,22 @@ class GameState {
         .map((m) => GameMove.fromJson(m))
         .toList(),
   );
+
+  /// Reads the seats, falling back to the two a game saved before three and
+  /// four existed carries instead.
+  static List<Player> _playersFrom(Map<String, dynamic> json) {
+    final listed = json['players'] as List?;
+    if (listed != null && listed.isNotEmpty) {
+      return listed
+          .map((p) => Player.fromJson(p as Map<String, dynamic>))
+          .toList();
+    }
+
+    return [
+      Player.fromJson(json['player1'] as Map<String, dynamic>),
+      Player.fromJson(json['player2'] as Map<String, dynamic>),
+    ];
+  }
 }
 
 // Factory for creating new games
@@ -220,16 +273,23 @@ class GameStateFactory {
     String player1Name = 'Player 1',
     String player2Name = 'AI',
     bool player2IsAI = true,
+    int playerCount = 2,
   }) {
     gameId ??= 'game_${DateTime.now().millisecondsSinceEpoch}';
 
     return GameState(
       gameId: gameId,
-      player1: PlayerFactory.createPlayer1(name: player1Name),
-      player2: PlayerFactory.createPlayer2(
-        name: player2Name,
-        isAI: player2IsAI,
-      ),
+      players: [
+        PlayerFactory.seat(1, name: player1Name, playerCount: playerCount),
+        PlayerFactory.seat(
+          2,
+          name: player2Name,
+          isAI: player2IsAI,
+          playerCount: playerCount,
+        ),
+        for (var seat = 3; seat <= playerCount; seat++)
+          PlayerFactory.seat(seat, playerCount: playerCount),
+      ],
     );
   }
 }

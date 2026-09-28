@@ -160,22 +160,21 @@ class GameService {
       }
     }
 
-    // A wall may never seal a player off from their goal row.
+    // A wall may never seal anyone off from their goal. Every seat is
+    // checked, so a four-player game cannot shut out the third or fourth.
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
 
-    final player1Path = Pathfinding.findShortestPath(
-      tempGameState,
-      tempGameState.player1.position,
-      tempGameState.player1.goalRow,
+    final sealsSomeoneIn = tempGameState.players.any(
+      (player) =>
+          Pathfinding.findShortestPath(
+            tempGameState,
+            player.position,
+            player.goal,
+          ) ==
+          null,
     );
 
-    final player2Path = Pathfinding.findShortestPath(
-      tempGameState,
-      tempGameState.player2.position,
-      tempGameState.player2.goalRow,
-    );
-
-    if (player1Path == null || player2Path == null) {
+    if (sealsSomeoneIn) {
       return const WallPlacementResult(WallRejection.blocksPlayer);
     }
 
