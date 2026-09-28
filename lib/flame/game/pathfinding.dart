@@ -22,11 +22,15 @@ class PathNode {
 }
 
 class Pathfinding {
-  // A* algorithm to find shortest path from start to any position in target row
+  /// The shortest route from [start] to any square on [goal].
+  ///
+  /// The target used to be a row, which only ever worked because the only two
+  /// players raced up and down. Seats three and four cross the board, so the
+  /// target is the edge they are heading for.
   static List<Position>? findShortestPath(
     GameState gameState,
     Position start,
-    int targetRow,
+    GoalEdge goal,
   ) {
     final openSet = PriorityQueue<PathNode>(
       (a, b) => a.fCost.compareTo(b.fCost),
@@ -34,15 +38,14 @@ class Pathfinding {
     final closedSet = <Position>{};
     final gScores = <Position, int>{};
 
-    final startNode = PathNode(start, 0, _calculateHeuristic(start, targetRow));
+    final startNode = PathNode(start, 0, _calculateHeuristic(start, goal));
     openSet.add(startNode);
     gScores[start] = 0;
 
     while (openSet.isNotEmpty) {
       final currentNode = openSet.removeFirst();
 
-      // Check if we reached the target row
-      if (currentNode.position.row == targetRow) {
+      if (goal.contains(currentNode.position)) {
         return _reconstructPath(currentNode);
       }
 
@@ -59,7 +62,7 @@ class Pathfinding {
 
         if (existingGScore == null || tentativeGScore < existingGScore) {
           gScores[neighborPos] = tentativeGScore;
-          final hCost = _calculateHeuristic(neighborPos, targetRow);
+          final hCost = _calculateHeuristic(neighborPos, goal);
           final neighborNode = PathNode(
             neighborPos,
             tentativeGScore,
@@ -75,53 +78,44 @@ class Pathfinding {
     return null; // No path found
   }
 
-  // Check if a wall placement would block all paths for any player
+  /// Whether [wall] would leave somebody with no route to their goal.
+  ///
+  /// Every seat is checked, not just the first two: in a four-player game a
+  /// wall that shuts one player in is just as illegal, and only looking at
+  /// two of them would let it through.
   static bool wouldWallBlockAllPaths(GameState gameState, Wall wall) {
-    // Create temporary game state with the wall
     final tempGameState = _createTempGameStateWithWall(gameState, wall);
 
-    // Check if both players still have valid paths
-    final player1Path = findShortestPath(
-      tempGameState,
-      tempGameState.player1.position,
-      tempGameState.player1.goalRow,
+    return tempGameState.players.any(
+      (player) =>
+          findShortestPath(tempGameState, player.position, player.goal) == null,
     );
-
-    final player2Path = findShortestPath(
-      tempGameState,
-      tempGameState.player2.position,
-      tempGameState.player2.goalRow,
-    );
-
-    return player1Path == null || player2Path == null;
   }
 
-  // Calculate shortest path lengths for both players
-  static Map<int, int> calculatePathLengths(GameState gameState) {
-    final player1Path = findShortestPath(
-      gameState,
-      gameState.player1.position,
-      gameState.player1.goalRow,
-    );
+  /// How far each seat still has to go, by seat number.
+  static Map<int, int> calculatePathLengths(GameState gameState) => {
+    for (final player in gameState.players)
+      player.id:
+          findShortestPath(gameState, player.position, player.goal)?.length ??
+          999,
+  };
 
-    final player2Path = findShortestPath(
-      gameState,
-      gameState.player2.position,
-      gameState.player2.goalRow,
-    );
-
-    return {1: player1Path?.length ?? 999, 2: player2Path?.length ?? 999};
-  }
-
-  // Find the best wall placement to maximize opponent\'s path
+  /// The wall that lengthens some opponent's route the most.
   static Wall? findBestWallPlacement(GameState gameState, int playerId) {
-    final opponentId = playerId == 1 ? 2 : 1;
-    final opponentPos = opponentId == 1
-        ? gameState.player1.position
-        : gameState.player2.position;
-    final opponentGoal = opponentId == 1
-        ? gameState.player1.goalRow
-        : gameState.player2.goalRow;
+    final opponents = gameState.opponentsOf(playerId);
+    if (opponents.isEmpty) return null;
+
+    // Whoever is closest to winning is the one worth blocking.
+    opponents.sort((a, b) {
+      final left =
+          findShortestPath(gameState, a.position, a.goal)?.length ?? 999;
+      final right =
+          findShortestPath(gameState, b.position, b.goal)?.length ?? 999;
+      return left.compareTo(right);
+    });
+
+    final opponentPos = opponents.first.position;
+    final opponentGoal = opponents.first.goal;
 
     Wall? bestWall;
     int maxPathIncrease = 0;
@@ -187,8 +181,19 @@ class Pathfinding {
     return bestWall;
   }
 
-  static int _calculateHeuristic(Position position, int targetRow) {
-    return (position.row - targetRow).abs();
+  /// Squares still to cross in a straight line, ignoring walls.
+  static int _calculateHeuristic(Position position, GoalEdge goal) {
+    const last = GameConstants.boardSize - 1;
+    switch (goal) {
+      case GoalEdge.top:
+        return position.row;
+      case GoalEdge.bottom:
+        return last - position.row;
+      case GoalEdge.left:
+        return position.col;
+      case GoalEdge.right:
+        return last - position.col;
+    }
   }
 
   static List<Position> _reconstructPath(PathNode node) {
@@ -204,16 +209,7 @@ class Pathfinding {
   }
 
   static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
-    return GameState(
-      gameId: original.gameId,
-      player1: original.player1,
-      player2: original.player2,
-      walls: [...original.walls, wall],
-      currentPlayerId: original.currentPlayerId,
-      status: original.status,
-      createdAt: original.createdAt,
-      updatedAt: original.updatedAt,
-    );
+    return original.copyWith(walls: [...original.walls, wall]);
   }
 
   static bool _isValidWallPlacement(GameState gameState, Wall wall) {

@@ -4,6 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Lets a run be started by hand from the Actions tab. Worth having: a run
+  # can fail to be queued at all, and without this there is no way to ask for
+  # one short of pushing a commit that exists only to trigger it.
+  workflow_dispatch:
 
 # A new push supersedes an in-flight run on the same ref.
 concurrency:

@@ -120,14 +120,7 @@ class QuoridorEngine {
 
       for (final move in order) {
         final child = applyMove(state, move);
-        final raw = -_negamax(
-          child,
-          depth - 1,
-          -_winScore * 2,
-          -alpha,
-          3 - me,
-          budget,
-        );
+        final raw = _search(child, depth - 1, alpha, _winScore * 2, me, budget);
 
         final score = _withRepetitionPenalty(raw, move, recent);
         if (score > alpha) alpha = score;
@@ -184,7 +177,7 @@ class QuoridorEngine {
     for (final position in state.getValidMoves(player.position)) {
       final move = GameMove.pawnMove(position, player.id);
       final after = applyMove(state, move);
-      final moved = player.id == 1 ? after.player1 : after.player2;
+      final moved = after.playerById(player.id);
 
       if (moved.hasReachedGoal) return move;
 
@@ -235,7 +228,7 @@ class QuoridorEngine {
   /// How far [me] would still have to go after playing [move].
   static int? _distanceAfter(GameState state, int me, GameMove move) {
     final after = applyMove(state, move);
-    final moved = me == 1 ? after.player1 : after.player2;
+    final moved = after.playerById(me);
     if (moved.hasReachedGoal) return -1;
     return distanceToGoal(after, moved);
   }
@@ -311,39 +304,45 @@ class QuoridorEngine {
     return score - (_repetitionCost * recency) ~/ _repetitionWindow;
   }
 
-  static int _negamax(
+  static int _search(
     GameState state,
     int depth,
     int alpha,
     int beta,
-    int perspective,
+    int root,
     _SearchBudget budget,
   ) {
     budget.spend();
 
     if (state.isGameOver || depth <= 0 || budget.exhausted) {
-      return _evaluate(state, perspective);
+      return _evaluate(state, root);
     }
 
     final moves = _generateMoves(state);
-    if (moves.isEmpty) return _evaluate(state, perspective);
+    if (moves.isEmpty) return _evaluate(state, root);
 
-    var value = -_winScore * 2;
+    // Every score in this tree is read from [root]'s chair rather than from
+    // whoever happens to be on move. With two players those are the same
+    // thing, which is why this used to negate at each ply and get away with
+    // it; with three or four there is no single "other side" to negate to.
+    // So the player we are choosing for maximises and everybody else
+    // minimises — they are all trying to get home before [root] does.
+    final maximising = state.currentPlayerId == root;
+    var value = maximising ? -_winScore * 2 : _winScore * 2;
 
     for (final move in moves) {
       final child = applyMove(state, move);
-      final score = -_negamax(
-        child,
-        depth - 1,
-        -beta,
-        -alpha,
-        3 - perspective,
-        budget,
-      );
+      final score = _search(child, depth - 1, alpha, beta, root, budget);
 
-      if (score > value) value = score;
-      if (value > alpha) alpha = value;
-      if (alpha >= beta) break; // The opponent would avoid this line.
+      if (maximising) {
+        if (score > value) value = score;
+        if (value > alpha) alpha = value;
+      } else {
+        if (score < value) value = score;
+        if (value < beta) beta = value;
+      }
+
+      if (alpha >= beta) break; // Whoever is to move would avoid this line.
     }
 
     return value;
@@ -354,24 +353,45 @@ class QuoridorEngine {
   /// Everything here is in units of "steps I am ahead": how much shorter my
   /// route is than theirs, plus a small credit for walls still in hand, since
   /// a wall unspent is a threat unspent.
+  ///
+  /// With more than two at the board, "theirs" is whoever is closest to
+  /// getting home. Averaging the field instead would let the engine feel
+  /// comfortable while the leader walks in: only the nearest opponent is
+  /// actually about to win.
   static int _evaluate(GameState state, int perspective) {
-    final me = perspective == 1 ? state.player1 : state.player2;
-    final them = perspective == 1 ? state.player2 : state.player1;
+    final me = state.playerById(perspective);
 
     if (me.hasReachedGoal) return _winScore;
-    if (them.hasReachedGoal) return -_winScore;
+
+    final opponents = state.opponentsOf(perspective);
+    if (opponents.any((player) => player.hasReachedGoal)) return -_winScore;
 
     final myDistance = distanceToGoal(state, me);
-    final theirDistance = distanceToGoal(state, them);
 
     // A sealed-off player cannot happen under the rules, but a defensive
     // value keeps the search total rather than throwing mid-line.
     if (myDistance == null) return -_winScore;
-    if (theirDistance == null) return _winScore;
 
-    return (theirDistance - myDistance) * _distanceWeight +
-        (me.wallsRemaining - them.wallsRemaining) * _wallWeight;
+    var nearest = _maxDistance;
+    var theirWalls = 0;
+    for (final opponent in opponents) {
+      final distance = distanceToGoal(state, opponent);
+      if (distance == null) return _winScore;
+      if (distance < nearest) nearest = distance;
+      theirWalls += opponent.wallsRemaining;
+    }
+
+    // Walls are compared against the average of the others, so holding five
+    // in a four-player game is not read as being fifteen behind.
+    final theirAverageWalls = theirWalls ~/ opponents.length;
+
+    return (nearest - myDistance) * _distanceWeight +
+        (me.wallsRemaining - theirAverageWalls) * _wallWeight;
   }
+
+  /// Longer than any real route, so it loses every comparison.
+  static const int _maxDistance =
+      GameConstants.boardSize * GameConstants.boardSize;
 
   /// Length of the shortest route from [player] to their goal row, in steps,
   /// or null when no route exists.
@@ -391,7 +411,7 @@ class QuoridorEngine {
 
       for (var i = 0; i < levelSize; i++) {
         final current = queue.removeAt(0);
-        if (current.row == player.goalRow) return steps;
+        if (player.isGoal(current)) return steps;
 
         for (final next in _neighbours(state, current)) {
           if (visited[next.row][next.col]) continue;
@@ -449,9 +469,14 @@ class QuoridorEngine {
     return moves;
   }
 
-  /// Walls that would interrupt a step on the opponent's shortest route.
+  /// Walls that would interrupt a step on an opponent's shortest route.
+  ///
+  /// With more than two playing, the route worth cutting is the one belonging
+  /// to whoever is closest to getting home.
   static List<Wall> _wallCandidates(GameState state) {
-    final opponent = state.otherPlayer;
+    final opponent = _nearestOpponent(state, state.currentPlayerId);
+    if (opponent == null) return const [];
+
     final route = _shortestRoute(state, opponent);
     if (route == null) return const [];
 
@@ -472,6 +497,22 @@ class QuoridorEngine {
     }
 
     return candidates;
+  }
+
+  /// Whichever opponent has least ground left to cover.
+  static Player? _nearestOpponent(GameState state, int playerId) {
+    Player? nearest;
+    var shortest = _maxDistance + 1;
+
+    for (final opponent in state.opponentsOf(playerId)) {
+      final distance = distanceToGoal(state, opponent) ?? _maxDistance;
+      if (distance < shortest) {
+        shortest = distance;
+        nearest = opponent;
+      }
+    }
+
+    return nearest;
   }
 
   /// The two walls that can block the step from [from] to [to].
@@ -502,7 +543,7 @@ class QuoridorEngine {
     while (queue.isNotEmpty) {
       final current = queue.removeAt(0);
 
-      if (current.row == player.goalRow) {
+      if (player.isGoal(current)) {
         final route = <Position>[];
         Position? step = current;
         while (step != null) {
@@ -528,17 +569,7 @@ class QuoridorEngine {
   /// Search generates only legal moves, so re-running validation — which costs
   /// two path searches per wall — would double the price of every node.
   static GameState applyMove(GameState state, GameMove move) {
-    final next = GameState(
-      gameId: state.gameId,
-      player1: state.player1.copyWith(),
-      player2: state.player2.copyWith(),
-      walls: List<Wall>.of(state.walls),
-      currentPlayerId: state.currentPlayerId,
-      status: state.status,
-      createdAt: state.createdAt,
-      updatedAt: state.updatedAt,
-      moveHistory: <GameMove>[],
-    );
+    final next = state.copyWith(clonePlayers: true, moveHistory: <GameMove>[]);
 
     if (move.type == MoveType.pawnMove) {
       next.movePawn(move.newPosition!);

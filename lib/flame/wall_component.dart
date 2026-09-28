@@ -66,18 +66,14 @@ class WallComponent extends PositionComponent {
   }
 
   Color _wallColor(int? ownerId) {
-    switch (ownerId) {
-      case 1:
-        return const Color(GameConstants.player1Color);
-      case 2:
-        return const Color(GameConstants.player2Color);
-      default:
-        return Color(
-          isDarkModeNotifier.value
-              ? GameConstants.wallColorDark
-              : GameConstants.wallColor,
-        );
+    if (ownerId == null) {
+      return Color(
+        isDarkModeNotifier.value
+            ? GameConstants.wallColorDark
+            : GameConstants.wallColor,
+      );
     }
+    return Color(GameConstants.colorForSeat(ownerId));
   }
 
   void _drawWalls(Canvas canvas) {

@@ -532,15 +532,10 @@ class OnlineGameService {
     GameState board, {
     required String player1Name,
     required String player2Name,
-  }) => GameState(
-    gameId: board.gameId,
-    player1: board.player1.copyWith(name: player1Name),
-    player2: board.player2.copyWith(name: player2Name, isAI: false),
-    walls: List<Wall>.from(board.walls),
-    currentPlayerId: board.currentPlayerId,
-    status: board.status,
-    createdAt: board.createdAt,
-    updatedAt: board.updatedAt,
-    moveHistory: List<GameMove>.from(board.moveHistory),
+  }) => board.copyWith(
+    players: [
+      board.player1.copyWith(name: player1Name),
+      board.player2.copyWith(name: player2Name, isAI: false),
+    ],
   );
 }

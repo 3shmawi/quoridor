@@ -240,64 +240,69 @@ class BoardComponent extends PositionComponent {
     );
   }
 
-  /// The goal row belonging to whoever is to move.
-  ({int row, Color color}) get _currentGoal => _gameState.currentPlayerId == 1
-      ? (
-          row: GameConstants.player1Goal,
-          color: const Color(GameConstants.player1Color),
-        )
-      : (
-          row: GameConstants.player2Goal,
-          color: const Color(GameConstants.player2Color),
-        );
-
-  /// Tints the row the player to move is heading for. The flags go on top, in
-  /// [_drawGoalFlags].
-  void _drawGoalRows(Canvas canvas) {
-    void markRow(int row, Color color) {
-      final first = _metrics.cellRect(Position(row, 0));
-      final last = _metrics.cellRect(
-        Position(row, GameConstants.boardSize - 1),
-      );
-
-      final rect = Rect.fromLTRB(
-        first.left - _metrics.spacing,
-        first.top - _metrics.spacing,
-        last.right + _metrics.spacing,
-        first.bottom + _metrics.spacing,
-      );
-
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(_metrics.cellSize * 0.2)),
-        Paint()
-          ..color = color.withValues(alpha: 0.3)
-          ..style = PaintingStyle.fill,
-      );
-    }
-
-    // Only the player to move sees their target row. Showing both at once
-    // says where the ends are; showing one says where *you* are going, and the
-    // strip appearing on your turn is what answers "which way am I running".
-    final goal = _currentGoal;
-    markRow(goal.row, goal.color);
+  /// The edge belonging to whoever is to move, and their colour.
+  ({GoalEdge edge, Color color}) get _currentGoal {
+    final player = _gameState.currentPlayer;
+    return (
+      edge: player.goal,
+      color: Color(GameConstants.colorForSeat(player.id)),
+    );
   }
 
-  /// Flags at both ends of each goal row.
+  /// The squares making up [edge], in order along it.
+  List<Position> _squaresOn(GoalEdge edge) {
+    const size = GameConstants.boardSize;
+    switch (edge) {
+      case GoalEdge.top:
+        return [for (var col = 0; col < size; col++) Position(0, col)];
+      case GoalEdge.bottom:
+        return [for (var col = 0; col < size; col++) Position(size - 1, col)];
+      case GoalEdge.left:
+        return [for (var row = 0; row < size; row++) Position(row, 0)];
+      case GoalEdge.right:
+        return [for (var row = 0; row < size; row++) Position(row, size - 1)];
+    }
+  }
+
+  /// Tints the edge the player to move is heading for. The flags go on top, in
+  /// [_drawGoalFlags].
+  void _drawGoalRows(Canvas canvas) {
+    // Only the player to move sees their target. Showing every edge at once
+    // says where the sides are; showing one says where *you* are going, and
+    // the strip appearing on your turn is what answers "which way am I
+    // running" — which matters far more once four people are running four
+    // different ways.
+    final goal = _currentGoal;
+    final squares = _squaresOn(goal.edge);
+
+    final first = _metrics.cellRect(squares.first);
+    final last = _metrics.cellRect(squares.last);
+
+    final rect = Rect.fromLTRB(
+      first.left - _metrics.spacing,
+      first.top - _metrics.spacing,
+      last.right + _metrics.spacing,
+      last.bottom + _metrics.spacing,
+    );
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(_metrics.cellSize * 0.2)),
+      Paint()
+        ..color = goal.color.withValues(alpha: 0.3)
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  /// Flags at both ends of the goal edge.
   ///
   /// Drawn after the grid: the cells are opaque, so anything painted with the
-  /// row tint underneath them would simply be covered up.
+  /// edge tint underneath them would simply be covered up.
   void _drawGoalFlags(Canvas canvas) {
-    void flagsOn(int row, Color color) {
-      _drawFlag(canvas, _metrics.cellCenter(Position(row, 0)), color);
-      _drawFlag(
-        canvas,
-        _metrics.cellCenter(Position(row, GameConstants.boardSize - 1)),
-        color,
-      );
-    }
-
     final goal = _currentGoal;
-    flagsOn(goal.row, goal.color);
+    final squares = _squaresOn(goal.edge);
+
+    _drawFlag(canvas, _metrics.cellCenter(squares.first), goal.color);
+    _drawFlag(canvas, _metrics.cellCenter(squares.last), goal.color);
   }
 
   /// A small pennant on a pole, centred on [center].
@@ -369,9 +374,7 @@ class BoardComponent extends PositionComponent {
   void _drawValidMoves(Canvas canvas) {
     if (!showValidMoves || _validMoves.isEmpty) return;
 
-    final color = _gameState.currentPlayerId == 1
-        ? const Color(GameConstants.player1Color)
-        : const Color(GameConstants.player2Color);
+    final color = Color(GameConstants.colorForSeat(_gameState.currentPlayerId));
 
     final fill = Paint()
       ..color = color.withValues(alpha: 0.18)
@@ -390,22 +393,16 @@ class BoardComponent extends PositionComponent {
   }
 
   void _drawPawns(Canvas canvas) {
-    _drawPawn(
-      canvas,
-      _gameState.player1.position,
-      const Color(GameConstants.player1Color),
-      '1',
-      _gameState.currentPlayerId == 1,
-      _selectedPawn == _gameState.player1.position,
-    );
-    _drawPawn(
-      canvas,
-      _gameState.player2.position,
-      const Color(GameConstants.player2Color),
-      '2',
-      _gameState.currentPlayerId == 2,
-      _selectedPawn == _gameState.player2.position,
-    );
+    for (final player in _gameState.players) {
+      _drawPawn(
+        canvas,
+        player.position,
+        Color(GameConstants.colorForSeat(player.id)),
+        '${player.id}',
+        _gameState.currentPlayerId == player.id,
+        _selectedPawn == player.position,
+      );
+    }
   }
 
   void _drawPawn(
