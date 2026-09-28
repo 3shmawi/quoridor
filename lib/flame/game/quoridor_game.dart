@@ -28,6 +28,9 @@ class QuoridorGame extends FlameGame
   /// same state never retrigger effects.
   int _soundedMoveCount = 0;
 
+  /// How hard the computer opponent plays. Set from the settings drawer.
+  AIDifficulty _difficulty = AIDifficulty.medium;
+
   /// Which seat this device plays, when the game is online.
   ///
   /// Null means a local game, where whoever is holding the phone plays both
@@ -159,7 +162,7 @@ class QuoridorGame extends FlameGame
     try {
       final newGameState = await GameService.executeAITurn(
         _gameState!,
-        AIDifficulty.medium,
+        _difficulty,
       );
 
       if (newGameState != _gameState) {
@@ -226,6 +229,7 @@ class QuoridorGame extends FlameGame
       final newGameState = await GameManager.processPlayerMove(
         _gameState!,
         move,
+        aiDifficulty: _difficulty,
       );
       updateGameState(newGameState);
 
@@ -250,9 +254,11 @@ class QuoridorGame extends FlameGame
   }
 
   void setDifficulty(AIDifficulty difficulty) {
-    // This could be used to adjust AI behavior in future moves
+    _difficulty = difficulty;
     onGameMessage?.call('Difficulty set to ${difficulty.name}');
   }
+
+  AIDifficulty get difficulty => _difficulty;
 
   void showValidMoves(bool show) {
     _boardComponent.showValidMoves = show;

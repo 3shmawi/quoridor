@@ -102,6 +102,40 @@ void main() {
     });
   });
 
+  group('which seat is mine', () {
+    test('the local seat is whichever one holds my uid, not always seat 1', () {
+      // The bug this pins: reading the seats positionally showed the
+      // opponent's walls as your own for whoever joined second.
+      final state = game();
+
+      expect(OnlineSession.forUid(state, 'uid-alice').localPlayerId, 1);
+      expect(OnlineSession.forUid(state, 'uid-bob').localPlayerId, 2);
+    });
+
+    test('each player resolves to a different seat', () {
+      final state = game();
+      final mine = OnlineSession.forUid(state, 'uid-bob');
+      final theirs = OnlineSession.forUid(state, 'uid-alice');
+
+      expect(mine.localPlayerId, isNot(theirs.localPlayerId));
+      expect(mine.opponent?.uid, 'uid-alice');
+      expect(theirs.opponent?.uid, 'uid-bob');
+    });
+
+    test('a seat maps to the matching board player', () {
+      final state = game();
+      final session = OnlineSession.forUid(state, 'uid-bob');
+
+      // Seat 2 must line up with player2 on the board, which is what the
+      // status strip uses to pick whose wall count to show as "You".
+      final seat = session.localPlayerId!;
+      final board = session.game.board;
+      final mine = seat == 1 ? board.player1 : board.player2;
+
+      expect(mine.id, seat);
+    });
+  });
+
   group('outcome', () {
     test('reports the win to the winner and the loss to the loser', () {
       final finished = game(

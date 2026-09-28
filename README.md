@@ -129,19 +129,18 @@ npx firebase-tools emulators:exec --only firestore \
 
 ### The AI opponent
 
-The AI works out of the box with no setup: it plays with a local
-pathfinding-based heuristic that follows its own shortest route and blocks
-yours, with three difficulty levels in the settings drawer.
+The AI needs no setup and makes no network calls. It is a search over real
+shortest-path distances: it looks ahead, values a position by how much shorter
+its route is than yours, and considers walls that would actually interrupt your
+best route.
 
-It can *optionally* consult a remote language model for strategy, which is off
-unless you supply a key at build time:
+Three strengths in the settings drawer, by how far ahead they look:
 
-```bash
-flutter run --dart-define=QUORIDOR_AI_API_KEY=your-key-here
-```
-
-No key means the remote call is skipped entirely and the local AI plays. Keys
-are never committed — see [Security](#security).
+| Strength | Looks ahead | Plays like |
+|---|---|---|
+| Easy | one move | sound but not always the best choice |
+| Medium | your reply | blocks when blocking is worth it |
+| Hard | two moves deep | sets walls up a move in advance |
 
 ### Firebase
 
@@ -191,10 +190,6 @@ so the rules can be tested directly — and reused unchanged by a future
 networked opponent. See [`docs/ONLINE_MULTIPLAYER_PLAN.md`](docs/ONLINE_MULTIPLAYER_PLAN.md).
 
 ## Security
-
-API credentials are supplied at build time via `--dart-define` and are not in
-the source tree. If you fork this repository, do not commit keys to
-`ai_service.dart` or anywhere else — use `--dart-define` or a CI secret.
 
 The values in `lib/firebase_options.dart` are Firebase client identifiers.
 Those are designed to be shipped inside client apps and are not secrets, but
