@@ -169,6 +169,37 @@ class QuoridorEngine {
     return scored.first.move;
   }
 
+  /// A single step along the shortest route to the player's goal.
+  ///
+  /// This is the move played when somebody's turn times out, and it is
+  /// deliberately not [bestMove]: the strongest reply is often a wall, and
+  /// spending one of the ten a player holds because they looked at their
+  /// phone's notification shade is a real cost they did not choose. Stepping
+  /// forward spends nothing and is never a blunder.
+  static GameMove? stepTowardsGoal(GameState state) {
+    final player = state.currentPlayer;
+
+    GameMove? best;
+    int? bestDistance;
+
+    for (final position in state.getValidMoves(player.position)) {
+      final move = GameMove.pawnMove(position, player.id);
+      final after = applyMove(state, move);
+      final moved = player.id == 1 ? after.player1 : after.player2;
+
+      if (moved.hasReachedGoal) return move;
+
+      final distance = distanceToGoal(after, moved);
+      if (distance == null) continue;
+      if (bestDistance == null || distance < bestDistance) {
+        bestDistance = distance;
+        best = move;
+      }
+    }
+
+    return best;
+  }
+
   /// The squares this player has occupied recently, most recent first.
   static List<Position> _recentPositions(GameState state, int playerId) {
     final positions = <Position>[];

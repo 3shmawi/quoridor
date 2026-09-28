@@ -121,6 +121,14 @@ class AppStrings {
   String get soundUnavailable => _get('soundUnavailable');
   String get language => _get('language');
   String get languageSubtitle => _get('languageSubtitle');
+  String get turnTimer => _get('turnTimer');
+  String get turnTimerSubtitle => _get('turnTimerSubtitle');
+  String get turnTimerOff => _get('turnTimerOff');
+  String get turnTimerOffSubtitle => _get('turnTimerOffSubtitle');
+  String turnTimerSeconds(int n) => _fill('turnTimerSeconds', '$n');
+  String get turnTimerSecondsSubtitle => _get('turnTimerSecondsSubtitle');
+  String get outOfTime => _get('outOfTime');
+
   String get aiDifficulty => _get('aiDifficulty');
   String get easy => _get('easy');
   String get easySubtitle => _get('easySubtitle');
@@ -265,6 +273,13 @@ class AppStrings {
     'soundEffects': 'Sound Effects',
     'soundEffectsSubtitle': 'Move and wall sounds',
     'soundUnavailable': 'Unavailable on this device',
+    'turnTimer': 'Turn Timer',
+    'turnTimerSubtitle': 'How long each turn lasts',
+    'turnTimerOff': 'No limit',
+    'turnTimerOffSubtitle': 'Take as long as you like',
+    'turnTimerSeconds': '%s seconds',
+    'turnTimerSecondsSubtitle': 'A move is played for you if time runs out',
+    'outOfTime': 'Out of time — a move was played for you',
     'language': 'Language',
     'languageSubtitle': 'العربية',
     'aiDifficulty': 'AI Difficulty',
@@ -405,6 +420,13 @@ class AppStrings {
     'soundEffects': 'المؤثرات الصوتية',
     'soundEffectsSubtitle': 'أصوات النقل والحواجز',
     'soundUnavailable': 'غير متاح على الجهاز ده',
+    'turnTimer': 'مؤقت الدور',
+    'turnTimerSubtitle': 'الدور الواحد بياخد قد إيه',
+    'turnTimerOff': 'من غير وقت',
+    'turnTimerOffSubtitle': 'خد وقتك زي ما تحب',
+    'turnTimerSeconds': '%s ثانية',
+    'turnTimerSecondsSubtitle': 'لو الوقت خلص هتتلعبلك نقلة',
+    'outOfTime': 'الوقت خلص — اتلعبتلك نقلة',
     'language': 'اللغة',
     'languageSubtitle': 'English',
     'aiDifficulty': 'مستوى الكمبيوتر',

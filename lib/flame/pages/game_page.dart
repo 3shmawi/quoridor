@@ -11,6 +11,7 @@ import '../../flame/services/app_strings.dart';
 import '../../flame/services/audio_service.dart';
 import '../../flame/services/settings_service.dart';
 import '../../flame/services/online/online_game_controller.dart';
+import '../../flame/services/turn_clock.dart';
 import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/services/ai_service.dart';
@@ -35,6 +36,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   bool _showMessage = false;
   bool _showValidMoves = true;
   AIDifficulty _currentDifficulty = SettingsService.instance.difficulty.value;
+
+  /// Counts down the turn in front of whoever is to play.
+  final TurnClock _clock = TurnClock();
+
+  /// True while a sheet or dialog is covering the board.
+  ///
+  /// The clock is paused under one: the mode sheet opens on the very first
+  /// frame, and a player reading it should not come back to a turn that has
+  /// already been played for them.
+  bool _menuOpen = false;
 
   /// Non-null while an online game is in progress.
   OnlineGameController? _online;
@@ -75,6 +86,44 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       if (mounted) setState(() {});
     };
     isInitializedProvider.value = _game.isInitialized;
+
+    _clock.limit = SettingsService.instance.turnLimit.value;
+    _clock.onExpired = _handleTurnExpired;
+    SettingsService.instance.turnLimit.addListener(_handleTurnLimitChanged);
+  }
+
+  void _handleTurnLimitChanged() {
+    _clock.limit = SettingsService.instance.turnLimit.value;
+    _syncClock();
+    if (mounted) setState(() {});
+  }
+
+  /// Keeps the clock pointed at the turn actually in front of the player.
+  ///
+  /// Called after anything that could have changed whose turn it is. The key
+  /// carries the move count as well as the seat, so a game where both sides
+  /// are the same player still restarts the clock on every move.
+  void _syncClock() {
+    if (!_game.isInitialized) return;
+
+    final state = _game.gameState;
+
+    // Nothing to count down while the computer is thinking, once somebody has
+    // won, or under an open menu.
+    if (state.isGameOver || state.currentPlayer.isAI || _menuOpen) {
+      _clock.stop();
+      return;
+    }
+
+    _clock.beginTurn(
+      '${state.gameId}:${state.moveHistory.length}:${state.currentPlayerId}',
+    );
+  }
+
+  void _handleTurnExpired() {
+    if (!mounted) return;
+    _showGameMessage(context.l10n.outOfTime);
+    _game.playForCurrentPlayer();
   }
 
   void closeMenu() {
@@ -86,6 +135,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _detachOnline(abandon: false);
+    SettingsService.instance.turnLimit.removeListener(_handleTurnLimitChanged);
+    _clock.dispose();
     _messageController.dispose();
     _confettiController.dispose();
     super.dispose();
@@ -136,6 +187,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       _showGameMessage(message);
       _online?.consumeMessage();
     }
+    _syncClock();
     setState(() {});
   }
 
@@ -174,6 +226,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     }
 
     isInitializedProvider.value = true;
+    _syncClock();
     setState(() {});
   }
 
@@ -344,100 +397,119 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _showGameInfo() {
-    showDialog(context: context, builder: (context) => _buildGameInfoDialog());
+    _whileMenuOpen(
+      showDialog<void>(
+        context: context,
+        builder: (context) => _buildGameInfoDialog(),
+      ),
+    );
+  }
+
+  /// Holds the clock while [barrier] is on screen, and starts it again after.
+  void _whileMenuOpen(Future<void> barrier) {
+    _menuOpen = true;
+    _syncClock();
+    barrier.whenComplete(() {
+      if (!mounted) return;
+      _menuOpen = false;
+      _syncClock();
+      setState(() {});
+    });
   }
 
   void _showGameModeSelection() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.55,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 12,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
+    _whileMenuOpen(
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.55,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 12,
+                offset: const Offset(0, -2),
               ),
-            ),
-            const SizedBox(height: 24),
-            // Title
-            Text(
-              context.l10n.chooseGameMode,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
+            ],
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            // Mode selection cards
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                shrinkWrap: true,
-                children: [
-                  _buildModeCard(
-                    icon: Icons.computer,
-                    title: context.l10n.playVsAI,
-                    subtitle: context.l10n.playVsAISubtitle,
-                    onTap: () {
-                      if (!_game.gameState.player2.isAI) {
-                        _game.togglePlayerMode();
-                      } else {
-                        _game.updateGameState(_game.gameState);
-                      }
-                      Navigator.pop(context);
-                      _showGameMessage(context.l10n.aiModeActivated);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildModeCard(
-                    icon: Icons.public,
-                    title: context.l10n.playOnline,
-                    subtitle: context.l10n.playOnlineSubtitle,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _startOnlineGame();
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildModeCard(
-                    icon: Icons.people,
-                    title: context.l10n.twoPlayers,
-                    subtitle: context.l10n.twoPlayersSubtitle,
-                    onTap: () {
-                      if (_game.gameState.player2.isAI) {
-                        _game.togglePlayerMode();
-                      } else {
-                        _game.updateGameState(_game.gameState);
-                      }
-                      Navigator.pop(context);
-                      _showGameMessage(context.l10n.twoPlayerModeActivated);
-                    },
-                  ),
-                ],
+              const SizedBox(height: 24),
+              // Title
+              Text(
+                context.l10n.chooseGameMode,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 32),
+              // Mode selection cards
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shrinkWrap: true,
+                  children: [
+                    _buildModeCard(
+                      icon: Icons.computer,
+                      title: context.l10n.playVsAI,
+                      subtitle: context.l10n.playVsAISubtitle,
+                      onTap: () {
+                        if (!_game.gameState.player2.isAI) {
+                          _game.togglePlayerMode();
+                        } else {
+                          _game.updateGameState(_game.gameState);
+                        }
+                        Navigator.pop(context);
+                        _showGameMessage(context.l10n.aiModeActivated);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModeCard(
+                      icon: Icons.public,
+                      title: context.l10n.playOnline,
+                      subtitle: context.l10n.playOnlineSubtitle,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _startOnlineGame();
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModeCard(
+                      icon: Icons.people,
+                      title: context.l10n.twoPlayers,
+                      subtitle: context.l10n.twoPlayersSubtitle,
+                      onTap: () {
+                        if (_game.gameState.player2.isAI) {
+                          _game.togglePlayerMode();
+                        } else {
+                          _game.updateGameState(_game.gameState);
+                        }
+                        Navigator.pop(context);
+                        _showGameMessage(context.l10n.twoPlayerModeActivated);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -520,6 +592,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The drawer covers the board, so the turn under it is not being played.
+      onDrawerChanged: (isOpen) {
+        _menuOpen = isOpen;
+        _syncClock();
+      },
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -641,6 +718,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                               AudioService.instance.enabled.value,
                               _toggleSound,
                             ),
+                          ]),
+
+                          const SizedBox(height: 24),
+
+                          _buildMenuSection(context.l10n.turnTimer, [
+                            for (final limit in TurnLimit.values)
+                              _buildTurnLimitItem(limit),
                           ]),
 
                           const SizedBox(height: 24),
@@ -948,6 +1032,56 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildTurnLimitItem(TurnLimit limit) {
+    final isSelected = SettingsService.instance.turnLimit.value == limit;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: isSelected
+          ? scheme.primary.withValues(alpha: 0.1)
+          : scheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isSelected
+              ? scheme.primary
+              : scheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: ListTile(
+        onTap: () => SettingsService.instance.turnLimit.value = limit,
+        leading: Icon(
+          limit == TurnLimit.off ? Icons.all_inclusive : Icons.timer_outlined,
+          color: isSelected
+              ? scheme.primary
+              : scheme.onSurface.withValues(alpha: 0.7),
+        ),
+        title: Text(
+          limit == TurnLimit.off
+              ? context.l10n.turnTimerOff
+              : context.l10n.turnTimerSeconds(limit.seconds),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? scheme.primary : scheme.onSurface,
+          ),
+        ),
+        subtitle: Text(
+          limit == TurnLimit.off
+              ? context.l10n.turnTimerOffSubtitle
+              : context.l10n.turnTimerSecondsSubtitle,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: scheme.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
+        trailing: isSelected
+            ? Icon(Icons.check_circle, color: scheme.primary)
+            : null,
+      ),
+    );
+  }
+
   Widget _buildDifficultyItem(AIDifficulty difficulty) {
     final isSelected = _currentDifficulty == difficulty;
 
@@ -1138,6 +1272,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   /// seat 1. Reading the seats positionally showed the opponent's wall count
   /// as your own for whoever joined second.
   Widget _buildStatusLine() {
+    // Only this strip rebuilds on a tick, not the board with it.
+    return ValueListenableBuilder<Duration?>(
+      valueListenable: _clock.remaining,
+      builder: (context, remaining, _) => _buildStatusRow(remaining),
+    );
+  }
+
+  Widget _buildStatusRow(Duration? remaining) {
     final state = _game.gameState;
     final online = _online;
     final localSeat = online?.localPlayerId ?? 1;
@@ -1164,6 +1306,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             color: _seatColor(localSeat),
             walls: localPlayer.wallsRemaining,
             isActive: state.currentPlayerId == localSeat,
+            remaining: state.currentPlayerId == localSeat ? remaining : null,
           ),
         ),
         const SizedBox(width: 10),
@@ -1173,11 +1316,24 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             color: _seatColor(opponentSeat),
             walls: opponentPlayer.wallsRemaining,
             isActive: state.currentPlayerId == opponentSeat,
+            remaining: state.currentPlayerId == opponentSeat ? remaining : null,
             trailing: true,
           ),
         ),
       ],
     );
+  }
+
+  /// Seconds left, rounded up, so the clock shows 1 for the whole of the last
+  /// second rather than sitting on 0 while there is still time to move.
+  static int _clockSeconds(Duration remaining) =>
+      (remaining.inMilliseconds / 1000).ceil();
+
+  /// A countdown as m:ss, or just seconds when under a minute.
+  static String _formatClock(int seconds) {
+    if (seconds < 60) return '$seconds';
+    final minutes = seconds ~/ 60;
+    return '$minutes:${(seconds % 60).toString().padLeft(2, '0')}';
   }
 
   static Color _seatColor(int seat) => Color(
@@ -1192,9 +1348,18 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     required Color color,
     required int walls,
     required bool isActive,
+    Duration? remaining,
     bool trailing = false,
   }) {
     final scheme = Theme.of(context).colorScheme;
+
+    // The last five seconds go red, so the countdown is noticed without being
+    // watched — the board is where the player is looking, not here. The test
+    // is on the number actually shown, so the colour and the digit never
+    // disagree about how much time is left.
+    final shown = remaining == null ? null : _clockSeconds(remaining);
+    final isUrgent = shown != null && shown <= 5;
+    final liveColor = isUrgent ? scheme.error : color;
 
     final badge = Container(
       width: 30,
@@ -1231,16 +1396,40 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               color: scheme.onSurface.withValues(alpha: isActive ? 1 : 0.55),
             ),
           ),
-          Text(
-            isActive ? context.l10n.toPlay : context.l10n.wallsCount(walls),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              color: isActive
-                  ? color
-                  : scheme.onSurface.withValues(alpha: 0.45),
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (shown != null) ...[
+                Icon(Icons.timer_outlined, size: 12, color: liveColor),
+                const SizedBox(width: 3),
+                Text(
+                  _formatClock(shown),
+                  style: TextStyle(
+                    fontSize: 11,
+                    // Tabular figures, so the text does not twitch sideways
+                    // as the digits change.
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    fontWeight: isUrgent ? FontWeight.bold : FontWeight.w500,
+                    color: liveColor,
+                  ),
+                ),
+              ] else
+                Flexible(
+                  child: Text(
+                    isActive
+                        ? context.l10n.toPlay
+                        : context.l10n.wallsCount(walls),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isActive
+                          ? color
+                          : scheme.onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -1250,11 +1439,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isActive ? color.withValues(alpha: 0.12) : Colors.transparent,
+        color: isActive
+            ? liveColor.withValues(alpha: 0.12)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isActive
-              ? color.withValues(alpha: 0.6)
+              ? liveColor.withValues(alpha: 0.6)
               : scheme.outline.withValues(alpha: 0.25),
           width: isActive ? 1.5 : 1,
         ),

@@ -9,6 +9,7 @@ import '../board_component.dart';
 import '../services/audio_service.dart';
 import '../constants.dart';
 import '../models/game_state.dart';
+import '../services/ai/quoridor_engine.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
 
@@ -213,6 +214,29 @@ class QuoridorGame extends FlameGame
       onGameMessage?.call('Invalid wall placement!');
       HapticFeedback.lightImpact();
     }
+  }
+
+  /// Plays a move on behalf of the player to move, because their time ran out.
+  ///
+  /// Running out of time forfeits the turn, not the game. A phone game gets
+  /// put down mid-turn constantly — for a notification, a bus stop, a person
+  /// talking to you — and ending the game over that would punish the player
+  /// far more than it discourages stalling. So the engine plays a quick, sane
+  /// move and the game carries on.
+  ///
+  /// It goes through the same path as a tap, so online the move is submitted
+  /// to the server like any other and the board still waits for it to land.
+  void playForCurrentPlayer() {
+    if (!canActNow) return;
+
+    // A step forward, never a wall: see [QuoridorEngine.stepTowardsGoal].
+    final move =
+        QuoridorEngine.stepTowardsGoal(_gameState!) ??
+        QuoridorEngine.bestMove(_gameState!, EngineStrength.easy);
+    if (move == null) return;
+
+    _boardComponent.clearInteraction();
+    unawaited(_processMove(move));
   }
 
   Future<void> _processMove(GameMove move) async {
