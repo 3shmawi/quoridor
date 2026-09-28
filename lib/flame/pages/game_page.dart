@@ -7,7 +7,9 @@ import 'dart:math' show pi;
 
 import '../constants.dart';
 import '../../flame/game/quoridor_game.dart';
+import '../../flame/services/app_strings.dart';
 import '../../flame/services/audio_service.dart';
+import '../../flame/services/settings_service.dart';
 import '../../flame/services/online/online_game_controller.dart';
 import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
@@ -32,7 +34,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   String _currentMessage = '';
   bool _showMessage = false;
   bool _showValidMoves = true;
-  AIDifficulty _currentDifficulty = AIDifficulty.medium;
+  AIDifficulty _currentDifficulty = SettingsService.instance.difficulty.value;
 
   /// Non-null while an online game is in progress.
   OnlineGameController? _online;
@@ -121,8 +123,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     setState(() {});
     _showGameMessage(
       controller.connection == OnlineConnectionState.waitingForOpponent
-          ? 'Share code ${controller.roomCode} to invite a friend'
-          : 'Connected — good luck',
+          ? context.l10n.shareCodeToInvite(controller.roomCode ?? '')
+          : context.l10n.connectedGoodLuck,
     );
   }
 
@@ -140,7 +142,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void _handleOnlineGameOver(bool didWin) {
     if (!mounted) return;
     if (didWin) _showConfetti();
-    _showGameMessage(didWin ? 'You win!' : 'Your opponent wins');
+    _showGameMessage(didWin ? context.l10n.youWin : context.l10n.opponentWins);
   }
 
   /// Tears down any online session and returns the board to local play.
@@ -162,7 +164,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _detachOnline(abandon: true);
     _game.newGame();
     setState(() {});
-    _showGameMessage('Left the online game');
+    _showGameMessage(context.l10n.leftOnlineGame);
   }
 
   void _handleGameStateChanged(GameState gameState) {
@@ -217,7 +219,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               size: 28,
             ),
             const SizedBox(width: 12),
-            const Text('Game Over!'),
+            Text(context.l10n.gameOverTitle),
           ],
         ),
         content: Column(
@@ -225,7 +227,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${_game.gameState.winner} wins!',
+              context.l10n.nameWins('${_game.gameState.winner}'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.bold,
@@ -233,7 +235,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 16),
             Text(
-              'Would you like to play again?',
+              context.l10n.playAgainSuggestion,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
@@ -243,7 +245,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             onPressed: () {
               Navigator.of(context).pop();
             },
-            child: const Text('Not Now'),
+            child: Text(context.l10n.notNow),
           ),
           FilledButton.icon(
             onPressed: () {
@@ -251,7 +253,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               _newGame();
             },
             icon: const Icon(Icons.refresh),
-            label: const Text('Play Again'),
+            label: Text(context.l10n.playAgain),
           ),
         ],
       ),
@@ -260,12 +262,12 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _newGame() {
     if (_isOnline) {
-      _showGameMessage('Leave the online game first');
+      _showGameMessage(context.l10n.leaveOnlineFirst);
       closeMenu();
       return;
     }
     _game.newGame();
-    _showGameMessage('New game started!');
+    _showGameMessage(context.l10n.newGameStarted);
     closeMenu();
   }
 
@@ -275,8 +277,18 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     });
     _game.showValidMoves(_showValidMoves);
     _showGameMessage(
-      _showValidMoves ? 'Valid moves shown' : 'Valid moves hidden',
+      _showValidMoves
+          ? context.l10n.validMovesShown
+          : context.l10n.validMovesHidden,
     );
+    closeMenu();
+  }
+
+  /// Switches between English and Arabic, which also flips the layout
+  /// direction for the whole app.
+  void _toggleLanguage() {
+    SettingsService.instance.toggleLanguage();
+    setState(() {});
     closeMenu();
   }
 
@@ -289,7 +301,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       // Silence anything mid-playback so the toggle takes effect immediately.
       unawaited(audio.stopAll());
     }
-    _showGameMessage(audio.enabled.value ? 'Sound on' : 'Sound off');
+    _showGameMessage(
+      audio.enabled.value ? context.l10n.soundOn : context.l10n.soundOff,
+    );
     closeMenu();
   }
 
@@ -297,8 +311,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     setState(() {
       _currentDifficulty = difficulty;
     });
+    SettingsService.instance.difficulty.value = difficulty;
     _game.setDifficulty(difficulty);
-    _showGameMessage('Difficulty: ${difficulty.name}');
+    _showGameMessage(
+      context.l10n.difficultySetTo(_difficultyLabel(difficulty)),
+    );
   }
 
   void _togglePlayerMode() {
@@ -309,17 +326,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   Future<void> _saveGame() async {
     final user = FirebaseService.currentUser;
     if (user == null) {
-      _showGameMessage('Please sign in to save game');
+      _showGameMessage(context.l10n.signInToSave);
       closeMenu();
       return;
     }
 
+    // Read the strings before awaiting: the screen may be gone by the time
+    // the save returns.
+    final saved = context.l10n.gameSaved;
+    final failed = context.l10n.gameSaveFailed;
+
     final gameId = await FirebaseService.saveGame(_game.gameState);
-    if (gameId != null) {
-      _showGameMessage('Game saved successfully!');
-    } else {
-      _showGameMessage('Failed to save game');
-    }
+    if (!mounted) return;
+
+    _showGameMessage(gameId != null ? saved : failed);
     closeMenu();
   }
 
@@ -362,7 +382,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             const SizedBox(height: 24),
             // Title
             Text(
-              'Choose Game Mode',
+              context.l10n.chooseGameMode,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.onSurface,
@@ -377,8 +397,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                 children: [
                   _buildModeCard(
                     icon: Icons.computer,
-                    title: 'Play vs AI',
-                    subtitle: 'Challenge our intelligent AI opponent',
+                    title: context.l10n.playVsAI,
+                    subtitle: context.l10n.playVsAISubtitle,
                     onTap: () {
                       if (!_game.gameState.player2.isAI) {
                         _game.togglePlayerMode();
@@ -386,14 +406,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         _game.updateGameState(_game.gameState);
                       }
                       Navigator.pop(context);
-                      _showGameMessage('Playing against AI');
+                      _showGameMessage(context.l10n.aiModeActivated);
                     },
                   ),
                   const SizedBox(height: 16),
                   _buildModeCard(
                     icon: Icons.public,
-                    title: 'Play Online',
-                    subtitle: 'Invite a friend with a code, or join theirs',
+                    title: context.l10n.playOnline,
+                    subtitle: context.l10n.playOnlineSubtitle,
                     onTap: () {
                       Navigator.pop(context);
                       _startOnlineGame();
@@ -402,8 +422,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   const SizedBox(height: 16),
                   _buildModeCard(
                     icon: Icons.people,
-                    title: 'Two Players',
-                    subtitle: 'Play with a friend on the same device',
+                    title: context.l10n.twoPlayers,
+                    subtitle: context.l10n.twoPlayersSubtitle,
                     onTap: () {
                       if (_game.gameState.player2.isAI) {
                         _game.togglePlayerMode();
@@ -411,7 +431,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         _game.updateGameState(_game.gameState);
                       }
                       Navigator.pop(context);
-                      _showGameMessage('Two player mode activated');
+                      _showGameMessage(context.l10n.twoPlayerModeActivated);
                     },
                   ),
                 ],
@@ -548,70 +568,76 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildMenuSection('Game Controls', [
+                          _buildMenuSection(context.l10n.gameControls, [
                             if (_isOnline)
                               _buildMenuItem(
                                 Icons.logout_rounded,
-                                'Leave Online Game',
-                                'Return to playing on this device',
+                                context.l10n.leaveOnlineGame,
+                                context.l10n.leaveOnlineGameSubtitle,
                                 _leaveOnlineGame,
                               )
                             else
                               _buildMenuItem(
                                 Icons.public,
-                                'Play Online',
-                                'Invite a friend with a code',
+                                context.l10n.playOnline,
+                                context.l10n.playOnlineSubtitleShort,
                                 _startOnlineGame,
                               ),
                             _buildMenuItem(
                               Icons.refresh,
-                              'New Game',
-                              'Start a fresh game',
+                              context.l10n.newGame,
+                              context.l10n.newGameSubtitle,
                               _newGame,
                             ),
                             _buildMenuItem(
                               Icons.save,
-                              'Save Game',
-                              'Save current progress',
+                              context.l10n.saveGame,
+                              context.l10n.saveGameSubtitle,
                               _saveGame,
                             ),
                             if (_game.isInitialized)
                               _buildMenuItem(
                                 Icons.people,
-                                'Toggle Player Mode',
+                                context.l10n.togglePlayerMode,
                                 _game.gameState.player2.isAI
-                                    ? 'Switch to 2 players'
-                                    : 'Switch to AI',
+                                    ? context.l10n.switchToTwoPlayers
+                                    : context.l10n.switchToAI,
                                 _togglePlayerMode,
                               ),
                           ]),
 
                           const SizedBox(height: 24),
 
-                          _buildMenuSection('Display Options', [
+                          _buildMenuSection(context.l10n.displayOptions, [
                             _buildSwitchItem(
                               Icons.visibility,
-                              'Show Valid Moves',
-                              'Highlight possible moves',
+                              context.l10n.showValidMoves,
+                              context.l10n.showValidMovesSubtitle,
                               _showValidMoves,
                               _toggleValidMoves,
                             ),
                             _buildSwitchItem(
                               Icons.dark_mode,
-                              'Dark Mode',
-                              'Toggle dark mode',
+                              context.l10n.darkMode,
+                              context.l10n.darkModeSubtitle,
                               isDarkModeNotifier.value,
                               () => isDarkModeNotifier.value =
                                   !isDarkModeNotifier.value,
+                            ),
+                            _buildMenuItem(
+                              Icons.language,
+                              context.l10n.language,
+                              context.l10n.languageSubtitle,
+                              _toggleLanguage,
                             ),
                             _buildSwitchItem(
                               AudioService.instance.enabled.value
                                   ? Icons.volume_up
                                   : Icons.volume_off,
-                              'Sound Effects',
+                              context.l10n.soundEffects,
                               AudioService.instance.isUnavailable
-                                  ? 'Unavailable on this device'
-                                  : 'Move and wall sounds',
+                                  ? context.l10n.soundUnavailable
+                                  : context.l10n.soundEffectsSubtitle,
                               AudioService.instance.enabled.value,
                               _toggleSound,
                             ),
@@ -619,7 +645,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
                           const SizedBox(height: 24),
 
-                          _buildMenuSection('AI Difficulty', [
+                          _buildMenuSection(context.l10n.aiDifficulty, [
                             _buildDifficultyItem(AIDifficulty.easy),
                             _buildDifficultyItem(AIDifficulty.medium),
                             _buildDifficultyItem(AIDifficulty.hard),
@@ -793,7 +819,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         // Game Title
         Expanded(
           child: Text(
-            'Quoridor Game',
+            context.l10n.appTitle,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
@@ -948,7 +974,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
         ),
         title: Text(
-          difficulty.name.toUpperCase(),
+          _difficultyLabel(difficulty),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             color: isSelected
@@ -988,11 +1014,22 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   String _getDifficultyDescription(AIDifficulty difficulty) {
     switch (difficulty) {
       case AIDifficulty.easy:
-        return 'Beginner-friendly AI';
+        return context.l10n.easySubtitle;
       case AIDifficulty.medium:
-        return 'Balanced challenge';
+        return context.l10n.mediumSubtitle;
       case AIDifficulty.hard:
-        return 'Expert-level AI';
+        return context.l10n.hardSubtitle;
+    }
+  }
+
+  String _difficultyLabel(AIDifficulty difficulty) {
+    switch (difficulty) {
+      case AIDifficulty.easy:
+        return context.l10n.easy;
+      case AIDifficulty.medium:
+        return context.l10n.medium;
+      case AIDifficulty.hard:
+        return context.l10n.hard;
     }
   }
 
@@ -1018,34 +1055,34 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       case OnlineConnectionState.connecting:
         color = scheme.onSurface.withValues(alpha: 0.7);
         icon = Icons.sync_rounded;
-        text = 'Connecting…';
+        text = context.l10n.connecting;
 
       case OnlineConnectionState.waitingForOpponent:
         color = const Color(0xFFD97706);
         icon = Icons.hourglass_top_rounded;
-        text = 'Waiting for an opponent — code ${online.roomCode}';
+        text = context.l10n.waitingForOpponentWithCode(online.roomCode ?? '');
         action = TextButton.icon(
           onPressed: () => _copyRoomCode(online.roomCode),
           icon: const Icon(Icons.copy_rounded, size: 16),
-          label: const Text('Copy'),
+          label: Text(context.l10n.copy),
         );
 
       case OnlineConnectionState.opponentAway:
         color = const Color(0xFFD97706);
         icon = Icons.cloud_off_rounded;
         text =
-            '${online.session?.opponent?.displayName ?? 'Opponent'} '
+            '${online.session?.opponent?.displayName ?? context.l10n.opponent} '
             'has gone quiet';
 
       case OnlineConnectionState.offline:
         color = const Color(0xFFDC2626);
         icon = Icons.wifi_off_rounded;
-        text = 'Lost contact with the game';
+        text = context.l10n.lostContact;
 
       case OnlineConnectionState.ended:
         color = scheme.onSurface.withValues(alpha: 0.7);
         icon = Icons.flag_rounded;
-        text = 'Game over';
+        text = context.l10n.gameOverShort;
 
       case OnlineConnectionState.live:
         final yourTurn = online.isLocalTurn;
@@ -1054,8 +1091,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             ? Icons.play_circle_outline_rounded
             : Icons.more_horiz_rounded;
         text = yourTurn
-            ? 'Your turn'
-            : '${online.session?.opponent?.displayName ?? 'Opponent'} '
+            ? context.l10n.yourTurn
+            : '${online.session?.opponent?.displayName ?? context.l10n.opponent} '
                   'is thinking…';
     }
 
@@ -1089,7 +1126,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   Future<void> _copyRoomCode(String? code) async {
     if (code == null) return;
     await Clipboard.setData(ClipboardData(text: code));
-    if (mounted) _showGameMessage('Code $code copied');
+    if (mounted) _showGameMessage(context.l10n.codeCopied(code));
   }
 
   // --- Status line ---------------------------------------------------------
@@ -1111,18 +1148,19 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     final String opponentLabel;
     if (online != null) {
-      opponentLabel = online.session?.opponent?.displayName ?? 'Opponent';
+      opponentLabel =
+          online.session?.opponent?.displayName ?? context.l10n.opponent;
     } else if (opponentPlayer.isAI) {
-      opponentLabel = 'AI';
+      opponentLabel = context.l10n.ai;
     } else {
-      opponentLabel = 'Player $opponentSeat';
+      opponentLabel = context.l10n.playerN(opponentSeat);
     }
 
     return Row(
       children: [
         Expanded(
           child: _buildPlayerStatus(
-            label: 'You',
+            label: context.l10n.you,
             color: _seatColor(localSeat),
             walls: localPlayer.wallsRemaining,
             isActive: state.currentPlayerId == localSeat,
@@ -1194,7 +1232,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             ),
           ),
           Text(
-            isActive ? 'to play' : '$walls walls',
+            isActive ? context.l10n.toPlay : context.l10n.wallsCount(walls),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1272,7 +1310,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         children: [
           Icon(Icons.info, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
-          Expanded(child: const Text('How to Play Quoridor')),
+          Expanded(child: Text(context.l10n.howToPlay)),
         ],
       ),
       content: SingleChildScrollView(
@@ -1281,32 +1319,29 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildInfoSection(
-              '🎯 Objective',
-              'Be the first player to reach the opposite side of the board.',
+              context.l10n.objective,
+              context.l10n.objectiveBody,
             ),
             _buildInfoSection(
-              '🎮 Your Turn',
-              'On each turn, either:\n• Move your pawn one space\n• Place a wall to block your opponent',
+              context.l10n.yourTurnSection,
+              context.l10n.yourTurnBody,
             ),
             _buildInfoSection(
-              '🚶 Movement',
+              context.l10n.movement,
               'The squares you can reach are ringed in your colour — tap one to move there. You may jump over your opponent if they are in your way.',
             ),
             _buildInfoSection(
-              '🧱 Walls',
-              'Each player has 10. Tap a gap between squares to line a wall up — it turns green if it can go there, red if it cannot. Tap the same spot again to place it. Aim slightly nearer the other gap to turn the wall.\n\nA wall may make your opponent\'s route longer, but never seal it off completely.',
+              context.l10n.wallsSection,
+              context.l10n.wallsBody,
             ),
-            _buildInfoSection(
-              '🏆 Winning',
-              'Player 1 (purple) starts at the bottom and wins by reaching the top row.\nPlayer 2 (teal) starts at the top and wins by reaching the bottom row.\n\nEach goal row is tinted in that player\'s colour.',
-            ),
+            _buildInfoSection(context.l10n.winning, context.l10n.winningBody),
           ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Got it!'),
+          child: Text(context.l10n.gotIt),
         ),
       ],
     );

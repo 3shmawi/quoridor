@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/online_session.dart';
+import '../services/app_strings.dart';
 import '../services/identity_service.dart';
 import '../services/online/online_game_controller.dart';
 import '../services/online/online_game_service.dart';
@@ -64,7 +65,7 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
     if (!ok) {
       setState(() {
         _busy = false;
-        _error = controller.message ?? 'Could not start the game';
+        _error = controller.message ?? context.l10n.couldNotStart;
       });
       controller.dispose();
       return;
@@ -83,7 +84,7 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
       backgroundColor: scheme.surface,
       appBar: AppBar(
         backgroundColor: scheme.surface,
-        title: const Text('Play online'),
+        title: Text(context.l10n.onlineLobbyTitle),
       ),
       body: SafeArea(
         child: ListView(
@@ -97,7 +98,7 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
             if (_resumable.isNotEmpty) ...[
               const SizedBox(height: 24),
               Text(
-                'Games in progress',
+                context.l10n.gamesInProgress,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: scheme.onSurface,
@@ -133,14 +134,14 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    identity?.displayName ?? 'Connecting…',
+                    identity?.displayName ?? context.l10n.connecting,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: scheme.onSurface,
                     ),
                   ),
                   Text(
-                    'Your opponent sees this name',
+                    context.l10n.opponentSeesThisName,
                     style: TextStyle(
                       fontSize: 12,
                       color: scheme.onSurface.withValues(alpha: 0.7),
@@ -175,7 +176,7 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
                 Icon(Icons.add_circle_outline, color: scheme.primary),
                 const SizedBox(width: 10),
                 Text(
-                  'Start a game',
+                  context.l10n.startAGame,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 17,
@@ -186,14 +187,14 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'You get a six-character code. Share it and your friend joins.',
+              context.l10n.startAGameSubtitle,
               style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _busy ? null : () => _run((c) => c.createGame()),
               icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Create game'),
+              label: Text(context.l10n.createGame),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
               ),
@@ -226,7 +227,7 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
                 Icon(Icons.login_rounded, color: scheme.primary),
                 const SizedBox(width: 10),
                 Text(
-                  'Join a game',
+                  context.l10n.joinAGame,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 17,
@@ -249,7 +250,7 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
               ),
               textAlign: TextAlign.center,
               decoration: InputDecoration(
-                hintText: 'CODE',
+                hintText: context.l10n.codeHint,
                 counterText: '',
                 hintStyle: TextStyle(
                   letterSpacing: 8,
@@ -280,7 +281,7 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
                   ? () => _run((c) => c.joinGame(_codeController.text))
                   : null,
               icon: const Icon(Icons.arrow_forward_rounded),
-              label: const Text('Join game'),
+              label: Text(context.l10n.joinGame),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
               ),
@@ -314,15 +315,17 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
         ),
         title: Text(
           waiting
-              ? 'Waiting for an opponent'
-              : 'vs ${opponent?.displayName ?? 'Opponent'}',
+              ? context.l10n.waitingForOpponent
+              : context.l10n.versName(
+                  opponent?.displayName ?? context.l10n.opponent,
+                ),
           style: TextStyle(
             fontWeight: FontWeight.w600,
             color: scheme.onSurface,
           ),
         ),
         subtitle: Text(
-          'Code ${game.roomCode} · ${game.moveCount} moves',
+          context.l10n.codeAndMoves(game.roomCode, game.moveCount),
           style: TextStyle(
             fontSize: 12,
             color: scheme.onSurface.withValues(alpha: 0.7),
