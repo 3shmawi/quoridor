@@ -21,6 +21,13 @@ class BoardComponent extends PositionComponent {
   /// page can rebuild its controls (mode, ghost wall, validity message).
   VoidCallback? onInteractionChanged;
 
+  /// The pawn the player has picked up, if any.
+  ///
+  /// Moving is two taps again: one on your pawn to pick it up, one on where
+  /// you want it. Nothing is highlighted until you pick the pawn up, which
+  /// keeps the board quiet while you are thinking.
+  Position? _selectedPawn;
+
   List<Position> _validMoves = const [];
 
   /// The wall the player is lining up but has not committed yet.
@@ -50,6 +57,7 @@ class BoardComponent extends PositionComponent {
   void updateGameState(GameState newGameState) {
     _gameState = newGameState;
     _wallComponent.gameState = newGameState;
+    _selectedPawn = null;
     _clearPendingWall();
     _refreshValidMoves();
     _wallComponent.showSlots = newGameState.currentPlayer.hasWallsRemaining;
@@ -62,6 +70,7 @@ class BoardComponent extends PositionComponent {
     _drawBoardSurface(canvas);
     _drawGoalRows(canvas);
     _drawGrid(canvas);
+    _drawGoalFlags(canvas);
     _drawValidMoves(canvas);
     _drawPawns(canvas);
   }
@@ -79,20 +88,31 @@ class BoardComponent extends PositionComponent {
   void handleTap(Vector2 position) {
     _ensureMetrics();
     final offset = Offset(position.x, position.y);
-
-    // Moving takes priority, but only on a square that is actually offered:
-    // the legal squares are the few glowing circles, so a tap on one is never
-    // ambiguous. Every other tap on the board is aiming a wall.
     final tapped = _metrics.positionAt(offset);
-    if (tapped != null && _validMoves.contains(tapped)) {
-      final center = _metrics.cellCenter(tapped);
-      if ((offset - center).distance <= _metrics.cellSize * 0.5) {
-        _clearPendingWall();
-        onMoveAttempted?.call(tapped);
-        return;
-      }
+
+    // Tapping your own pawn picks it up, or puts it back down.
+    if (tapped != null && tapped == _gameState.currentPlayer.position) {
+      _clearPendingWall();
+      _selectedPawn = _selectedPawn == tapped ? null : tapped;
+      _refreshValidMoves();
+      onInteractionChanged?.call();
+      return;
     }
 
+    // While a pawn is held, the board is about moving it and nothing else.
+    if (_selectedPawn != null) {
+      if (tapped != null && _validMoves.contains(tapped)) {
+        onMoveAttempted?.call(tapped);
+      } else {
+        _selectedPawn = null;
+        _refreshValidMoves();
+        onInteractionChanged?.call();
+      }
+      return;
+    }
+
+    // Pawn down: the rest of the board aims a wall, which gives a whole cell
+    // to aim with rather than the few pixels of the gap itself.
     if (_gameState.currentPlayer.hasWallsRemaining) _aimWall(offset);
   }
 
@@ -155,20 +175,18 @@ class BoardComponent extends PositionComponent {
   }
 
   void handleHover(Vector2 position) {
+    if (_selectedPawn != null) return;
     _ensureMetrics();
-    final offset = Offset(position.x, position.y);
-    final tapped = _metrics.positionAt(offset);
-    if (tapped != null && _validMoves.contains(tapped)) {
-      _wallComponent.previewWall = null;
-      return;
+    if (_gameState.currentPlayer.hasWallsRemaining) {
+      _aimWall(Offset(position.x, position.y));
     }
-    if (_gameState.currentPlayer.hasWallsRemaining) _aimWall(offset);
   }
 
   void _refreshValidMoves() {
-    _validMoves = _gameState.isGameOver
+    final selected = _selectedPawn;
+    _validMoves = (selected == null || _gameState.isGameOver)
         ? const []
-        : _gameState.getValidMoves(_gameState.currentPlayer.position);
+        : _gameState.getValidMoves(selected);
   }
 
   // --- Rendering ---------------------------------------------------------
@@ -187,28 +205,98 @@ class BoardComponent extends PositionComponent {
     );
   }
 
-  /// Tints each player's target row so the direction of play is obvious at a
-  /// glance instead of being a thin line at the board edge.
+  /// The goal row belonging to whoever is to move.
+  ({int row, Color color}) get _currentGoal => _gameState.currentPlayerId == 1
+      ? (
+          row: GameConstants.player1Goal,
+          color: const Color(GameConstants.player1Color),
+        )
+      : (
+          row: GameConstants.player2Goal,
+          color: const Color(GameConstants.player2Color),
+        );
+
+  /// Tints the row the player to move is heading for. The flags go on top, in
+  /// [_drawGoalFlags].
   void _drawGoalRows(Canvas canvas) {
-    void tintRow(int row, Color color) {
-      final rect = Rect.fromLTRB(
-        _metrics.cellRect(Position(row, 0)).left - _metrics.spacing,
-        _metrics.cellRect(Position(row, 0)).top - _metrics.spacing,
-        _metrics.cellRect(Position(row, GameConstants.boardSize - 1)).right +
-            _metrics.spacing,
-        _metrics.cellRect(Position(row, 0)).bottom + _metrics.spacing,
+    void markRow(int row, Color color) {
+      final first = _metrics.cellRect(Position(row, 0));
+      final last = _metrics.cellRect(
+        Position(row, GameConstants.boardSize - 1),
       );
+
+      final rect = Rect.fromLTRB(
+        first.left - _metrics.spacing,
+        first.top - _metrics.spacing,
+        last.right + _metrics.spacing,
+        first.bottom + _metrics.spacing,
+      );
+
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, Radius.circular(_metrics.cellSize * 0.2)),
         Paint()
-          ..color = color.withValues(alpha: 0.16)
+          ..color = color.withValues(alpha: 0.3)
           ..style = PaintingStyle.fill,
       );
     }
 
-    // Player 1 runs to the top row, player 2 to the bottom row.
-    tintRow(GameConstants.player1Goal, const Color(GameConstants.player1Color));
-    tintRow(GameConstants.player2Goal, const Color(GameConstants.player2Color));
+    // Only the player to move sees their target row. Showing both at once
+    // says where the ends are; showing one says where *you* are going, and the
+    // strip appearing on your turn is what answers "which way am I running".
+    final goal = _currentGoal;
+    markRow(goal.row, goal.color);
+  }
+
+  /// Flags at both ends of each goal row.
+  ///
+  /// Drawn after the grid: the cells are opaque, so anything painted with the
+  /// row tint underneath them would simply be covered up.
+  void _drawGoalFlags(Canvas canvas) {
+    void flagsOn(int row, Color color) {
+      _drawFlag(canvas, _metrics.cellCenter(Position(row, 0)), color);
+      _drawFlag(
+        canvas,
+        _metrics.cellCenter(Position(row, GameConstants.boardSize - 1)),
+        color,
+      );
+    }
+
+    final goal = _currentGoal;
+    flagsOn(goal.row, goal.color);
+  }
+
+  /// A small pennant on a pole, centred on [center].
+  void _drawFlag(Canvas canvas, Offset center, Color color) {
+    final height = _metrics.cellSize * 0.52;
+    final width = _metrics.cellSize * 0.3;
+    final poleWidth = _metrics.cellSize * 0.06;
+
+    final top = center.dy - height / 2;
+    final poleX = center.dx - width / 2;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(poleX, top, poleWidth, height),
+        Radius.circular(poleWidth / 2),
+      ),
+      Paint()
+        ..color = color.withValues(alpha: 0.85)
+        ..style = PaintingStyle.fill,
+    );
+
+    // The pennant hangs from the top of the pole.
+    final pennant = Path()
+      ..moveTo(poleX + poleWidth, top)
+      ..lineTo(poleX + poleWidth + width, top + height * 0.18)
+      ..lineTo(poleX + poleWidth, top + height * 0.36)
+      ..close();
+
+    canvas.drawPath(
+      pennant,
+      Paint()
+        ..color = color.withValues(alpha: 0.85)
+        ..style = PaintingStyle.fill,
+    );
   }
 
   void _drawGrid(Canvas canvas) {
@@ -273,6 +361,7 @@ class BoardComponent extends PositionComponent {
       const Color(GameConstants.player1Color),
       '1',
       _gameState.currentPlayerId == 1,
+      _selectedPawn == _gameState.player1.position,
     );
     _drawPawn(
       canvas,
@@ -280,6 +369,7 @@ class BoardComponent extends PositionComponent {
       const Color(GameConstants.player2Color),
       '2',
       _gameState.currentPlayerId == 2,
+      _selectedPawn == _gameState.player2.position,
     );
   }
 
@@ -289,6 +379,7 @@ class BoardComponent extends PositionComponent {
     Color color,
     String label,
     bool isCurrentPlayer,
+    bool isSelected,
   ) {
     final center = _metrics.cellCenter(position);
     final radius = _metrics.cellSize * 0.36;
@@ -320,15 +411,15 @@ class BoardComponent extends PositionComponent {
         ..strokeWidth = radius * 0.12,
     );
 
-    // A halo marks whose turn it is.
-    if (isCurrentPlayer) {
+    // A halo marks whose turn it is; a solid ring marks a pawn picked up.
+    if (isCurrentPlayer || isSelected) {
       canvas.drawCircle(
         center,
-        radius * 1.22,
+        radius * (isSelected ? 1.34 : 1.22),
         Paint()
-          ..color = color.withValues(alpha: 0.45)
+          ..color = color.withValues(alpha: isSelected ? 1 : 0.45)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = radius * 0.1,
+          ..strokeWidth = radius * (isSelected ? 0.16 : 0.1),
       );
     }
 

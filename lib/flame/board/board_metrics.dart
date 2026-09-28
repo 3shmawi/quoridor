@@ -118,6 +118,11 @@ class BoardMetrics {
   }
 
   /// The cell under [point], or null when the point falls outside the grid.
+  ///
+  /// A point in the gap after a cell still resolves to that cell: the gaps are
+  /// only a few pixels wide, so treating them as their own target would make
+  /// walls almost impossible to place with a finger. Which target a tap means
+  /// is decided in [BoardComponent] by what is actionable, not by pixels.
   Position? positionAt(Offset point) {
     final x = point.dx - _left;
     final y = point.dy - _top;
@@ -126,6 +131,7 @@ class BoardMetrics {
     final col = (x / step).floor();
     final row = (y / step).floor();
     if (row < 0 || row >= _n || col < 0 || col >= _n) return null;
+
     return Position(row, col);
   }
 
