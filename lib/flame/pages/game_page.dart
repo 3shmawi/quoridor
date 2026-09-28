@@ -14,6 +14,7 @@ import '../../flame/services/online/online_game_controller.dart';
 import '../../flame/services/turn_clock.dart';
 import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
+import '../../flame/models/player.dart';
 import '../../flame/services/ai_service.dart';
 import '../../flame/services/firebase_service.dart';
 import '../../theme.dart';
@@ -471,12 +472,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       title: context.l10n.playVsAI,
                       subtitle: context.l10n.playVsAISubtitle,
                       onTap: () {
-                        if (!_game.gameState.player2.isAI) {
-                          _game.togglePlayerMode();
-                        } else {
-                          _game.updateGameState(_game.gameState);
+                        _detachOnline(abandon: true);
+                        // Coming back from a four-player game has to put the
+                        // board back to two, not just swap in the computer.
+                        if (_game.gameState.playerCount != 2 ||
+                            !_game.gameState.player2.isAI) {
+                          _game.startGame(playerCount: 2, againstAI: true);
                         }
                         Navigator.pop(context);
+                        _syncClock();
+                        setState(() {});
                         _showGameMessage(context.l10n.aiModeActivated);
                       },
                     ),
@@ -495,15 +500,21 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       icon: Icons.people,
                       title: context.l10n.twoPlayers,
                       subtitle: context.l10n.twoPlayersSubtitle,
-                      onTap: () {
-                        if (_game.gameState.player2.isAI) {
-                          _game.togglePlayerMode();
-                        } else {
-                          _game.updateGameState(_game.gameState);
-                        }
-                        Navigator.pop(context);
-                        _showGameMessage(context.l10n.twoPlayerModeActivated);
-                      },
+                      onTap: () => _startLocalGame(2),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModeCard(
+                      icon: Icons.groups,
+                      title: context.l10n.threePlayers,
+                      subtitle: context.l10n.threePlayersSubtitle,
+                      onTap: () => _startLocalGame(3),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModeCard(
+                      icon: Icons.groups_3,
+                      title: context.l10n.fourPlayers,
+                      subtitle: context.l10n.fourPlayersSubtitle,
+                      onTap: () => _startLocalGame(4),
                     ),
                   ],
                 ),
@@ -512,6 +523,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           ),
         ),
       ),
+    );
+  }
+
+  /// Starts a hotseat game for [playerCount] on this device.
+  void _startLocalGame(int playerCount) {
+    _detachOnline(abandon: true);
+    _game.startGame(playerCount: playerCount, againstAI: false);
+    Navigator.pop(context);
+    _syncClock();
+    setState(() {});
+    _showGameMessage(
+      playerCount == 2
+          ? context.l10n.twoPlayerModeActivated
+          : context.l10n.localGameStarted(playerCount),
     );
   }
 
@@ -1282,46 +1307,50 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   Widget _buildStatusRow(Duration? remaining) {
     final state = _game.gameState;
     final online = _online;
-    final localSeat = online?.localPlayerId ?? 1;
-    final opponentSeat = 3 - localSeat;
 
-    final localPlayer = localSeat == 1 ? state.player1 : state.player2;
-    final opponentPlayer = localSeat == 1 ? state.player2 : state.player1;
+    // Online there is a "you"; on one device passed around there is not, so
+    // every seat is simply named.
+    final localSeat = online?.localPlayerId;
 
-    final String opponentLabel;
-    if (online != null) {
-      opponentLabel =
-          online.session?.opponent?.displayName ?? context.l10n.opponent;
-    } else if (opponentPlayer.isAI) {
-      opponentLabel = context.l10n.ai;
-    } else {
-      opponentLabel = context.l10n.playerN(opponentSeat);
+    // Two pills can each afford a name and a wall count. Four cannot, so past
+    // two they shrink to the badge and the seat's name, and only the player
+    // to move spells out what is going on.
+    final compact = state.playerCount > 2;
+
+    final pills = <Widget>[];
+    for (final player in state.players) {
+      if (pills.isNotEmpty) pills.add(SizedBox(width: compact ? 6 : 10));
+
+      pills.add(
+        Expanded(
+          child: _buildPlayerStatus(
+            seat: player.id,
+            label: _labelFor(player, localSeat),
+            color: _seatColor(player.id),
+            walls: player.wallsRemaining,
+            isActive: state.currentPlayerId == player.id,
+            remaining: state.currentPlayerId == player.id ? remaining : null,
+            compact: compact,
+            // The last pill leans its badge outwards, so the row reads as a
+            // pair of ends rather than everything crowding to the left.
+            trailing: !compact && player.id != state.players.first.id,
+          ),
+        ),
+      );
     }
 
-    return Row(
-      children: [
-        Expanded(
-          child: _buildPlayerStatus(
-            label: context.l10n.you,
-            color: _seatColor(localSeat),
-            walls: localPlayer.wallsRemaining,
-            isActive: state.currentPlayerId == localSeat,
-            remaining: state.currentPlayerId == localSeat ? remaining : null,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildPlayerStatus(
-            label: opponentLabel,
-            color: _seatColor(opponentSeat),
-            walls: opponentPlayer.wallsRemaining,
-            isActive: state.currentPlayerId == opponentSeat,
-            remaining: state.currentPlayerId == opponentSeat ? remaining : null,
-            trailing: true,
-          ),
-        ),
-      ],
-    );
+    return Row(children: pills);
+  }
+
+  /// What to call a seat: you, the person you are playing, or its number.
+  String _labelFor(Player player, int? localSeat) {
+    if (localSeat != null) {
+      if (player.id == localSeat) return context.l10n.you;
+      return _online?.session?.opponent?.displayName ?? context.l10n.opponent;
+    }
+
+    if (player.isAI) return context.l10n.ai;
+    return context.l10n.playerN(player.id);
   }
 
   /// Seconds left, rounded up, so the clock shows 1 for the whole of the last
@@ -1336,20 +1365,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     return '$minutes:${(seconds % 60).toString().padLeft(2, '0')}';
   }
 
-  static Color _seatColor(int seat) => Color(
-    seat == 1 ? GameConstants.player1Color : GameConstants.player2Color,
-  );
+  static Color _seatColor(int seat) => Color(GameConstants.colorForSeat(seat));
 
   /// One player's pill. The player to move gets their colour and says so; the
   /// other fades back, so whose turn it is reads at a glance rather than from
   /// a weight difference in the text.
   Widget _buildPlayerStatus({
+    required int seat,
     required String label,
     required Color color,
     required int walls,
     required bool isActive,
     Duration? remaining,
     bool trailing = false,
+    bool compact = false,
   }) {
     final scheme = Theme.of(context).colorScheme;
 
@@ -1361,18 +1390,25 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     final isUrgent = shown != null && shown <= 5;
     final liveColor = isUrgent ? scheme.error : color;
 
+    final badgeSize = compact ? 26.0 : 30.0;
+
+    // With four at the board the badge shows the seat number rather than the
+    // wall count, because that is the number printed on the pawn: a row of
+    // pills that all read "5" says nothing about which one is you.
+    final badgeText = compact ? '$seat' : '$walls';
+
     final badge = Container(
-      width: 30,
-      height: 30,
+      width: badgeSize,
+      height: badgeSize,
       decoration: BoxDecoration(
         color: isActive ? color : color.withValues(alpha: 0.18),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
       child: Text(
-        '$walls',
+        badgeText,
         style: TextStyle(
-          fontSize: 13,
+          fontSize: compact ? 12 : 13,
           fontWeight: FontWeight.bold,
           color: isActive ? Colors.white : color,
         ),
@@ -1386,16 +1422,17 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: scheme.onSurface.withValues(alpha: isActive ? 1 : 0.55),
+          if (!compact)
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: scheme.onSurface.withValues(alpha: isActive ? 1 : 0.55),
+              ),
             ),
-          ),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1418,7 +1455,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   child: Text(
                     isActive
                         ? context.l10n.toPlay
-                        : context.l10n.wallsCount(walls),
+                        : (compact
+                              ? context.l10n.wallsShort(walls)
+                              : context.l10n.wallsCount(walls)),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1437,7 +1476,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 7 : 12,
+        vertical: compact ? 8 : 10,
+      ),
       decoration: BoxDecoration(
         color: isActive
             ? liveColor.withValues(alpha: 0.12)
@@ -1452,8 +1494,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       ),
       child: Row(
         children: trailing
-            ? [text, const SizedBox(width: 10), badge]
-            : [badge, const SizedBox(width: 10), text],
+            ? [text, SizedBox(width: compact ? 6 : 10), badge]
+            : [badge, SizedBox(width: compact ? 6 : 10), text],
       ),
     );
   }

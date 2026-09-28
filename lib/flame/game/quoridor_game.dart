@@ -271,10 +271,29 @@ class QuoridorGame extends FlameGame
   }
 
   // Game control methods
-  void newGame() {
+
+  /// Starts a fresh game, keeping the table as it is.
+  void newGame() => startGame(
+    playerCount: _gameState?.playerCount ?? 2,
+    againstAI: _gameState?.players.any((player) => player.isAI) ?? true,
+  );
+
+  /// Starts a fresh game with [playerCount] at the board.
+  ///
+  /// Three and four play each other: the computer opponent reads the board
+  /// through one pair of eyes — mine against the nearest rival — which is
+  /// enough to hold its own, but it has not been played enough hands at a
+  /// crowded board to be offered as one of them yet.
+  void startGame({int playerCount = 2, bool againstAI = true}) {
     _announcedGameOver = false;
     _soundedMoveCount = 0;
-    updateGameState(GameStateFactory.createNewGame());
+    updateGameState(
+      GameStateFactory.createNewGame(
+        playerCount: playerCount,
+        player2IsAI: againstAI && playerCount == 2,
+        player2Name: againstAI && playerCount == 2 ? 'AI' : 'Player 2',
+      ),
+    );
     onGameMessage?.call('New game started!');
   }
 

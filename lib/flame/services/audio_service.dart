@@ -15,11 +15,14 @@ enum GameSound {
 
   final String asset;
 
+  // There are two recorded voices and up to four seats, so the odd seats
+  // share one and the even seats the other. Four distinct effects would be
+  // better; two that alternate still tell you a different player just moved.
   static GameSound move(int playerId) =>
-      playerId == 1 ? GameSound.movePlayer1 : GameSound.movePlayer2;
+      playerId.isOdd ? GameSound.movePlayer1 : GameSound.movePlayer2;
 
   static GameSound wall(int playerId) =>
-      playerId == 1 ? GameSound.wallPlayer1 : GameSound.wallPlayer2;
+      playerId.isOdd ? GameSound.wallPlayer1 : GameSound.wallPlayer2;
 }
 
 /// Plays the game's sound effects.

@@ -42,6 +42,11 @@ class AppStrings {
   String get playOnlineSubtitle => _get('playOnlineSubtitle');
   String get twoPlayers => _get('twoPlayers');
   String get twoPlayersSubtitle => _get('twoPlayersSubtitle');
+  String get threePlayers => _get('threePlayers');
+  String get threePlayersSubtitle => _get('threePlayersSubtitle');
+  String get fourPlayers => _get('fourPlayers');
+  String get fourPlayersSubtitle => _get('fourPlayersSubtitle');
+  String localGameStarted(int n) => _fill('localGameStarted', '$n');
 
   // --- Status strip ------------------------------------------------------
   String get you => _get('you');
@@ -50,6 +55,7 @@ class AppStrings {
   String playerN(int n) => _fill('playerN', '$n');
   String get toPlay => _get('toPlay');
   String wallsCount(int n) => _fill('wallsCount', '$n');
+  String wallsShort(int n) => _fill('wallsShort', '$n');
 
   // --- Online ------------------------------------------------------------
   String get connecting => _get('connecting');
@@ -202,6 +208,11 @@ class AppStrings {
     'playOnlineSubtitle': 'Invite a friend with a code, or join theirs',
     'twoPlayers': 'Two Players',
     'twoPlayersSubtitle': 'Play with a friend on the same device',
+    'threePlayers': 'Three Players',
+    'threePlayersSubtitle': 'Three on the same device, seven walls each',
+    'fourPlayers': 'Four Players',
+    'fourPlayersSubtitle': 'Four on the same device, five walls each',
+    'localGameStarted': '%s-player game started',
 
     'you': 'You',
     'ai': 'AI',
@@ -209,6 +220,7 @@ class AppStrings {
     'playerN': 'Player %s',
     'toPlay': 'to play',
     'wallsCount': '%s walls',
+    'wallsShort': '%s ▮',
 
     'connecting': 'Connecting…',
     'waitingForOpponentWithCode': 'Waiting for an opponent — code %s',
@@ -350,6 +362,11 @@ class AppStrings {
     'playOnlineSubtitle': 'ادعُ صديقك بكود، أو ادخل بكوده',
     'twoPlayers': 'لاعبان',
     'twoPlayersSubtitle': 'العب مع صديق على نفس الجهاز',
+    'threePlayers': 'تلات لاعيبة',
+    'threePlayersSubtitle': 'تلاتة على نفس الجهاز، ٧ جدران لكل واحد',
+    'fourPlayers': 'أربع لاعيبة',
+    'fourPlayersSubtitle': 'أربعة على نفس الجهاز، ٥ جدران لكل واحد',
+    'localGameStarted': 'بدأت لعبة %s لاعيبة',
 
     'you': 'أنت',
     'ai': 'الكمبيوتر',
@@ -357,6 +374,7 @@ class AppStrings {
     'playerN': 'اللاعب %s',
     'toPlay': 'دورك',
     'wallsCount': '%s حواجز',
+    'wallsShort': '%s ▮',
 
     'connecting': 'جاري الاتصال…',
     'waitingForOpponentWithCode': 'في انتظار خصم — الكود %s',
