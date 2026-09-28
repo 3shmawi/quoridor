@@ -48,14 +48,40 @@ class WallComponent extends PositionComponent {
     }
   }
 
+  /// Who placed each wall, worked out from the move history.
+  ///
+  /// The wall itself does not record an owner -- it is just a position and an
+  /// orientation, which is all the rules need -- so the history is the source
+  /// for this. A wall with no matching move (an older saved game, say) falls
+  /// back to the neutral colour.
+  Map<Wall, int> get _wallOwners {
+    final owners = <Wall, int>{};
+    for (final move in gameState.moveHistory) {
+      final wall = move.wall;
+      if (move.type == MoveType.wallPlace && wall != null) {
+        owners[wall] = move.playerId;
+      }
+    }
+    return owners;
+  }
+
+  Color _wallColor(int? ownerId) {
+    switch (ownerId) {
+      case 1:
+        return const Color(GameConstants.player1Color);
+      case 2:
+        return const Color(GameConstants.player2Color);
+      default:
+        return Color(
+          isDarkModeNotifier.value
+              ? GameConstants.wallColorDark
+              : GameConstants.wallColor,
+        );
+    }
+  }
+
   void _drawWalls(Canvas canvas) {
-    final wallPaint = Paint()
-      ..color = Color(
-        isDarkModeNotifier.value
-            ? GameConstants.wallColorDark
-            : GameConstants.wallColor,
-      )
-      ..style = PaintingStyle.fill;
+    final owners = _wallOwners;
 
     final shadowPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.3)
@@ -72,7 +98,12 @@ class WallComponent extends PositionComponent {
         ),
         shadowPaint,
       );
-      canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), wallPaint);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, radius),
+        Paint()
+          ..color = _wallColor(owners[wall])
+          ..style = PaintingStyle.fill,
+      );
     }
   }
 

@@ -26,13 +26,13 @@ build is deployed to GitHub Pages from `main` on every push.
 
 ## Screenshots
 
-| Choose a game mode | The board | Aiming a wall |
+| Choose a game mode | The board | Pawn picked up |
 |---|---|---|
-| ![Game mode selection](docs/screenshots/01-game-mode.png) | ![The board, with reachable squares ringed](docs/screenshots/02-board.png) | ![A wall previewed in green](docs/screenshots/03-wall-aim.png) |
+| ![Game mode selection](docs/screenshots/01-game-mode.png) | ![The board, with a flagged goal row at each end](docs/screenshots/02-board.png) | ![The pawn picked up, showing where it can go](docs/screenshots/03-move.png) |
 
-| Wall placed | Settings |
-|---|---|
-| ![A placed wall on the board](docs/screenshots/04-wall-placed.png) | ![Settings drawer](docs/screenshots/05-menu.png) |
+| Aiming a wall | Walls placed | Settings |
+|---|---|---|
+| ![A wall previewed in green](docs/screenshots/04-wall-aim.png) | ![One wall from each player, in their own colours](docs/screenshots/05-walls.png) | ![Settings drawer](docs/screenshots/06-menu.png) |
 
 All screenshots are from the web build, captured at phone size.
 
@@ -52,20 +52,24 @@ wall may never leave either player with no path at all to their goal row. It
 may only make the journey longer.
 
 You win by reaching the row on the opposite side of the board. Player 1 starts
-at the bottom and runs to the top row; player 2 does the reverse. Both goal rows
-are tinted on the board in the owner's colour.
+at the bottom and runs to the top row; player 2 does the reverse. Each goal row
+is tinted and carries a flag at both ends, in that player's colour.
 
 ### The controls
 
 There are none — the board is the whole interface.
 
-- **To move**, tap one of the squares ringed in your colour. Those are exactly
-  the squares you can legally reach, so there is no pawn to select first and
-  nothing to read.
-- **To place a wall**, tap the gap between two squares. Faint dots mark every
-  gap a wall can go in. The wall appears green if it can go there and red if it
-  cannot, and a second tap on the same spot places it. Aiming slightly nearer
-  the other gap turns the wall, so there is no rotate button either.
+- **To move**, tap your pawn to pick it up. The squares it can legally reach
+  are ringed in your colour; tap one to go there. Tapping anywhere else puts
+  the pawn back down.
+- **To place a wall**, with your pawn down, tap roughly where you want it. The
+  wall snaps to the nearest gap and appears green if it can go there, red if it
+  cannot. A second tap in the same place puts it down. Aiming slightly nearer
+  the other gap turns the wall, so there is no rotate button.
+
+Walls carry the colour of whoever placed them, and each goal row is tinted and
+flagged in its owner's colour, so which way you are running is obvious without
+reading anything.
 
 Under the board is a single line with each player's name and how many walls
 they have left; the player to move is the bold one.
