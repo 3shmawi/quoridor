@@ -7,6 +7,8 @@ import 'package:quoridor/flame/services/ai/quoridor_engine.dart';
 import 'package:quoridor/flame/services/game_service.dart';
 
 void main() {
+  _timeoutMoveTests();
+
   GameState game({
     required Position p1,
     required Position p2,
@@ -195,6 +197,72 @@ void main() {
         lessThan(2000),
         reason: 'hard took ${watch.elapsedMilliseconds}ms',
       );
+    });
+  });
+}
+
+void _timeoutMoveTests() {
+  group('the move played when a turn times out', () {
+    test('is always a pawn move, never a wall', () {
+      final state = GameStateFactory.createNewGame(player2IsAI: true);
+      final move = QuoridorEngine.stepTowardsGoal(state);
+
+      expect(move, isNotNull);
+      expect(move!.type, MoveType.pawnMove);
+    });
+
+    test('spends none of the player\'s walls', () {
+      final state = GameStateFactory.createNewGame(player2IsAI: true);
+      final before = state.player1.wallsRemaining;
+
+      final after = QuoridorEngine.applyMove(
+        state,
+        QuoridorEngine.stepTowardsGoal(state)!,
+      );
+
+      expect(after.player1.wallsRemaining, before);
+    });
+
+    test('shortens the route to the goal', () {
+      final state = GameStateFactory.createNewGame(player2IsAI: true);
+      final before = QuoridorEngine.distanceToGoal(state, state.player1)!;
+
+      final after = QuoridorEngine.applyMove(
+        state,
+        QuoridorEngine.stepTowardsGoal(state)!,
+      );
+
+      expect(QuoridorEngine.distanceToGoal(after, after.player1), before - 1);
+    });
+
+    test('goes round a wall rather than stalling in front of it', () {
+      final state = GameStateFactory.createNewGame(player2IsAI: true);
+      // Across the square directly in front of player 1, who starts at (8,4).
+      state.walls.add(const Wall(Position(8, 3), WallOrientation.horizontal));
+      state.walls.add(const Wall(Position(8, 4), WallOrientation.horizontal));
+
+      final before = QuoridorEngine.distanceToGoal(state, state.player1)!;
+      final after = QuoridorEngine.applyMove(
+        state,
+        QuoridorEngine.stepTowardsGoal(state)!,
+      );
+
+      expect(
+        QuoridorEngine.distanceToGoal(after, after.player1),
+        lessThan(before),
+      );
+    });
+
+    test('takes the goal when it is one step away', () {
+      final state = GameStateFactory.createNewGame(player2IsAI: true);
+      state.player1.moveTo(const Position(1, 4));
+
+      final after = QuoridorEngine.applyMove(
+        state,
+        QuoridorEngine.stepTowardsGoal(state)!,
+      );
+
+      expect(after.player1.hasReachedGoal, isTrue);
     });
   });
 }

@@ -72,7 +72,7 @@ class QuoridorEngine {
   static int _depthFor(EngineStrength strength) {
     switch (strength) {
       case EngineStrength.easy:
-        return 2;
+        return 1;
       case EngineStrength.medium:
         return 4;
       case EngineStrength.hard:
@@ -149,24 +149,54 @@ class QuoridorEngine {
 
     if (scored.isEmpty) return moves.first;
 
-    // Easy is meant to be beatable, so it takes one of the better moves
-    // rather than the best one. But "one of the top three" is not the same as
-    // "nearly as good": with only two or three sensible moves on the board,
-    // the third is often a step backwards, and an opponent that wanders is
-    // read as broken rather than as easy. So the pool is bounded by score —
-    // moves that cost less than a single step of progress — and is empty when
-    // there is only one reasonable move, which is exactly when it matters.
+    _breakTiesByProgress(state, me, scored);
+
+    // Easy is weak because it only looks two moves ahead, not because it
+    // plays badly on purpose. The randomness here is for variety between
+    // games, so it only ever chooses between moves that are genuinely
+    // interchangeable: the same search score *and* the same ground gained.
+    //
+    // Picking among merely similar moves is what made it wander. Once a game
+    // is decided every move scores alike, so "similar" became "all of them"
+    // and easy walked in circles for twenty moves while the position was
+    // there to be played out.
     if (strength == EngineStrength.easy && scored.length > 1) {
-      final best = scored.first.score;
-      final pool = scored
-          .where((entry) => best - entry.score < _distanceWeight)
-          .where((entry) => !_revisits(entry.move, recent))
-          .take(3)
-          .toList();
-      if (pool.isNotEmpty) return pool[rng.nextInt(pool.length)].move;
+      final pool = _equivalentTo(state, me, scored.first, scored, recent);
+      if (pool.length > 1) return pool[rng.nextInt(pool.length)].move;
     }
 
     return scored.first.move;
+  }
+
+  /// A single step along the shortest route to the player's goal.
+  ///
+  /// This is the move played when somebody's turn times out, and it is
+  /// deliberately not [bestMove]: the strongest reply is often a wall, and
+  /// spending one of the ten a player holds because they looked at their
+  /// phone's notification shade is a real cost they did not choose. Stepping
+  /// forward spends nothing and is never a blunder.
+  static GameMove? stepTowardsGoal(GameState state) {
+    final player = state.currentPlayer;
+
+    GameMove? best;
+    int? bestDistance;
+
+    for (final position in state.getValidMoves(player.position)) {
+      final move = GameMove.pawnMove(position, player.id);
+      final after = applyMove(state, move);
+      final moved = player.id == 1 ? after.player1 : after.player2;
+
+      if (moved.hasReachedGoal) return move;
+
+      final distance = distanceToGoal(after, moved);
+      if (distance == null) continue;
+      if (bestDistance == null || distance < bestDistance) {
+        bestDistance = distance;
+        best = move;
+      }
+    }
+
+    return best;
   }
 
   /// The squares this player has occupied recently, most recent first.
@@ -180,6 +210,76 @@ class QuoridorEngine {
       if (positions.length >= _repetitionWindow) break;
     }
     return positions;
+  }
+
+  /// The moves that are interchangeable with [first]: same score, same
+  /// distance gained, and not a square this pawn has just left.
+  static List<({GameMove move, int score})> _equivalentTo(
+    GameState state,
+    int me,
+    ({GameMove move, int score}) first,
+    List<({GameMove move, int score})> scored,
+    List<Position> recent,
+  ) {
+    final target = _distanceAfter(state, me, first.move);
+
+    return scored
+        .where((entry) => entry.score == first.score)
+        .where((entry) => _distanceAfter(state, me, entry.move) == target)
+        .where(
+          (entry) => entry.move == first.move || !_revisits(entry.move, recent),
+        )
+        .toList();
+  }
+
+  /// How far [me] would still have to go after playing [move].
+  static int? _distanceAfter(GameState state, int me, GameMove move) {
+    final after = applyMove(state, move);
+    final moved = me == 1 ? after.player1 : after.player2;
+    if (moved.hasReachedGoal) return -1;
+    return distanceToGoal(after, moved);
+  }
+
+  /// Orders moves the search rated equally by how much ground they gain.
+  ///
+  /// This is what stops the engine giving up. Once a position is decided —
+  /// most often because the opponent is one step from home — every move it
+  /// can make leads to the same result, so the search rates them all exactly
+  /// alike and the choice between them falls to whatever order they happened
+  /// to be generated in. That reads as the computer pacing in circles, which
+  /// is precisely when a player notices it and calls it broken.
+  ///
+  /// Distance cannot go in the evaluation to fix this: ranking a decided
+  /// position by the loser's remaining distance also tells the *winner* to
+  /// wall the loser in before finishing, because a bigger margin would score
+  /// better than an immediate win. A win is a win. So the tie is broken out
+  /// here instead, where it can only choose between moves the search itself
+  /// could not separate, and can never change what the search believes.
+  static void _breakTiesByProgress(
+    GameState state,
+    int me,
+    List<({GameMove move, int score})> scored,
+  ) {
+    final best = scored.first.score;
+    final tied = scored.where((entry) => entry.score == best).toList();
+    if (tied.length < 2) return;
+
+    ({GameMove move, int score})? closest;
+    int? shortest;
+
+    for (final entry in tied) {
+      final distance = _distanceAfter(state, me, entry.move);
+      if (distance == null) continue;
+      if (shortest == null || distance < shortest) {
+        shortest = distance;
+        closest = entry;
+      }
+      if (shortest < 0) break;
+    }
+
+    if (closest == null) return;
+    scored.remove(closest);
+    scored.insert(0, closest);
   }
 
   /// Whether [move] steps back onto a square this pawn has just left.

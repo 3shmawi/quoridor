@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme.dart';
 import 'ai_service.dart';
 import 'audio_service.dart';
+import 'turn_clock.dart';
 
 /// The player's settings, kept across restarts.
 ///
@@ -20,6 +21,7 @@ class SettingsService {
   static const String _validMovesKey = 'settings.showValidMoves';
   static const String _languageKey = 'settings.language';
   static const String _difficultyKey = 'settings.difficulty';
+  static const String _turnLimitKey = 'settings.turnLimit';
 
   /// Languages the game is translated into.
   static const List<Locale> supportedLocales = [Locale('en'), Locale('ar')];
@@ -30,6 +32,15 @@ class SettingsService {
   );
   final ValueNotifier<AIDifficulty> difficulty = ValueNotifier<AIDifficulty>(
     AIDifficulty.medium,
+  );
+
+  /// How long a player gets per turn.
+  ///
+  /// Off by default: the game shipped without a clock, and switching one on
+  /// under the players already using it would change how their games end
+  /// without their asking. It is one tap away in the settings drawer.
+  final ValueNotifier<TurnLimit> turnLimit = ValueNotifier<TurnLimit>(
+    TurnLimit.off,
   );
 
   SharedPreferences? _prefs;
@@ -51,6 +62,7 @@ class SettingsService {
       showValidMoves.value = prefs.getBool(_validMovesKey) ?? true;
       locale.value = _localeFor(prefs.getString(_languageKey));
       difficulty.value = _difficultyFor(prefs.getString(_difficultyKey));
+      turnLimit.value = _turnLimitFor(prefs.getString(_turnLimitKey));
     } catch (error) {
       debugPrint('SettingsService: using defaults, load failed: $error');
     } finally {
@@ -71,6 +83,7 @@ class SettingsService {
     );
     locale.addListener(() => _write(_languageKey, locale.value.languageCode));
     difficulty.addListener(() => _write(_difficultyKey, difficulty.value.name));
+    turnLimit.addListener(() => _write(_turnLimitKey, turnLimit.value.name));
   }
 
   /// Switches between the languages the game supports.
@@ -101,6 +114,13 @@ class SettingsService {
       if (candidate.languageCode == code) return candidate;
     }
     return supportedLocales.first;
+  }
+
+  static TurnLimit _turnLimitFor(String? name) {
+    for (final candidate in TurnLimit.values) {
+      if (candidate.name == name) return candidate;
+    }
+    return TurnLimit.off;
   }
 
   static AIDifficulty _difficultyFor(String? name) {
