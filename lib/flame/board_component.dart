@@ -21,6 +21,16 @@ class BoardComponent extends PositionComponent {
   /// page can rebuild its controls (mode, ghost wall, validity message).
   VoidCallback? onInteractionChanged;
 
+  /// Whether the board should respond to input at all.
+  ///
+  /// Online, the opponent's turn is perfectly active but not this device's, and
+  /// checking only when a move is submitted was too late: picking the pawn up
+  /// and lining a wall up both happen here first, so the board lit up and
+  /// previewed a wall that could never be placed. Null means always.
+  bool Function()? canInteract;
+
+  bool get _interactive => canInteract?.call() ?? true;
+
   /// The pawn the player has picked up, if any.
   ///
   /// Moving is two taps again: one on your pawn to pick it up, one on where
@@ -46,6 +56,9 @@ class BoardComponent extends PositionComponent {
 
   /// The wall currently being lined up, if any.
   Wall? get pendingWall => _pendingWall;
+
+  /// The pawn currently picked up, if any.
+  Position? get selectedPawn => _selectedPawn;
 
   /// Validity of [pendingWall], including the reason when it is illegal.
   WallPlacementResult? get pendingWallResult => _pendingResult;
@@ -86,6 +99,11 @@ class BoardComponent extends PositionComponent {
   // --- Input -------------------------------------------------------------
 
   void handleTap(Vector2 position) {
+    if (!_interactive) {
+      clearInteraction();
+      return;
+    }
+
     _ensureMetrics();
     final offset = Offset(position.x, position.y);
     final tapped = _metrics.positionAt(offset);
@@ -168,6 +186,18 @@ class BoardComponent extends PositionComponent {
     onInteractionChanged?.call();
   }
 
+  /// Puts down whatever was being lined up or held.
+  ///
+  /// Used when this device may not act: a wall preview or a lifted pawn left
+  /// on screen during the opponent's turn reads as an invitation to play.
+  void clearInteraction() {
+    if (_pendingWall == null && _selectedPawn == null) return;
+    _clearPendingWall();
+    _selectedPawn = null;
+    _refreshValidMoves();
+    onInteractionChanged?.call();
+  }
+
   void _clearPendingWall() {
     _pendingWall = null;
     _pendingResult = null;
@@ -175,6 +205,11 @@ class BoardComponent extends PositionComponent {
   }
 
   void handleHover(Vector2 position) {
+    if (!_interactive) {
+      clearInteraction();
+      return;
+    }
+
     if (_selectedPawn != null) return;
     _ensureMetrics();
     if (_gameState.currentPlayer.hasWallsRemaining) {
