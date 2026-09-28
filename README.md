@@ -28,7 +28,7 @@ build is deployed to GitHub Pages from `main` on every push.
 
 | Choose a game mode | The board | Pawn picked up |
 |---|---|---|
-| ![Game mode selection](docs/screenshots/01-game-mode.png) | ![The board, with a flagged goal row at each end](docs/screenshots/02-board.png) | ![The pawn picked up, showing where it can go](docs/screenshots/03-move.png) |
+| ![Game mode selection](docs/screenshots/01-game-mode.png) | ![The board, with the player to move's goal row flagged](docs/screenshots/02-board.png) | ![The pawn picked up, showing where it can go](docs/screenshots/03-move.png) |
 
 | Aiming a wall | Walls placed | Settings |
 |---|---|---|
@@ -52,8 +52,9 @@ wall may never leave either player with no path at all to their goal row. It
 may only make the journey longer.
 
 You win by reaching the row on the opposite side of the board. Player 1 starts
-at the bottom and runs to the top row; player 2 does the reverse. Each goal row
-is tinted and carries a flag at both ends, in that player's colour.
+at the bottom and runs to the top row; player 2 does the reverse. On each turn
+the board tints and flags the goal row belonging to whoever is to move, so the
+strip swaps ends as play alternates.
 
 ### The controls
 
@@ -67,9 +68,10 @@ There are none — the board is the whole interface.
   cannot. A second tap in the same place puts it down. Aiming slightly nearer
   the other gap turns the wall, so there is no rotate button.
 
-Walls carry the colour of whoever placed them, and each goal row is tinted and
-flagged in its owner's colour, so which way you are running is obvious without
-reading anything.
+Walls carry the colour of whoever placed them. **Your** goal row is tinted and
+flagged in your colour on your turn, and the strip moves to the other end when
+the turn passes — so which way you are running is answered without reading
+anything.
 
 Under the board is a single line with each player's name and how many walls
 they have left; the player to move is the bold one.

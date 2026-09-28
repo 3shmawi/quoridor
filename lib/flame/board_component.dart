@@ -205,8 +205,18 @@ class BoardComponent extends PositionComponent {
     );
   }
 
-  /// Tints each player's target row, so it is obvious which way you are
-  /// running without reading anything. The flags go on top, in
+  /// The goal row belonging to whoever is to move.
+  ({int row, Color color}) get _currentGoal => _gameState.currentPlayerId == 1
+      ? (
+          row: GameConstants.player1Goal,
+          color: const Color(GameConstants.player1Color),
+        )
+      : (
+          row: GameConstants.player2Goal,
+          color: const Color(GameConstants.player2Color),
+        );
+
+  /// Tints the row the player to move is heading for. The flags go on top, in
   /// [_drawGoalFlags].
   void _drawGoalRows(Canvas canvas) {
     void markRow(int row, Color color) {
@@ -230,9 +240,11 @@ class BoardComponent extends PositionComponent {
       );
     }
 
-    // Player 1 runs to the top row, player 2 to the bottom row.
-    markRow(GameConstants.player1Goal, const Color(GameConstants.player1Color));
-    markRow(GameConstants.player2Goal, const Color(GameConstants.player2Color));
+    // Only the player to move sees their target row. Showing both at once
+    // says where the ends are; showing one says where *you* are going, and the
+    // strip appearing on your turn is what answers "which way am I running".
+    final goal = _currentGoal;
+    markRow(goal.row, goal.color);
   }
 
   /// Flags at both ends of each goal row.
@@ -249,8 +261,8 @@ class BoardComponent extends PositionComponent {
       );
     }
 
-    flagsOn(GameConstants.player1Goal, const Color(GameConstants.player1Color));
-    flagsOn(GameConstants.player2Goal, const Color(GameConstants.player2Color));
+    final goal = _currentGoal;
+    flagsOn(goal.row, goal.color);
   }
 
   /// A small pennant on a pole, centred on [center].
