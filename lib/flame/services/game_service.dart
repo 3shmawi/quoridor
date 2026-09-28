@@ -7,7 +7,7 @@ import 'ai_service.dart';
 class GameService {
   // Validate if a move is legal
   static bool isValidMove(GameState gameState, GameMove move) {
-    final player = move.playerId == 1 ? gameState.player1 : gameState.player2;
+    final player = gameState.playerById(move.playerId);
 
     if (move.type == MoveType.pawnMove) {
       return _isValidPawnMove(gameState, player, move.newPosition!);
@@ -23,17 +23,7 @@ class GameService {
     }
 
     // Create a new game state (immutable approach)
-    final newGameState = GameState(
-      gameId: gameState.gameId,
-      player1: gameState.player1,
-      player2: gameState.player2,
-      walls: List.from(gameState.walls),
-      currentPlayerId: gameState.currentPlayerId,
-      status: gameState.status,
-      createdAt: gameState.createdAt,
-      updatedAt: DateTime.now(),
-      moveHistory: List.from(gameState.moveHistory),
-    );
+    final newGameState = gameState.copyWith(updatedAt: DateTime.now());
 
     // Execute the move
     if (move.type == MoveType.pawnMove) {
@@ -205,17 +195,7 @@ class GameService {
   }
 
   static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
-    return GameState(
-      gameId: original.gameId,
-      player1: original.player1,
-      player2: original.player2,
-      walls: [...original.walls, wall],
-      currentPlayerId: original.currentPlayerId,
-      status: original.status,
-      createdAt: original.createdAt,
-      updatedAt: original.updatedAt,
-      moveHistory: List.from(original.moveHistory),
-    );
+    return original.copyWith(walls: [...original.walls, wall]);
   }
 
   static List<Wall> _getValidWallPlacements(GameState gameState) {

@@ -291,16 +291,12 @@ class QuoridorGame extends FlameGame
 
   void togglePlayerMode() {
     // Switch between AI and human player 2
-    final newGameState = GameState(
-      gameId: _gameState!.gameId,
-      player1: _gameState!.player1,
-      player2: _gameState!.player2.copyWith(isAI: !_gameState!.player2.isAI),
-      walls: _gameState!.walls,
-      currentPlayerId: _gameState!.currentPlayerId,
-      status: _gameState!.status,
-      createdAt: _gameState!.createdAt,
+    final newGameState = _gameState!.copyWith(
+      players: [
+        for (final player in _gameState!.players)
+          player.id == 2 ? player.copyWith(isAI: !player.isAI) : player,
+      ],
       updatedAt: DateTime.now(),
-      moveHistory: _gameState!.moveHistory,
     );
 
     updateGameState(newGameState);

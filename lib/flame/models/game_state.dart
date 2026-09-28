@@ -19,28 +19,49 @@ class GameState {
 
   GameState({
     required this.gameId,
-    List<Player>? players,
-    Player? player1,
-    Player? player2,
+    required this.players,
     List<Wall>? walls,
     this.currentPlayerId = 1,
     this.status = GameStatus.playing,
     DateTime? createdAt,
     DateTime? updatedAt,
     List<GameMove>? moveHistory,
-  }) : players =
-           players ??
-           [
-             if (player1 != null) player1,
-             if (player2 != null) player2,
-           ],
-       walls = walls ?? [],
+  }) : walls = walls ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
        moveHistory = moveHistory ?? [];
 
   /// How many are playing.
   int get playerCount => players.length;
+
+  /// This state with the given parts replaced, keeping every seat.
+  ///
+  /// Copying used to be written out by hand at each call site, naming the
+  /// first two players — which quietly dropped seats three and four the
+  /// moment they existed, and left a three-player game playing as two.
+  /// Going through here means a copy cannot lose anybody.
+  GameState copyWith({
+    List<Player>? players,
+    List<Wall>? walls,
+    int? currentPlayerId,
+    GameStatus? status,
+    DateTime? updatedAt,
+    List<GameMove>? moveHistory,
+    bool clonePlayers = false,
+  }) => GameState(
+    gameId: gameId,
+    players:
+        players ??
+        (clonePlayers
+            ? [for (final player in this.players) player.copyWith()]
+            : this.players),
+    walls: walls ?? List<Wall>.of(this.walls),
+    currentPlayerId: currentPlayerId ?? this.currentPlayerId,
+    status: status ?? this.status,
+    createdAt: createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    moveHistory: moveHistory ?? List<GameMove>.of(this.moveHistory),
+  );
 
   /// The first two seats, which the two-player game is written in terms of.
   Player get player1 => players[0];

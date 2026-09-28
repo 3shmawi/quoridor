@@ -107,7 +107,8 @@ class Pathfinding {
 
     // Whoever is closest to winning is the one worth blocking.
     opponents.sort((a, b) {
-      final left = findShortestPath(gameState, a.position, a.goal)?.length ?? 999;
+      final left =
+          findShortestPath(gameState, a.position, a.goal)?.length ?? 999;
       final right =
           findShortestPath(gameState, b.position, b.goal)?.length ?? 999;
       return left.compareTo(right);
@@ -208,16 +209,7 @@ class Pathfinding {
   }
 
   static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
-    return GameState(
-      gameId: original.gameId,
-      player1: original.player1,
-      player2: original.player2,
-      walls: [...original.walls, wall],
-      currentPlayerId: original.currentPlayerId,
-      status: original.status,
-      createdAt: original.createdAt,
-      updatedAt: original.updatedAt,
-    );
+    return original.copyWith(walls: [...original.walls, wall]);
   }
 
   static bool _isValidWallPlacement(GameState gameState, Wall wall) {
