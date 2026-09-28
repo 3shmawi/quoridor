@@ -38,16 +38,45 @@ class QuoridorEngine {
   static const int _wallWeight = 1;
 
   /// Upper bound on nodes per move, so a turn never hangs the UI.
-  static const int _nodeBudget = 30000;
+  static const int _nodeBudget = 200000;
+
+  /// Wall-clock cap per move, per strength.
+  ///
+  /// Node counts are a poor proxy for time once the board fills up and each
+  /// node costs a path search, so the search also stops on the clock. This is
+  /// what separates medium from hard: both look four moves ahead, but on a
+  /// crowded board — the only place the difference shows — medium runs out of
+  /// time and settles for what it has seen, while hard finishes the line.
+  ///
+  /// Searching deeper than four was tried and plays *worse*: the budget cuts
+  /// a depth-six search off mid-tree, leaving the root comparing scores taken
+  /// at different depths, which is how the engine talks itself into a step
+  /// backwards.
+  static Duration _timeBudgetFor(EngineStrength strength) {
+    switch (strength) {
+      case EngineStrength.easy:
+        return const Duration(milliseconds: 150);
+      case EngineStrength.medium:
+        return const Duration(milliseconds: 400);
+      case EngineStrength.hard:
+        return const Duration(milliseconds: 900);
+    }
+  }
+
+  /// How many of its own recent squares the engine will avoid returning to.
+  ///
+  /// One is not enough: a pawn can circle three or four squares without ever
+  /// stepping straight back, which is what "it repeats itself" looks like.
+  static const int _repetitionWindow = 6;
 
   static int _depthFor(EngineStrength strength) {
     switch (strength) {
       case EngineStrength.easy:
-        return 1;
-      case EngineStrength.medium:
         return 2;
+      case EngineStrength.medium:
+        return 4;
       case EngineStrength.hard:
-        return 3;
+        return 4;
     }
   }
 
@@ -65,75 +94,121 @@ class QuoridorEngine {
 
     final rng = random ?? Random();
 
-    // Easy plays a decent move rather than the best one, so it is beatable
-    // without being silly: it still uses real distances, it just does not
-    // always pick the top choice.
-    if (strength == EngineStrength.easy && rng.nextDouble() < 0.35) {
-      final pawnMoves = moves
-          .where((m) => m.type == MoveType.pawnMove)
+    final budget = _SearchBudget(_nodeBudget, _timeBudgetFor(strength));
+    final target = _depthFor(strength);
+
+    // Where this pawn has been lately, so the search can prefer not to
+    // revisit it when nothing else separates the moves.
+    final recent = _recentPositions(state, me);
+
+    // Deepen one ply at a time, keeping only depths that finished.
+    //
+    // Searching straight to the target depth was what made the engine look
+    // silly: when the budget ran out halfway through the root's move list,
+    // the moves searched before the cutoff carried real scores and the rest
+    // carried whatever the truncated search happened to return, so the engine
+    // compared depths against each other and picked a step backwards. Falling
+    // back to the last *complete* depth means a cut-off search is merely
+    // shallower, never incoherent — and the ordering from that depth makes
+    // the next one prune far harder, so the depth is usually reached anyway.
+    var scored = <({GameMove move, int score})>[];
+    var order = moves;
+
+    for (var depth = 1; depth <= target; depth++) {
+      final pass = <({GameMove move, int score})>[];
+      var alpha = -_winScore * 2;
+
+      for (final move in order) {
+        final child = applyMove(state, move);
+        final raw = -_negamax(
+          child,
+          depth - 1,
+          -_winScore * 2,
+          -alpha,
+          3 - me,
+          budget,
+        );
+
+        final score = _withRepetitionPenalty(raw, move, recent);
+        if (score > alpha) alpha = score;
+        pass.add((move: move, score: score));
+
+        if (budget.exhausted) break;
+      }
+
+      // A pass that did not see every root move cannot be compared with one
+      // that did, so it is discarded rather than mixed in.
+      if (pass.length < order.length) break;
+
+      pass.sort((a, b) => b.score.compareTo(a.score));
+      scored = pass;
+      order = [for (final entry in pass) entry.move];
+
+      if (budget.exhausted) break;
+    }
+
+    if (scored.isEmpty) return moves.first;
+
+    // Easy is meant to be beatable, so it takes one of the better moves
+    // rather than the best one. But "one of the top three" is not the same as
+    // "nearly as good": with only two or three sensible moves on the board,
+    // the third is often a step backwards, and an opponent that wanders is
+    // read as broken rather than as easy. So the pool is bounded by score —
+    // moves that cost less than a single step of progress — and is empty when
+    // there is only one reasonable move, which is exactly when it matters.
+    if (strength == EngineStrength.easy && scored.length > 1) {
+      final best = scored.first.score;
+      final pool = scored
+          .where((entry) => best - entry.score < _distanceWeight)
+          .where((entry) => !_revisits(entry.move, recent))
+          .take(3)
           .toList();
-      if (pawnMoves.isNotEmpty) {
-        return pawnMoves[rng.nextInt(pawnMoves.length)];
-      }
+      if (pool.isNotEmpty) return pool[rng.nextInt(pool.length)].move;
     }
 
-    final budget = _NodeBudget(_nodeBudget);
-    final depth = _depthFor(strength);
-
-    // Where this pawn came from, used only to break ties away from stepping
-    // straight back — the shuffle the old AI was famous for.
-    final previous = _previousPosition(state, me);
-
-    GameMove? best;
-    var bestScore = -_winScore * 2;
-
-    for (final move in moves) {
-      final child = applyMove(state, move);
-      final score = -_negamax(
-        child,
-        depth - 1,
-        -_winScore * 2,
-        -bestScore,
-        3 - me,
-        budget,
-      );
-
-      final adjusted = _tieBreak(score, move, previous);
-
-      if (best == null || adjusted > bestScore) {
-        bestScore = adjusted;
-        best = move;
-      }
-    }
-
-    return best ?? moves.first;
+    return scored.first.move;
   }
 
-  /// Nudges a move that walks straight back where it came from below an
-  /// otherwise equal alternative.
-  static int _tieBreak(int score, GameMove move, Position? previous) {
-    if (previous == null) return score;
-    if (move.type != MoveType.pawnMove) return score;
-    return move.newPosition == previous ? score - 1 : score;
-  }
-
-  static Position? _previousPosition(GameState state, int playerId) {
+  /// The squares this player has occupied recently, most recent first.
+  static List<Position> _recentPositions(GameState state, int playerId) {
+    final positions = <Position>[];
     for (var i = state.moveHistory.length - 1; i >= 0; i--) {
       final move = state.moveHistory[i];
-      if (move.playerId == playerId && move.type == MoveType.pawnMove) {
-        // The move that put the pawn where it is; the square before that is
-        // the one it would be stepping back to.
-        for (var j = i - 1; j >= 0; j--) {
-          final earlier = state.moveHistory[j];
-          if (earlier.playerId == playerId &&
-              earlier.type == MoveType.pawnMove) {
-            return earlier.newPosition;
-          }
-        }
-        return null;
-      }
+      if (move.playerId != playerId || move.type != MoveType.pawnMove) continue;
+      final at = move.newPosition;
+      if (at != null) positions.add(at);
+      if (positions.length >= _repetitionWindow) break;
     }
-    return null;
+    return positions;
+  }
+
+  /// Whether [move] steps back onto a square this pawn has just left.
+  static bool _revisits(GameMove move, List<Position> recent) =>
+      move.type == MoveType.pawnMove && recent.contains(move.newPosition);
+
+  /// What a revisit costs, in the same units as distance.
+  ///
+  /// A penalty smaller than one step cannot stop a shuttle, because that is
+  /// exactly the shape of one: from A the search rates B a step better, and
+  /// from B it rates A a step better, so a sub-step penalty loses to the
+  /// illusion every time and the pawn shuttles until the game is abandoned.
+  /// Just over two steps breaks that while still letting through a retreat
+  /// that genuinely opens a shorter route.
+  static const int _repetitionCost = _distanceWeight * 2 + 4;
+
+  /// Discourages stepping back onto a square this pawn has just left.
+  static int _withRepetitionPenalty(
+    int score,
+    GameMove move,
+    List<Position> recent,
+  ) {
+    if (move.type != MoveType.pawnMove) return score;
+    final index = recent.indexOf(move.newPosition!);
+    if (index < 0) return score;
+
+    // The more recently it was there, the worse going back looks.
+    final recency = _repetitionWindow - index;
+    return score - (_repetitionCost * recency) ~/ _repetitionWindow;
   }
 
   static int _negamax(
@@ -142,7 +217,7 @@ class QuoridorEngine {
     int alpha,
     int beta,
     int perspective,
-    _NodeBudget budget,
+    _SearchBudget budget,
   ) {
     budget.spend();
 
@@ -377,14 +452,28 @@ class QuoridorEngine {
   }
 }
 
-/// Counts nodes so a search stops before it becomes a pause the player notices.
-class _NodeBudget {
-  _NodeBudget(this.limit);
+/// Stops a search before it becomes a pause the player notices.
+///
+/// Both limits matter: nodes bound a wide shallow search, and the clock bounds
+/// a deep one on a crowded board where every node costs a path search.
+class _SearchBudget {
+  _SearchBudget(this.nodeLimit, Duration timeLimit)
+    : _deadline = DateTime.now().add(timeLimit);
 
-  final int limit;
+  final int nodeLimit;
+  final DateTime _deadline;
+
   int used = 0;
+  bool _outOfTime = false;
 
-  bool get exhausted => used >= limit;
+  bool get exhausted => _outOfTime || used >= nodeLimit;
 
-  void spend() => used++;
+  void spend() {
+    used++;
+    // Checking the clock is not free, but checking it rarely lets the search
+    // overshoot its budget by more than the budget itself.
+    if (used % 128 == 0 && DateTime.now().isAfter(_deadline)) {
+      _outOfTime = true;
+    }
+  }
 }

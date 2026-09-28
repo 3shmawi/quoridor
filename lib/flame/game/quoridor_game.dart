@@ -75,6 +75,7 @@ class QuoridorGame extends FlameGame
     _boardComponent.onMoveAttempted = _handleMoveAttempt;
     _boardComponent.onWallPlaceAttempted = _handleWallPlaceAttempt;
     _boardComponent.onInteractionChanged = () => onInteractionChanged?.call();
+    _boardComponent.canInteract = () => canActNow;
 
     // Load the sound effects once, up front, so the first move does not stall
     // on asset resolution.
@@ -291,6 +292,18 @@ class QuoridorGame extends FlameGame
   bool onTapDown(TapDownEvent event) {
     if (!_isInitialized) return false;
 
+    // Refuse the tap before the board reacts to it at all.
+    //
+    // Checking only when a move is submitted was too late: picking the pawn up
+    // and lining a wall up both happen on the board first, so during the
+    // opponent's turn the board still lit up and showed a wall preview that
+    // could never be placed.
+    if (!canActNow) {
+      onGameMessage?.call('It\'s not your turn!');
+      _boardComponent.clearInteraction();
+      return true;
+    }
+
     // Convert screen coordinates to local board coordinates
     final localPosition = event.localPosition - _boardComponent.position;
 
@@ -322,6 +335,12 @@ class QuoridorGame extends FlameGame
     if (!_isInitialized) return false;
 
     // Convert screen coordinates to local board coordinates
+    // Hover previews a wall, so it is gated for the same reason taps are.
+    if (!canActNow) {
+      _boardComponent.clearInteraction();
+      return true;
+    }
+
     final localPosition = Vector2(
       event.localPosition.dx - _boardComponent.position.x,
       event.localPosition.dy - _boardComponent.position.y,
