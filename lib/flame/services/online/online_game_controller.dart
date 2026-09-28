@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../constants.dart';
 import '../../models/game_state.dart';
 import '../../models/online_session.dart';
+import '../ai/quoridor_engine.dart';
 import '../identity_service.dart';
 import 'online_game_service.dart';
 
@@ -53,6 +54,9 @@ class OnlineGameController extends ChangeNotifier {
   String? _message;
   bool _submitting = false;
   bool _disposed = false;
+
+  /// True while a move is shown locally but not yet confirmed by the server.
+  bool _pendingLocalMove = false;
 
   StreamSubscription<OnlineGame>? _subscription;
   Timer? _heartbeat;
@@ -150,8 +154,14 @@ class OnlineGameController extends ChangeNotifier {
         ? previous?.copyWith(game: game)
         : OnlineSession.forUid(game, identity.uid);
 
+    // The server's copy is the truth, so it always replaces what is on
+    // screen -- including when it is simply confirming the move this device
+    // already showed optimistically.
     final moved = previous != null && game.moveCount != previous.game.moveCount;
-    if (moved) onRemoteUpdate?.call(game.board);
+    if (_pendingLocalMove && game.moveCount >= previous!.game.moveCount) {
+      _pendingLocalMove = false;
+    }
+    if (moved || _pendingLocalMove) onRemoteUpdate?.call(game.board);
 
     if (game.isOver && (previous == null || !previous.game.isOver)) {
       final didWin = _session?.didWin;
@@ -172,27 +182,32 @@ class OnlineGameController extends ChangeNotifier {
 
   /// Submits [move] on behalf of the local player.
   ///
-  /// The optimistic board is not applied here: the board this device renders
-  /// follows the server's copy, which keeps the two clients from drifting
-  /// apart when a move is refused.
+  /// The move is shown immediately and sent in the background. Waiting for the
+  /// server to echo it back put a whole round trip between the tap and the
+  /// board changing, which reads as the game being slow even on a good
+  /// connection.
+  ///
+  /// Showing it first is safe because the move was already validated against
+  /// the same rules the server applies, and the write is guarded by the move
+  /// counter: if the server refuses, [_rollback] puts the confirmed board back
+  /// and the listener delivers the truth either way.
   Future<bool> submitMove(GameMove move) async {
     final session = _session;
     if (session == null || _submitting) return false;
 
+    final confirmed = session.game;
     _submitting = true;
-    notifyListeners();
 
     try {
+      _applyOptimistically(move);
+
       final result = await _service.submitMove(session, move);
 
       if (!result.isSuccess) {
-        _message = result.message;
-
-        // A stale move means the opponent got there first; the listener will
-        // deliver the real board, so there is nothing to roll back.
-        if (result.failure == OnlineFailure.staleMove) {
-          _message = 'Your opponent moved first';
-        }
+        _rollback(confirmed);
+        _message = result.failure == OnlineFailure.staleMove
+            ? 'Your opponent moved first'
+            : result.message;
         return false;
       }
 
@@ -203,6 +218,42 @@ class OnlineGameController extends ChangeNotifier {
       if (!_disposed) notifyListeners();
     }
   }
+
+  /// Shows [move] on this device before the server has confirmed it.
+  void _applyOptimistically(GameMove move) {
+    final session = _session;
+    if (session == null) return;
+
+    final board = QuoridorEngine.applyMove(session.game.board, move);
+    _pendingLocalMove = true;
+    _session = session.copyWith(
+      game: _withBoard(session.game, board, session.game.moveCount + 1),
+    );
+    onRemoteUpdate?.call(board);
+    notifyListeners();
+  }
+
+  /// Restores the last board the server confirmed.
+  void _rollback(OnlineGame confirmed) {
+    _pendingLocalMove = false;
+    _session = _session?.copyWith(game: confirmed);
+    onRemoteUpdate?.call(confirmed.board);
+    notifyListeners();
+  }
+
+  static OnlineGame _withBoard(OnlineGame game, GameState board, int count) =>
+      OnlineGame(
+        gameId: game.gameId,
+        roomCode: game.roomCode,
+        status: game.status,
+        players: game.players,
+        currentPlayerId: board.currentPlayerId,
+        moveCount: count,
+        board: board,
+        winnerPlayerId: game.winnerPlayerId,
+        outcomeReason: game.outcomeReason,
+        updatedAt: game.updatedAt,
+      );
 
   /// Leaves the game, marking this device away.
   Future<void> leave({bool abandon = false}) async {

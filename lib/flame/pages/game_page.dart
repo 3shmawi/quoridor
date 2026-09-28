@@ -1094,34 +1094,61 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   // --- Status line ---------------------------------------------------------
 
-  /// One line under the board: who is playing and how many walls each has.
+  /// The strip under the board: both players, their walls, and whose turn it
+  /// is.
   ///
-  /// Deliberately the only chrome on this screen. The board says everything
-  /// else on its own — the squares you can reach glow, the gaps a wall can go
-  /// in are dotted, and a wall being aimed is green or red.
+  /// Online, "you" is whichever seat this device holds -- it is not always
+  /// seat 1. Reading the seats positionally showed the opponent's wall count
+  /// as your own for whoever joined second.
   Widget _buildStatusLine() {
     final state = _game.gameState;
+    final online = _online;
+    final localSeat = online?.localPlayerId ?? 1;
+    final opponentSeat = 3 - localSeat;
+
+    final localPlayer = localSeat == 1 ? state.player1 : state.player2;
+    final opponentPlayer = localSeat == 1 ? state.player2 : state.player1;
+
+    final String opponentLabel;
+    if (online != null) {
+      opponentLabel = online.session?.opponent?.displayName ?? 'Opponent';
+    } else if (opponentPlayer.isAI) {
+      opponentLabel = 'AI';
+    } else {
+      opponentLabel = 'Player $opponentSeat';
+    }
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildPlayerStatus(
-          label: 'You',
-          color: const Color(GameConstants.player1Color),
-          walls: state.player1.wallsRemaining,
-          isActive: state.currentPlayerId == 1,
+        Expanded(
+          child: _buildPlayerStatus(
+            label: 'You',
+            color: _seatColor(localSeat),
+            walls: localPlayer.wallsRemaining,
+            isActive: state.currentPlayerId == localSeat,
+          ),
         ),
-        _buildPlayerStatus(
-          label: state.player2.isAI ? 'AI' : 'Player 2',
-          color: const Color(GameConstants.player2Color),
-          walls: state.player2.wallsRemaining,
-          isActive: state.currentPlayerId == 2,
-          trailing: true,
+        const SizedBox(width: 10),
+        Expanded(
+          child: _buildPlayerStatus(
+            label: opponentLabel,
+            color: _seatColor(opponentSeat),
+            walls: opponentPlayer.wallsRemaining,
+            isActive: state.currentPlayerId == opponentSeat,
+            trailing: true,
+          ),
         ),
       ],
     );
   }
 
+  static Color _seatColor(int seat) => Color(
+    seat == 1 ? GameConstants.player1Color : GameConstants.player2Color,
+  );
+
+  /// One player's pill. The player to move gets their colour and says so; the
+  /// other fades back, so whose turn it is reads at a glance rather than from
+  /// a weight difference in the text.
   Widget _buildPlayerStatus({
     required String label,
     required Color color,
@@ -1129,30 +1156,76 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     required bool isActive,
     bool trailing = false,
   }) {
-    final dot = Container(
-      width: 10,
-      height: 10,
+    final scheme = Theme.of(context).colorScheme;
+
+    final badge = Container(
+      width: 30,
+      height: 30,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isActive ? 1 : 0.35),
+        color: isActive ? color : color.withValues(alpha: 0.18),
         shape: BoxShape.circle,
       ),
-    );
-
-    final text = Text(
-      '$label · $walls',
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-        color: Theme.of(
-          context,
-        ).colorScheme.onSurface.withValues(alpha: isActive ? 1 : 0.5),
+      alignment: Alignment.center,
+      child: Text(
+        '$walls',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: isActive ? Colors.white : color,
+        ),
       ),
     );
 
-    return Row(
-      children: trailing
-          ? [text, const SizedBox(width: 8), dot]
-          : [dot, const SizedBox(width: 8), text],
+    final text = Flexible(
+      child: Column(
+        crossAxisAlignment: trailing
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: scheme.onSurface.withValues(alpha: isActive ? 1 : 0.55),
+            ),
+          ),
+          Text(
+            isActive ? 'to play' : '$walls walls',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              color: isActive
+                  ? color
+                  : scheme.onSurface.withValues(alpha: 0.45),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isActive ? color.withValues(alpha: 0.12) : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isActive
+              ? color.withValues(alpha: 0.6)
+              : scheme.outline.withValues(alpha: 0.25),
+          width: isActive ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        children: trailing
+            ? [text, const SizedBox(width: 10), badge]
+            : [badge, const SizedBox(width: 10), text],
+      ),
     );
   }
 
