@@ -1,8 +1,9 @@
-name: Deploy web build to GitHub Pages
+name: Deploy web to GitHub Pages
 
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
   # Allows a deploy to be re-run by hand from the Actions tab.
   workflow_dispatch:
 
@@ -16,31 +17,47 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  # The one Flutter version, kept equal to .fvmrc. A test holds every
+  # workflow to it.
+  FLUTTER_VERSION: 3.32.0
+
 jobs:
+  test:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
   build:
     name: Build
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          # Whole history, so release notes can fall back to commit subjects
+          # Whole history, so latest.json notes can fall back to the commits
           # since the last tag.
           fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
-          # Keep in step with the version pinned in .fvmrc.
-          flutter-version: 3.32.0
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
       - run: flutter pub get
 
-      # Pages serves the site from /<repo>/, so the app has to be built with
-      # that base path or every asset request 404s. --no-web-resources-cdn
-      # bundles CanvasKit so the build is self-contained.
-      # The app learns what it is from these, and compares them with
-      # latest.json to tell whether a newer build is out.
+      # Pages serves the site from /<repo>/, so the app is built with that
+      # base path. The defines let it compare itself with latest.json.
       - name: Build web
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
@@ -48,16 +65,18 @@ jobs:
             --release \
             --no-web-resources-cdn \
             --base-href "/${GITHUB_REPOSITORY#*/}/" \
+            --build-name=$VERSION \
+            --build-number=${{ github.run_number }} \
             --dart-define=APP_VERSION=$VERSION \
-            --dart-define=APP_BUILD_NUMBER=${{ github.run_number }} \
+            --dart-define=BUILD_NUMBER=${{ github.run_number }} \
             --dart-define=APP_COMMIT=${{ github.sha }}
 
-      # Deployed next to the site, so an open tab can see it is out of date.
+      # Deployed next to the site, with this commit, so an open tab can tell
+      # it is out of date.
       - name: Write latest.json
         run: python3 tool/write_latest_json.py build/web/latest.json
 
       # Pages has no server-side routing, so a deep link would 404 on reload.
-      # Serving index.html as the 404 page makes the app handle the route.
       - name: Add SPA fallback
         run: cp build/web/index.html build/web/404.html
 

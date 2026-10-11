@@ -1,0 +1,53 @@
+name: Bump version
+
+# Run from the Actions tab. Commits "Version X.Y.Z", tags vX.Y.Z and pushes
+# both; the tag starts release.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      part:
+        description: Which part of the version to raise
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A tag pushed with the default GITHUB_TOKEN does not start other
+          # workflows. RELEASE_TOKEN (a fine-grained PAT with contents:write)
+          # does; without it the tag is pushed and release.yml must be
+          # started by hand for that tag.
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - name: Raise the version
+        id: bump
+        run: |
+          VERSION=$(python3 tool/bump_version.py "${{ inputs.part }}")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, tag and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Version ${{ steps.bump.outputs.version }}"
+          git tag "v${{ steps.bump.outputs.version }}"
+          git push origin HEAD "v${{ steps.bump.outputs.version }}"
+
+      - name: Say what happens next
+        env:
+          HAS_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::warning::RELEASE_TOKEN is not set, so the tag will not start release.yml by itself. Start 'Release' from the Actions tab and pick tag v${{ steps.bump.outputs.version }}."
+          fi
