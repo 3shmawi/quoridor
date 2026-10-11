@@ -182,10 +182,10 @@ void main() {
     });
 
     test('every release workflow writes latest.json with the same script', () {
-      for (final name in ['deploy-pages.yml', 'release.yml']) {
+      for (final name in ['pages.yml', 'release.yml']) {
         final workflow = File('.github/workflows/$name').readAsStringSync();
         expect(workflow, contains('tool/write_latest_json.py'), reason: name);
-        expect(workflow, contains('APP_BUILD_NUMBER'), reason: name);
+        expect(workflow, contains('BUILD_NUMBER='), reason: name);
       }
     });
   });
