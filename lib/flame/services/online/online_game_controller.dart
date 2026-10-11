@@ -14,13 +14,13 @@ enum OnlineConnectionState {
   /// Creating or joining a game.
   connecting,
 
-  /// In a game, waiting for the second player to arrive.
+  /// In a game, waiting for the remaining seats to fill.
   waitingForOpponent,
 
-  /// Both players present and the game is live.
+  /// Every player present and the game is live.
   live,
 
-  /// The opponent has stopped reporting in.
+  /// At least one other player has stopped reporting in.
   opponentAway,
 
   /// This device has lost contact with the backend.
@@ -82,10 +82,30 @@ class OnlineGameController extends ChangeNotifier {
   int? get localPlayerId => _session?.localPlayerId;
   String? get roomCode => _session?.game.roomCode;
 
-  /// Creates a game and starts watching it.
-  Future<bool> createGame() async {
+  /// The first other player who has stopped reporting in, if any.
+  OnlinePlayer? get awayPlayer {
+    final session = _session;
+    if (session == null) return null;
+    final now = DateTime.now();
+    for (final player in session.opponents) {
+      final lastSeen = player.lastSeen;
+      if (lastSeen == null || now.difference(lastSeen) > presenceTimeout) {
+        return player;
+      }
+    }
+    return null;
+  }
+
+  /// The player whose turn it is, as the server names them.
+  OnlinePlayer? get playerToMove {
+    final game = _session?.game;
+    return game?.players[game.currentPlayerId];
+  }
+
+  /// Creates a game for [playerCount] people and starts watching it.
+  Future<bool> createGame({int playerCount = 2}) async {
     _setConnection(OnlineConnectionState.connecting);
-    final result = await _service.createPrivateGame();
+    final result = await _service.createPrivateGame(playerCount: playerCount);
     return _adopt(result);
   }
 
@@ -247,6 +267,7 @@ class OnlineGameController extends ChangeNotifier {
         roomCode: game.roomCode,
         status: game.status,
         players: game.players,
+        playerCount: game.playerCount,
         currentPlayerId: board.currentPlayerId,
         moveCount: count,
         board: board,
@@ -280,19 +301,15 @@ class OnlineGameController extends ChangeNotifier {
       _setConnection(OnlineConnectionState.ended);
       return;
     }
-    if (!game.hasBothPlayers) {
+    if (!game.isFull) {
       _setConnection(OnlineConnectionState.waitingForOpponent);
       return;
     }
 
-    final opponent = session.opponent;
-    final lastSeen = opponent?.lastSeen;
-    final away =
-        lastSeen == null ||
-        DateTime.now().difference(lastSeen) > presenceTimeout;
-
     _setConnection(
-      away ? OnlineConnectionState.opponentAway : OnlineConnectionState.live,
+      awayPlayer != null
+          ? OnlineConnectionState.opponentAway
+          : OnlineConnectionState.live,
     );
   }
 

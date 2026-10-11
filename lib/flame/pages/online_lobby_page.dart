@@ -24,6 +24,9 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
   final TextEditingController _codeController = TextEditingController();
 
   bool _busy = false;
+
+  /// Seats in the game this device would create.
+  int _playerCount = 2;
   String? _error;
   List<OnlineGame> _resumable = const [];
 
@@ -191,8 +194,35 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
               style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
             ),
             const SizedBox(height: 16),
+            Text(
+              context.l10n.howManyPlayers,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface.withValues(alpha: 0.8),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<int>(
+              segments: [
+                for (final count in const [2, 3, 4])
+                  ButtonSegment(
+                    value: count,
+                    label: Text('$count'),
+                    icon: const Icon(Icons.person_outline, size: 18),
+                  ),
+              ],
+              selected: {_playerCount},
+              showSelectedIcon: false,
+              onSelectionChanged: _busy
+                  ? null
+                  : (selection) =>
+                        setState(() => _playerCount = selection.first),
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _busy ? null : () => _run((c) => c.createGame()),
+              onPressed: _busy
+                  ? null
+                  : () => _run((c) => c.createGame(playerCount: _playerCount)),
               icon: const Icon(Icons.play_arrow_rounded),
               label: Text(context.l10n.createGame),
               style: FilledButton.styleFrom(
@@ -295,10 +325,11 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
   Widget _buildResumeTile(OnlineGame game) {
     final scheme = Theme.of(context).colorScheme;
     final waiting = game.status == OnlineGameStatus.waiting;
-    final opponent =
-        game.players[1]?.uid == IdentityService.instance.current?.uid
-        ? game.players[2]
-        : game.players[1];
+    final myUid = IdentityService.instance.current?.uid;
+    final opponents = [
+      for (final player in game.players.values)
+        if (player.uid != myUid) player.displayName,
+    ];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -317,7 +348,9 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
           waiting
               ? context.l10n.waitingForOpponent
               : context.l10n.versName(
-                  opponent?.displayName ?? context.l10n.opponent,
+                  opponents.isEmpty
+                      ? context.l10n.opponent
+                      : opponents.join(', '),
                 ),
           style: TextStyle(
             fontWeight: FontWeight.w600,

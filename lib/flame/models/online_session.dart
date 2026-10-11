@@ -4,10 +4,10 @@ import 'game_state.dart';
 
 /// Lifecycle of an online game.
 enum OnlineGameStatus {
-  /// Created, with one seat still empty.
+  /// Created, with at least one seat still empty.
   waiting,
 
-  /// Both seats filled; moves are being played.
+  /// Every seat filled; moves are being played.
   active,
 
   /// Someone won, resigned or the game was drawn.
@@ -65,8 +65,11 @@ class OnlineGame {
   final String roomCode;
   final OnlineGameStatus status;
 
-  /// Seats, keyed by the same player numbers the rules use: 1 and 2.
+  /// Seats, keyed by the same player numbers the rules use: 1 to 4.
   final Map<int, OnlinePlayer> players;
+
+  /// How many seats the game was created with: 2, 3 or 4.
+  final int playerCount;
 
   final int currentPlayerId;
 
@@ -87,6 +90,7 @@ class OnlineGame {
     required this.roomCode,
     required this.status,
     required this.players,
+    this.playerCount = 2,
     required this.currentPlayerId,
     required this.moveCount,
     required this.board,
@@ -99,7 +103,16 @@ class OnlineGame {
       status == OnlineGameStatus.finished ||
       status == OnlineGameStatus.abandoned;
 
-  bool get hasBothPlayers => players.containsKey(1) && players.containsKey(2);
+  /// Whether every seat has someone in it.
+  bool get isFull => firstEmptySeat == null;
+
+  /// The lowest seat nobody has taken yet, or null when the game is full.
+  int? get firstEmptySeat {
+    for (var seat = 1; seat <= playerCount; seat++) {
+      if (!players.containsKey(seat)) return seat;
+    }
+    return null;
+  }
 
   /// The seat [uid] occupies, or null when they are not in this game.
   int? playerIdOf(String uid) {
@@ -137,11 +150,19 @@ class OnlineSession {
       game.status == OnlineGameStatus.active &&
       game.currentPlayerId == localPlayerId;
 
-  /// The opponent's seat, if both are filled.
+  /// Everyone else at the table, in seat order.
+  List<OnlinePlayer> get opponents => [
+    for (final entry
+        in (game.players.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key))))
+      if (entry.key != localPlayerId) entry.value,
+  ];
+
+  /// The first other player. With two seats, simply the opponent.
   OnlinePlayer? get opponent {
-    final id = localPlayerId;
-    if (id == null) return null;
-    return game.players[id == 1 ? 2 : 1];
+    if (localPlayerId == null) return null;
+    final others = opponents;
+    return others.isEmpty ? null : others.first;
   }
 
   OnlinePlayer? get localPlayer =>

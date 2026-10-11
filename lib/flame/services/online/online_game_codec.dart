@@ -50,6 +50,7 @@ class OnlineGameCodec {
     'roomCode': roomCode,
     'status': OnlineGameStatus.waiting.name,
     'players': {'1': encodePlayer(creator)},
+    'playerCount': board.playerCount,
     'currentPlayerId': board.currentPlayerId,
     'moveCount': 0,
     'board': board.toJson(),
@@ -57,13 +58,19 @@ class OnlineGameCodec {
     'updatedAt': timestamp,
   };
 
-  /// The fields written when the second player takes their seat.
+  /// The fields written when a player takes [seat].
+  ///
+  /// The game goes live only once [fillsGame] -- the last empty seat is
+  /// taken. Until then it stays findable by its code.
   static Map<String, dynamic> encodeJoin({
+    required int seat,
     required OnlinePlayer joiner,
+    required bool fillsGame,
     required Object timestamp,
   }) => {
-    'players.2': encodePlayer(joiner),
-    'status': OnlineGameStatus.active.name,
+    'players.$seat': encodePlayer(joiner),
+    'status':
+        (fillsGame ? OnlineGameStatus.active : OnlineGameStatus.waiting).name,
     'updatedAt': timestamp,
   };
 
@@ -83,7 +90,7 @@ class OnlineGameCodec {
     if (board.isGameOver) {
       data['status'] = OnlineGameStatus.finished.name;
       data['outcome'] = {
-        'winner': board.status == GameStatus.player1Won ? 1 : 2,
+        'winner': board.winnerId,
         'reason': OnlineOutcomeReason.goal.name,
       };
     }
@@ -134,6 +141,7 @@ class OnlineGameCodec {
       roomCode: data['roomCode'] as String? ?? '',
       status: OnlineGameStatus.fromName(data['status'] as String?),
       players: players,
+      playerCount: data['playerCount'] as int? ?? 2,
       currentPlayerId: data['currentPlayerId'] as int? ?? 1,
       moveCount: data['moveCount'] as int? ?? 0,
       board: GameState.fromJson(Map<String, dynamic>.from(boardData)),

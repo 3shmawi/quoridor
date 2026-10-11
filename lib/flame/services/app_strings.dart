@@ -64,6 +64,8 @@ class AppStrings {
   String get waitingForOpponent => _get('waitingForOpponent');
   String hasGoneQuiet(String name) => _fill('hasGoneQuiet', name);
   String get lostContact => _get('lostContact');
+  String nameGoneQuiet(String name) => _fill('nameGoneQuiet', name);
+  String nameThinking(String name) => _fill('nameThinking', name);
   String get gameOverShort => _get('gameOverShort');
   String get yourTurn => _get('yourTurn');
   String isThinking(String name) => _fill('isThinking', name);
@@ -93,6 +95,7 @@ class AppStrings {
   String get onlineUnavailable => _get('onlineUnavailable');
   String get gameNotFound => _get('gameNotFound');
   String get gameFull => _get('gameFull');
+  String get howManyPlayers => _get('howManyPlayers');
   String get alreadyJoined => _get('alreadyJoined');
   String get notYourTurn => _get('notYourTurn');
   String get backendError => _get('backendError');
@@ -227,6 +230,8 @@ class AppStrings {
     'waitingForOpponent': 'Waiting for an opponent',
     'hasGoneQuiet': '%s has gone quiet',
     'lostContact': 'Lost contact with the game',
+    'nameGoneQuiet': '%s has gone quiet',
+    'nameThinking': '%s is thinking…',
     'gameOverShort': 'Game over',
     'yourTurn': 'Your turn',
     'isThinking': '%s is thinking…',
@@ -254,7 +259,8 @@ class AppStrings {
 
     'onlineUnavailable': 'Online play is unavailable right now',
     'gameNotFound': 'No game found with that code',
-    'gameFull': 'That game already has two players',
+    'gameFull': 'That game is already full',
+    'howManyPlayers': 'How many players?',
     'alreadyJoined': 'You are already in that game',
     'notYourTurn': 'It is not your turn',
     'backendError': 'Could not reach the game server',
@@ -381,6 +387,8 @@ class AppStrings {
     'waitingForOpponent': 'في انتظار خصم',
     'hasGoneQuiet': 'انقطع %s',
     'lostContact': 'انقطع الاتصال باللعبة',
+    'nameGoneQuiet': '%s فصل',
+    'nameThinking': '%s بيفكّر…',
     'gameOverShort': 'انتهت اللعبة',
     'yourTurn': 'دورك',
     'isThinking': '%s بيفكر…',
@@ -407,7 +415,8 @@ class AppStrings {
 
     'onlineUnavailable': 'اللعب الأونلاين مش متاح دلوقتي',
     'gameNotFound': 'مفيش لعبة بالكود ده',
-    'gameFull': 'اللعبة دي مكتملة بلاعبين',
+    'gameFull': 'اللعبة دي مكتملة',
+    'howManyPlayers': 'كام لاعب؟',
     'alreadyJoined': 'إنت أصلاً في اللعبة دي',
     'notYourTurn': 'مش دورك',
     'backendError': 'تعذّر الوصول لخادم اللعبة',

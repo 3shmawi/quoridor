@@ -114,7 +114,9 @@ void main() {
   group('join encoding', () {
     test('writes seat 2 with a dotted path so seat 1 is untouched', () {
       final encoded = OnlineGameCodec.encodeJoin(
+        seat: 2,
         joiner: bob,
+        fillsGame: true,
         timestamp: fixedTime,
       );
 
@@ -123,6 +125,78 @@ void main() {
       expect(encoded.containsKey('players.2'), isTrue);
       expect(encoded.containsKey('players'), isFalse);
       expect(encoded['status'], 'active');
+    });
+  });
+
+  group('three and four players', () {
+    const carol = OnlinePlayer(uid: 'uid-carol', displayName: 'Carol');
+
+    test('a new game records how many seats it has', () {
+      final encoded = OnlineGameCodec.encodeNewGame(
+        roomCode: 'ABCDEF',
+        creator: alice,
+        board: GameStateFactory.createNewGame(
+          player2IsAI: false,
+          playerCount: 4,
+        ),
+        timestamp: fixedTime,
+      );
+      expect(encoded['playerCount'], 4);
+    });
+
+    test('a join that leaves seats empty keeps the game waiting', () {
+      final encoded = OnlineGameCodec.encodeJoin(
+        seat: 3,
+        joiner: carol,
+        fillsGame: false,
+        timestamp: fixedTime,
+      );
+      expect(encoded.containsKey('players.3'), isTrue);
+      expect(encoded['status'], 'waiting');
+    });
+
+    test('decodes the seat count, and is full only with every seat', () {
+      final partial = OnlineGameCodec.decodeGame('g', {
+        ...gameDoc(status: 'waiting'),
+        'playerCount': 3,
+      });
+      expect(partial.playerCount, 3);
+      expect(partial.isFull, isFalse);
+      expect(partial.firstEmptySeat, 3);
+
+      final full = OnlineGameCodec.decodeGame('g', {
+        ...gameDoc(
+          players: {
+            '1': OnlineGameCodec.encodePlayer(alice),
+            '2': OnlineGameCodec.encodePlayer(bob),
+            '3': OnlineGameCodec.encodePlayer(carol),
+          },
+        ),
+        'playerCount': 3,
+      });
+      expect(full.isFull, isTrue);
+      expect(full.playerIdOf('uid-carol'), 3);
+    });
+
+    test('a game stored without a count is a two-player game', () {
+      final decoded = OnlineGameCodec.decodeGame('g', gameDoc());
+      expect(decoded.playerCount, 2);
+      expect(decoded.isFull, isTrue);
+    });
+
+    test('records seat three as the winner', () {
+      final board = GameStateFactory.createNewGame(
+        player2IsAI: false,
+        playerCount: 3,
+      ).copyWith(status: GameStatus.player3Won);
+
+      final encoded = OnlineGameCodec.encodeMoveResult(
+        board: board,
+        moveCount: 9,
+        timestamp: fixedTime,
+      );
+      expect(encoded['status'], 'finished');
+      expect((encoded['outcome'] as Map)['winner'], 3);
     });
   });
 
@@ -217,7 +291,7 @@ void main() {
         ),
       );
 
-      expect(decoded.hasBothPlayers, isFalse);
+      expect(decoded.isFull, isFalse);
       expect(decoded.playerIdOf('uid-alice'), 1);
     });
 

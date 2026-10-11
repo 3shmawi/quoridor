@@ -98,7 +98,7 @@ void main() {
         'uid-alice',
       );
       expect(session.opponent, isNull);
-      expect(session.game.hasBothPlayers, isFalse);
+      expect(session.game.isFull, isFalse);
     });
   });
 
@@ -148,6 +148,55 @@ void main() {
 
     test('is undecided while the game is still running', () {
       expect(OnlineSession.forUid(game(), 'uid-alice').didWin, isNull);
+    });
+  });
+
+  group('four players', () {
+    const carol = OnlinePlayer(uid: 'uid-carol', displayName: 'Carol');
+    const dan = OnlinePlayer(uid: 'uid-dan', displayName: 'Dan');
+
+    OnlineGame table({int currentPlayerId = 1}) => OnlineGame(
+      gameId: 'g4',
+      roomCode: 'ABCDEF',
+      status: OnlineGameStatus.active,
+      players: const {1: alice, 2: bob, 3: carol, 4: dan},
+      playerCount: 4,
+      currentPlayerId: currentPlayerId,
+      moveCount: 0,
+      board: GameStateFactory.createNewGame(player2IsAI: false, playerCount: 4),
+    );
+
+    test('seat four acts only on its own turn', () {
+      expect(OnlineSession.forUid(table(), 'uid-dan').isLocalTurn, isFalse);
+      expect(
+        OnlineSession.forUid(table(currentPlayerId: 4), 'uid-dan').isLocalTurn,
+        isTrue,
+      );
+    });
+
+    test('everyone else at the table is an opponent, in seat order', () {
+      final session = OnlineSession.forUid(table(), 'uid-carol');
+      expect(session.opponents.map((p) => p.uid), [
+        'uid-alice',
+        'uid-bob',
+        'uid-dan',
+      ]);
+    });
+
+    test('a seat-three win belongs to seat three only', () {
+      final finished = OnlineGame(
+        gameId: 'g4',
+        roomCode: 'ABCDEF',
+        status: OnlineGameStatus.finished,
+        players: const {1: alice, 2: bob, 3: carol, 4: dan},
+        playerCount: 4,
+        currentPlayerId: 1,
+        moveCount: 20,
+        board: table().board,
+        winnerPlayerId: 3,
+      );
+      expect(OnlineSession.forUid(finished, 'uid-carol').didWin, isTrue);
+      expect(OnlineSession.forUid(finished, 'uid-dan').didWin, isFalse);
     });
   });
 }

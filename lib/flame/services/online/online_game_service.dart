@@ -18,7 +18,7 @@ enum OnlineFailure {
   /// No game carries the code that was entered.
   gameNotFound,
 
-  /// The game already has two players.
+  /// Every seat in the game is already taken.
   gameFull,
 
   /// The player tried to join a game they are already in.
@@ -60,7 +60,7 @@ class OnlineResult<T> {
       case OnlineFailure.gameNotFound:
         return 'No game found with that code';
       case OnlineFailure.gameFull:
-        return 'That game already has two players';
+        return 'That game is already full';
       case OnlineFailure.alreadyJoined:
         return 'You are already in that game';
       case OnlineFailure.notYourTurn:
@@ -102,8 +102,12 @@ class OnlineGameService {
       ? FirebaseFirestore.instance.collection(gamesCollection)
       : null;
 
-  /// Creates a game with a room code and seats the creator as player 1.
-  Future<OnlineResult<OnlineSession>> createPrivateGame() async {
+  /// Creates a game for [playerCount] people with a room code and seats the
+  /// creator as player 1.
+  Future<OnlineResult<OnlineSession>> createPrivateGame({
+    int playerCount = 2,
+  }) async {
+    assert(playerCount >= 2 && playerCount <= 4);
     final games = _games;
     final identity = await IdentityService.instance.ensureSignedIn();
     if (games == null || identity == null) {
@@ -125,12 +129,13 @@ class OnlineGameService {
         );
       }
 
-      // Player 2 is filled in on join, so the local board starts as a normal
-      // two-human game with no AI.
+      // The other seats are filled in on join, so the board starts with
+      // every seat human and nobody's name but the creator's.
       final board = GameStateFactory.createNewGame(
         player1Name: identity.displayName,
         player2Name: 'Waiting…',
         player2IsAI: false,
+        playerCount: playerCount,
       );
 
       final doc = games.doc();
@@ -170,8 +175,8 @@ class OnlineGameService {
 
   /// Takes the empty seat in the game carrying [rawCode].
   ///
-  /// The seat is claimed in a transaction, so two people racing on the same
-  /// code cannot both become player 2.
+  /// The lowest empty seat is claimed in a transaction, so two people racing
+  /// on the same code cannot both take it.
   Future<OnlineResult<OnlineSession>> joinByCode(String rawCode) async {
     final games = _games;
     final identity = await IdentityService.instance.ensureSignedIn();
@@ -212,7 +217,8 @@ class OnlineGameService {
           failure = OnlineFailure.alreadyJoined;
           return;
         }
-        if (game.hasBothPlayers) {
+        final seat = game.firstEmptySeat;
+        if (seat == null) {
           failure = OnlineFailure.gameFull;
           return;
         }
@@ -223,17 +229,16 @@ class OnlineGameService {
           connected: true,
         );
 
-        // Name the seats now that both players are known, so each client
-        // renders the opponent's real name.
-        final board = _withPlayerNames(
-          game.board,
-          player1Name: game.players[1]?.displayName ?? 'Player 1',
-          player2Name: joiner.displayName,
-        );
+        // Name the seat now that its player is known, so each client
+        // renders the real name.
+        final board = _withPlayerName(game.board, seat, joiner.displayName);
+        final fillsGame = game.players.length + 1 >= game.playerCount;
 
         transaction.update(doc, {
           ...OnlineGameCodec.encodeJoin(
+            seat: seat,
             joiner: joiner,
+            fillsGame: fillsGame,
             timestamp: FieldValue.serverTimestamp(),
           ),
           'board': board.toJson(),
@@ -450,7 +455,7 @@ class OnlineGameService {
     final results = <String, OnlineGame>{};
 
     // Firestore has no OR across fields, so each seat is a separate query.
-    for (final seat in [1, 2]) {
+    for (final seat in [1, 2, 3, 4]) {
       try {
         final snapshot = await games
             .where(
@@ -528,14 +533,13 @@ class OnlineGameService {
     }
   }
 
-  static GameState _withPlayerNames(
-    GameState board, {
-    required String player1Name,
-    required String player2Name,
-  }) => board.copyWith(
-    players: [
-      board.player1.copyWith(name: player1Name),
-      board.player2.copyWith(name: player2Name, isAI: false),
-    ],
-  );
+  static GameState _withPlayerName(GameState board, int seat, String name) =>
+      board.copyWith(
+        players: [
+          for (final player in board.players)
+            player.id == seat
+                ? player.copyWith(name: name, isAI: false)
+                : player,
+        ],
+      );
 }
