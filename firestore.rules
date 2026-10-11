@@ -65,7 +65,7 @@ service cloud.firestore {
           && incoming().players['1'].uid == request.auth.uid
           && incoming().status == 'waiting'
           && incoming().moveCount == 0
-          && incoming().playerCount in [2, 3, 4]
+          && playerCountOf(incoming()) in [2, 3, 4]
           && incoming().roomCode is string
           && incoming().roomCode.size() == 6
           && incoming().board is map;

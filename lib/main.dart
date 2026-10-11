@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:quoridor/flame/pages/game_page.dart';
@@ -12,6 +13,8 @@ import 'flame/services/firebase_service.dart';
 import 'flame/services/app_strings.dart';
 import 'flame/services/identity_service.dart';
 import 'flame/services/settings_service.dart';
+import 'flame/services/update/update_service.dart';
+import 'flame/widgets/update_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,8 +30,15 @@ void main() async {
   await SettingsService.instance.load();
 
   // Load the sound effects once for the whole app. Failures are handled
-  // inside the service and simply leave the game silent.
-  unawaited(AudioService.instance.initialize());
+  // inside the service and simply leave the game silent. Browsers refuse
+  // audio until the first tap or key, so on the web this waits for one (see
+  // [_QuoridorAppState.build]); anything played before it would fail and
+  // can leave a player broken.
+  if (!kIsWeb) unawaited(AudioService.instance.initialize());
+
+  // Looks for a newer build now and whenever the app returns to the
+  // foreground. Never blocks start-up and stays quiet on any failure.
+  UpdateService.instance.start();
 
   runApp(const QuoridorApp());
 }
@@ -45,7 +55,7 @@ Future<void> _connectFirebase() async {
     // never touches it, so a failure here costs nothing.
     await IdentityService.instance.ensureSignedIn();
   } catch (error) {
-    FirebaseService.markReady(available: false);
+    FirebaseService.markReady(available: false, error: '$error');
     debugPrint('Firebase unavailable, continuing offline: $error');
   }
 }
@@ -77,9 +87,8 @@ class _QuoridorAppState extends State<QuoridorApp> with WidgetsBindingObserver {
       case AppLifecycleState.hidden:
         // Stop playback when the app goes to the background so no native
         // player is left holding the audio focus.
-        unawaited(AudioService.instance.stopAll());
+        AudioService.instance.stopAll();
       case AppLifecycleState.detached:
-        unawaited(AudioService.instance.dispose());
       case AppLifecycleState.resumed:
       case AppLifecycleState.inactive:
         break;
@@ -95,6 +104,17 @@ class _QuoridorAppState extends State<QuoridorApp> with WidgetsBindingObserver {
           valueListenable: isDarkModeNotifier,
           builder: (context, value, child) {
             return MaterialApp(
+              builder: (context, child) {
+                final app = UpdateOverlay(
+                  child: child ?? const SizedBox.shrink(),
+                );
+                if (!kIsWeb) return app;
+                return Listener(
+                  onPointerDown: (_) =>
+                      unawaited(AudioService.instance.initialize()),
+                  child: app,
+                );
+              },
               onGenerateTitle: (context) => context.l10n.appTitle,
               theme: lightTheme,
               darkTheme: darkTheme,

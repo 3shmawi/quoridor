@@ -1,0 +1,58 @@
+name: Release Android
+
+# Push a tag named after the version in pubspec.yaml, e.g. v1.1.0.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Whole history, so release notes can fall back to commit subjects
+          # since the last tag.
+          fetch-depth: 0
+
+      - name: Check the tag matches pubspec.yaml
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          test "v$VERSION" = "$GITHUB_REF_NAME" || {
+            echo "Tag $GITHUB_REF_NAME does not match pubspec version $VERSION"
+            exit 1
+          }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # Keep in step with the version pinned in .fvmrc.
+          flutter-version: 3.32.0
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Build APK
+        run: |
+          flutter build apk --release \
+            --build-number=${{ github.run_number }} \
+            --dart-define=APP_VERSION=$VERSION \
+            --dart-define=APP_BUILD_NUMBER=${{ github.run_number }} \
+            --dart-define=APP_COMMIT=${{ github.sha }}
+
+      - name: Write latest.json
+        run: python3 tool/write_latest_json.py build/latest.json
+
+      # Installed builds read releases/latest/download/latest.json. A release
+      # only becomes "latest" once it is published with its files, so the
+      # checker never sees a build that is still being made.
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/latest.json

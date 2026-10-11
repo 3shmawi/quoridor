@@ -194,6 +194,114 @@ describe('joining a game', () => {
   });
 });
 
+describe('three and four players', () => {
+  const CAROL = 'uid-carol';
+  const DAN = 'uid-dan';
+
+  function tableOf(count, seated) {
+    const players = {};
+    seated.forEach((uid, i) => (players[i + 1] = player(uid, uid)));
+    return { ...waitingGame(ALICE), playerCount: count, players };
+  }
+
+  it('lets a game be created for four', async () => {
+    await assertSucceeds(
+      setDoc(doc(db(ALICE), 'games/four-1'), tableOf(4, [ALICE])),
+    );
+  });
+
+  it('refuses a game for five', async () => {
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/four-2'), tableOf(5, [ALICE])),
+    );
+  });
+
+  it('keeps the game waiting until the last seat fills', async () => {
+    await seed('games/four-3', tableOf(3, [ALICE]));
+    // Going live with a seat still empty is refused...
+    await assertFails(
+      updateDoc(doc(db(BOB), 'games/four-3'), {
+        'players.2': player(BOB, 'Bob'),
+        status: 'active',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    // ...staying waiting is not.
+    await assertSucceeds(
+      updateDoc(doc(db(BOB), 'games/four-3'), {
+        'players.2': player(BOB, 'Bob'),
+        status: 'waiting',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    // The last seat takes it live.
+    await assertSucceeds(
+      updateDoc(doc(db(CAROL), 'games/four-3'), {
+        'players.3': player(CAROL, 'Carol'),
+        status: 'active',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('refuses a seat past the game size', async () => {
+    await seed('games/four-4', tableOf(3, [ALICE, BOB]));
+    await assertFails(
+      updateDoc(doc(db(DAN), 'games/four-4'), {
+        'players.4': player(DAN, 'Dan'),
+        status: 'waiting',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('refuses taking a second seat', async () => {
+    await seed('games/four-5', tableOf(4, [ALICE, BOB]));
+    await assertFails(
+      updateDoc(doc(db(BOB), 'games/four-5'), {
+        'players.3': player(BOB, 'Bob'),
+        status: 'waiting',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('lets seat three move on its turn only', async () => {
+    const live = {
+      ...tableOf(3, [ALICE, BOB, CAROL]),
+      status: 'active',
+      currentPlayerId: 3,
+    };
+    await seed('games/four-6', live);
+    await assertFails(
+      updateDoc(doc(db(BOB), 'games/four-6'), { moveCount: 1 }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(CAROL), 'games/four-6'), {
+        moveCount: 1,
+        currentPlayerId: 1,
+      }),
+    );
+  });
+
+  it('lets a heartbeat touch only the caller’s own seat', async () => {
+    const live = { ...tableOf(3, [ALICE, BOB, CAROL]), status: 'active' };
+    await seed('games/four-7', live);
+    await assertSucceeds(
+      updateDoc(doc(db(CAROL), 'games/four-7'), {
+        'players.3.connected': true,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(db(CAROL), 'games/four-7'), {
+        'players.1.connected': false,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+});
+
 describe('playing a move', () => {
   it('lets the player to move advance the counter by one', async () => {
     await seed('games/move-1', activeGame({ currentPlayerId: 1 }));

@@ -36,6 +36,39 @@ void main() {
     });
   });
 
+  group('tapping off the board', () {
+    // A screen wider than it is tall leaves a margin either side of the
+    // square board, which is where these taps land.
+    setUp(() {
+      board.size = Vector2(800, 400);
+      board.handleTap(Vector2.zero());
+      board.clearInteraction();
+    });
+
+    Vector2 margin() => Vector2(board.metrics.boardRect.left / 2, 200);
+
+    test('puts down a wall being lined up', () {
+      board.handleTap(centreOf(const Position(4, 4)) + Vector2(5, 5));
+      expect(board.pendingWall, isNotNull);
+
+      board.handleTap(margin());
+      expect(board.pendingWall, isNull);
+    });
+
+    test('puts down a lifted pawn', () {
+      board.handleTap(centreOf(state.currentPlayer.position));
+      expect(board.selectedPawn, isNotNull);
+
+      board.handleTap(margin());
+      expect(board.selectedPawn, isNull);
+    });
+
+    test('never lines a wall up by itself', () {
+      board.handleTap(margin());
+      expect(board.pendingWall, isNull);
+    });
+  });
+
   group('when it is not this device\'s turn', () {
     setUp(() => board.canInteract = () => false);
 

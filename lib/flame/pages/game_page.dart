@@ -12,6 +12,7 @@ import '../../flame/services/audio_service.dart';
 import '../../flame/services/settings_service.dart';
 import '../../flame/services/online/online_game_controller.dart';
 import '../../flame/services/turn_clock.dart';
+import '../services/update/update_service.dart';
 import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/models/player.dart';
@@ -164,6 +165,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     // The server's board is the one being rendered from here on.
     _game.localPlayerId = controller.localPlayerId;
+    _game.turnGate = () => controller.isLocalTurn;
     _game.onSubmitMove = controller.submitMove;
     controller.onRemoteUpdate = _game.updateGameState;
     controller.onGameOver = _handleOnlineGameOver;
@@ -209,6 +211,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     controller.dispose();
 
     _game.localPlayerId = null;
+    _game.turnGate = null;
     _game.onSubmitMove = null;
   }
 
@@ -353,7 +356,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     });
     if (!audio.enabled.value) {
       // Silence anything mid-playback so the toggle takes effect immediately.
-      unawaited(audio.stopAll());
+      audio.stopAll();
     }
     _showGameMessage(
       audio.enabled.value ? context.l10n.soundOn : context.l10n.soundOff,
@@ -671,6 +674,19 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildMenuSection(context.l10n.gameControls, [
+                            // Stays here after "Later", so the update is one
+                            // tap away for as long as it is waiting.
+                            if (UpdateService.instance.available.value
+                                case final update?)
+                              _buildMenuItem(
+                                Icons.system_update_rounded,
+                                context.l10n.updateWaiting(update.version),
+                                context.l10n.updateWaitingSubtitle,
+                                () {
+                                  closeMenu();
+                                  unawaited(UpdateService.instance.update());
+                                },
+                              ),
                             if (_isOnline)
                               _buildMenuItem(
                                 Icons.logout_rounded,
@@ -737,9 +753,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                                   ? Icons.volume_up
                                   : Icons.volume_off,
                               context.l10n.soundEffects,
-                              AudioService.instance.isUnavailable
-                                  ? context.l10n.soundUnavailable
-                                  : context.l10n.soundEffectsSubtitle,
+                              context.l10n.soundEffectsSubtitle,
                               AudioService.instance.enabled.value,
                               _toggleSound,
                             ),
@@ -806,8 +820,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               spacing: 20,
               children: [
                 Expanded(
-                  child: GameWidget<QuoridorGame>.controlled(
-                    gameFactory: () => _game,
+                  // A tap anywhere off the game area -- the status strip, the
+                  // padding, the banner -- puts down whatever was lined up.
+                  child: TapRegion(
+                    onTapOutside: (_) => _game.clearInteraction(),
+                    // Online, the board dims while it is someone else's turn:
+                    // it can be watched but not touched until the turn
+                    // comes back.
+                    child: AnimatedOpacity(
+                      opacity: _isOnline && !_game.canActNow ? 0.6 : 1,
+                      duration: const Duration(milliseconds: 200),
+                      child: GameWidget<QuoridorGame>.controlled(
+                        gameFactory: () => _game,
+                      ),
+                    ),
                   ),
                 ),
                 if (_isOnline) _buildOnlineBanner(),

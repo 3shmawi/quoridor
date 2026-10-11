@@ -41,10 +41,18 @@ class QuoridorGame extends FlameGame
   int? localPlayerId;
 
   /// Whether this device may act on the current turn.
+  /// Online, the server's view of whose turn it is. Set while a game is
+  /// online, so the board also stays still while seats are still filling or
+  /// a move is on its way to the server -- times when the board alone would
+  /// say this seat may move.
+  bool Function()? turnGate;
+
   bool get canActNow {
     final state = _gameState;
     if (state == null || state.isGameOver) return false;
     if (state.currentPlayer.isAI) return false;
+    final gate = turnGate;
+    if (gate != null && !gate()) return false;
     final seat = localPlayerId;
     return seat == null || state.currentPlayerId == seat;
   }
@@ -78,10 +86,6 @@ class QuoridorGame extends FlameGame
     _boardComponent.onInteractionChanged = () => onInteractionChanged?.call();
     _boardComponent.canInteract = () => canActNow;
 
-    // Load the sound effects once, up front, so the first move does not stall
-    // on asset resolution.
-    unawaited(AudioService.instance.initialize());
-
     // Position board in center
     _boardComponent.position = Vector2(0, 0);
     add(_boardComponent);
@@ -99,7 +103,7 @@ class QuoridorGame extends FlameGame
       _announcedGameOver = true;
       onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
       onGameWon?.call();
-      AudioService.instance.play(GameSound.win);
+      AudioService.instance.play(Sfx.win);
     }
   }
 
@@ -143,8 +147,8 @@ class QuoridorGame extends FlameGame
     for (var i = 0; i < newMoves.length; i++) {
       final move = newMoves[i];
       final sound = move.type == MoveType.pawnMove
-          ? GameSound.move(move.playerId)
-          : GameSound.wall(move.playerId);
+          ? Sfx.move(move.playerId)
+          : Sfx.wall(move.playerId);
 
       if (i == 0) {
         AudioService.instance.play(sound);
@@ -237,6 +241,13 @@ class QuoridorGame extends FlameGame
 
     _boardComponent.clearInteraction();
     unawaited(_processMove(move));
+  }
+
+  /// Puts down a lifted pawn or a wall being lined up. Called for taps that
+  /// land outside the game area altogether.
+  void clearInteraction() {
+    if (!_isInitialized) return;
+    _boardComponent.clearInteraction();
   }
 
   Future<void> _processMove(GameMove move) async {
