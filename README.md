@@ -260,6 +260,13 @@ Everything is in GitHub Actions:
   Signing, Google Play (internal track) and TestFlight run only when their
   secrets are set; otherwise those steps are skipped with a note.
 
+Secrets are pushed from your own machine with `tool/setup_secrets.sh`. It
+reads the values all your apps share from `~/.app-secrets/shared.env`
+(created as a template on first run), generates this app's Android upload
+keystore once in `~/.app-secrets/apps/<repo>/`, and sets every secret with
+`gh`. Run it with `--dry-run` first to see what it would set. Back up
+`~/.app-secrets/`: Google Play needs the same upload key for every update.
+
 Installed apps and open browser tabs check for a newer build at start and
 when they come back to the foreground, and offer it in a card at the top. To
 force an update, because old builds would actually break, put the oldest
