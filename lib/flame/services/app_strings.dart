@@ -23,6 +23,16 @@ class AppStrings {
 
   Map<String, String> get _table => isArabic ? _ar : _en;
 
+  String updateAvailableTitle(String version) =>
+      _fill('updateAvailableTitle', version);
+  String get updateLater => _get('updateLater');
+  String get updateReload => _get('updateReload');
+  String get updateDownload => _get('updateDownload');
+  String get updateForced => _get('updateForced');
+  String whatsNewIn(String version) => _fill('whatsNewIn', version);
+  String updateWaiting(String version) => _fill('updateWaiting', version);
+  String get updateWaitingSubtitle => _get('updateWaitingSubtitle');
+
   String _get(String key) => _table[key] ?? _en[key] ?? key;
 
   /// Fills the single `%s` placeholder in [key]'s text.
@@ -200,6 +210,14 @@ class AppStrings {
 
   static const Map<String, String> _en = {
     'appTitle': 'Quoridor',
+    'updateAvailableTitle': 'Version %s is available',
+    'updateLater': 'Later',
+    'updateReload': 'Update',
+    'updateDownload': 'Download',
+    'updateForced': 'This version no longer works. Update to keep playing.',
+    'whatsNewIn': "What's new in %s",
+    'updateWaiting': 'Update to %s',
+    'updateWaitingSubtitle': 'A new version is ready',
     'gotIt': 'Got it!',
     'copy': 'Copy',
     'cancel': 'Cancel',
@@ -357,6 +375,14 @@ class AppStrings {
   /// rows the wrong way round — so it is corrected here.
   static const Map<String, String> _ar = {
     'appTitle': 'كوريدور',
+    'updateAvailableTitle': 'إصدار %s متاح',
+    'updateLater': 'بعدين',
+    'updateReload': 'حدّث',
+    'updateDownload': 'نزّل',
+    'updateForced': 'الإصدار ده مبقاش شغال. حدّث علشان تكمّل لعب.',
+    'whatsNewIn': 'الجديد في %s',
+    'updateWaiting': 'حدّث لـ %s',
+    'updateWaitingSubtitle': 'فيه إصدار جديد جاهز',
     'gotIt': 'تمام',
     'copy': 'نسخ',
     'cancel': 'إلغاء',

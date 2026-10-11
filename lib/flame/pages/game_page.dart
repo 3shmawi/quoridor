@@ -12,6 +12,7 @@ import '../../flame/services/audio_service.dart';
 import '../../flame/services/settings_service.dart';
 import '../../flame/services/online/online_game_controller.dart';
 import '../../flame/services/turn_clock.dart';
+import '../services/update/update_service.dart';
 import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/models/player.dart';
@@ -673,6 +674,19 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildMenuSection(context.l10n.gameControls, [
+                            // Stays here after "Later", so the update is one
+                            // tap away for as long as it is waiting.
+                            if (UpdateService.instance.available.value
+                                case final update?)
+                              _buildMenuItem(
+                                Icons.system_update_rounded,
+                                context.l10n.updateWaiting(update.version),
+                                context.l10n.updateWaitingSubtitle,
+                                () {
+                                  closeMenu();
+                                  unawaited(UpdateService.instance.update());
+                                },
+                              ),
                             if (_isOnline)
                               _buildMenuItem(
                                 Icons.logout_rounded,

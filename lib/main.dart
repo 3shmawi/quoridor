@@ -13,6 +13,8 @@ import 'flame/services/firebase_service.dart';
 import 'flame/services/app_strings.dart';
 import 'flame/services/identity_service.dart';
 import 'flame/services/settings_service.dart';
+import 'flame/services/update/update_service.dart';
+import 'flame/widgets/update_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +35,10 @@ void main() async {
   // [_QuoridorAppState.build]); anything played before it would fail and
   // can leave a player broken.
   if (!kIsWeb) unawaited(AudioService.instance.initialize());
+
+  // Looks for a newer build now and whenever the app returns to the
+  // foreground. Never blocks start-up and stays quiet on any failure.
+  UpdateService.instance.start();
 
   runApp(const QuoridorApp());
 }
@@ -98,13 +104,17 @@ class _QuoridorAppState extends State<QuoridorApp> with WidgetsBindingObserver {
           valueListenable: isDarkModeNotifier,
           builder: (context, value, child) {
             return MaterialApp(
-              builder: kIsWeb
-                  ? (context, child) => Listener(
-                      onPointerDown: (_) =>
-                          unawaited(AudioService.instance.initialize()),
-                      child: child,
-                    )
-                  : null,
+              builder: (context, child) {
+                final app = UpdateOverlay(
+                  child: child ?? const SizedBox.shrink(),
+                );
+                if (!kIsWeb) return app;
+                return Listener(
+                  onPointerDown: (_) =>
+                      unawaited(AudioService.instance.initialize()),
+                  child: app,
+                );
+              },
               onGenerateTitle: (context) => context.l10n.appTitle,
               theme: lightTheme,
               darkTheme: darkTheme,
