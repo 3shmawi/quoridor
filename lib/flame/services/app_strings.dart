@@ -26,6 +26,9 @@ class AppStrings {
   String updateAvailableTitle(String version) =>
       _fill('updateAvailableTitle', version);
   String get updateLater => _get('updateLater');
+  String get yourName => _get('yourName');
+  String get save => _get('save');
+  String get tapToChangeName => _get('tapToChangeName');
   String get updateReload => _get('updateReload');
   String get updateDownload => _get('updateDownload');
   String get updateForced => _get('updateForced');
@@ -212,6 +215,9 @@ class AppStrings {
     'appTitle': 'Quoridor',
     'updateAvailableTitle': 'Version %s is available',
     'updateLater': 'Later',
+    'yourName': 'Your name',
+    'save': 'Save',
+    'tapToChangeName': 'Others see this name — tap to change it',
     'updateReload': 'Update',
     'updateDownload': 'Download',
     'updateForced': 'This version no longer works. Update to keep playing.',
@@ -377,6 +383,9 @@ class AppStrings {
     'appTitle': 'كوريدور',
     'updateAvailableTitle': 'إصدار %s متاح',
     'updateLater': 'بعدين',
+    'yourName': 'اسمك',
+    'save': 'حفظ',
+    'tapToChangeName': 'اللاعيبة التانيين هيشوفوا الاسم ده — دوس علشان تغيّره',
     'updateReload': 'حدّث',
     'updateDownload': 'نزّل',
     'updateForced': 'الإصدار ده مبقاش شغال. حدّث علشان تكمّل لعب.',

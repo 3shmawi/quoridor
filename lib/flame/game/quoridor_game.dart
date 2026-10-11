@@ -47,6 +47,16 @@ class QuoridorGame extends FlameGame
   /// say this seat may move.
   bool Function()? turnGate;
 
+  /// Quarter turns the board is shown rotated by. Set from the seat this
+  /// device holds online; zero on a shared device.
+  set viewTurns(int turns) {
+    _viewTurns = turns;
+    if (_isInitialized) _boardComponent.viewTurns = turns;
+  }
+
+  int get viewTurns => _viewTurns;
+  int _viewTurns = 0;
+
   bool get canActNow {
     final state = _gameState;
     if (state == null || state.isGameOver) return false;
@@ -85,6 +95,7 @@ class QuoridorGame extends FlameGame
     _boardComponent.onWallPlaceAttempted = _handleWallPlaceAttempt;
     _boardComponent.onInteractionChanged = () => onInteractionChanged?.call();
     _boardComponent.canInteract = () => canActNow;
+    _boardComponent.viewTurns = _viewTurns;
 
     // Position board in center
     _boardComponent.position = Vector2(0, 0);
@@ -183,7 +194,6 @@ class QuoridorGame extends FlameGame
   void _handleMoveAttempt(Position newPosition) {
     if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId) ||
         !canActNow) {
-      onGameMessage?.call('It\'s not your turn!');
       return;
     }
 
@@ -200,7 +210,6 @@ class QuoridorGame extends FlameGame
   void _handleWallPlaceAttempt(Wall wall) {
     if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId) ||
         !canActNow) {
-      onGameMessage?.call('It\'s not your turn!');
       return;
     }
 
@@ -348,8 +357,9 @@ class QuoridorGame extends FlameGame
     // and lining a wall up both happen on the board first, so during the
     // opponent's turn the board still lit up and showed a wall preview that
     // could never be placed.
+    // The board is dimmed while it is not this device's turn, which says
+    // so already; a toast on every tap only got in the way.
     if (!canActNow) {
-      onGameMessage?.call('It\'s not your turn!');
       _boardComponent.clearInteraction();
       return true;
     }
