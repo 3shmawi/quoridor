@@ -93,6 +93,7 @@ class AppStrings {
   String get onlineUnavailable => _get('onlineUnavailable');
   String get gameNotFound => _get('gameNotFound');
   String get gameFull => _get('gameFull');
+  String get howManyPlayers => _get('howManyPlayers');
   String get alreadyJoined => _get('alreadyJoined');
   String get notYourTurn => _get('notYourTurn');
   String get backendError => _get('backendError');
@@ -254,7 +255,8 @@ class AppStrings {
 
     'onlineUnavailable': 'Online play is unavailable right now',
     'gameNotFound': 'No game found with that code',
-    'gameFull': 'That game already has two players',
+    'gameFull': 'That game is already full',
+    'howManyPlayers': 'How many players?',
     'alreadyJoined': 'You are already in that game',
     'notYourTurn': 'It is not your turn',
     'backendError': 'Could not reach the game server',
@@ -407,7 +409,8 @@ class AppStrings {
 
     'onlineUnavailable': 'اللعب الأونلاين مش متاح دلوقتي',
     'gameNotFound': 'مفيش لعبة بالكود ده',
-    'gameFull': 'اللعبة دي مكتملة بلاعبين',
+    'gameFull': 'اللعبة دي مكتملة',
+    'howManyPlayers': 'كام لاعب؟',
     'alreadyJoined': 'إنت أصلاً في اللعبة دي',
     'notYourTurn': 'مش دورك',
     'backendError': 'تعذّر الوصول لخادم اللعبة',

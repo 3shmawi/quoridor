@@ -27,26 +27,35 @@ service cloud.firestore {
         return request.auth != null;
       }
 
+      // Whether [uid] sits in [seat] (a string key, '1' to '4').
+      function sitsIn(data, seat, uid) {
+        return data.players.keys().hasAny([seat]) && data.players[seat].uid == uid;
+      }
+
       // The seat this request's caller occupies, or 0 when they hold none.
       //
       // Every branch returns an int on purpose: a ternary that mixed an int
       // with null compiled, but with a warning, and relying on a fuzzy type
       // in a security boundary is not worth the brevity.
       function seatOf(data, uid) {
-        return (data.players.keys().hasAny(['1']) && data.players['1'].uid == uid)
-          ? 1
-          : ((data.players.keys().hasAny(['2']) && data.players['2'].uid == uid)
-              ? 2
-              : 0);
+        return sitsIn(data, '1', uid) ? 1
+          : (sitsIn(data, '2', uid) ? 2
+            : (sitsIn(data, '3', uid) ? 3
+              : (sitsIn(data, '4', uid) ? 4 : 0)));
       }
 
       function isPlayer(data) {
         return signedIn() && seatOf(data, request.auth.uid) != 0;
       }
 
-      // The seat the caller does not occupy.
-      function otherSeat(data, uid) {
-        return seatOf(data, uid) == 1 ? 2 : 1;
+      // Games written before three- and four-player tables carry no count.
+      function playerCountOf(data) {
+        return data.get('playerCount', 2);
+      }
+
+      // The seats a joiner may take in a game of [count].
+      function joinableSeats(count) {
+        return count == 2 ? ['2'] : (count == 3 ? ['2', '3'] : ['2', '3', '4']);
       }
 
       // A new game seats its creator as player 1 and starts empty.
@@ -56,20 +65,35 @@ service cloud.firestore {
           && incoming().players['1'].uid == request.auth.uid
           && incoming().status == 'waiting'
           && incoming().moveCount == 0
+          && incoming().playerCount in [2, 3, 4]
           && incoming().roomCode is string
           && incoming().roomCode.size() == 6
           && incoming().board is map;
       }
 
-      // Taking the empty seat: only seat 2, only with your own uid, and only
-      // while the game is still waiting.
+      // Whether the caller took [seat] in this write.
+      function tookSeat(seat) {
+        return !existing().players.keys().hasAny([seat])
+          && sitsIn(incoming(), seat, request.auth.uid);
+      }
+
+      // Taking an empty seat: exactly one, with your own uid, only while the
+      // game is still waiting, and only if you are not already at the table.
+      // The game goes live with the last seat and not before.
       function isValidJoin() {
+        let count = playerCountOf(existing());
+        let added = incoming().players.diff(existing().players);
         return signedIn()
           && existing().status == 'waiting'
-          && !existing().players.keys().hasAny(['2'])
-          && incoming().players['2'].uid == request.auth.uid
-          && incoming().players['1'] == existing().players['1']
-          && incoming().status == 'active'
+          && seatOf(existing(), request.auth.uid) == 0
+          && added.addedKeys().size() == 1
+          && added.addedKeys().hasOnly(joinableSeats(count))
+          && added.changedKeys().size() == 0
+          && added.removedKeys().size() == 0
+          && (tookSeat('2') || tookSeat('3') || tookSeat('4'))
+          && playerCountOf(incoming()) == count
+          && incoming().status
+             == (incoming().players.size() == count ? 'active' : 'waiting')
           && incoming().moveCount == existing().moveCount
           && incoming().roomCode == existing().roomCode;
       }
@@ -84,6 +108,7 @@ service cloud.firestore {
           && existing().currentPlayerId == seatOf(existing(), request.auth.uid)
           && incoming().moveCount == existing().moveCount + 1
           && incoming().players == existing().players
+          && playerCountOf(incoming()) == playerCountOf(existing())
           && incoming().roomCode == existing().roomCode
           && incoming().status in ['active', 'finished'];
       }
@@ -91,7 +116,7 @@ service cloud.firestore {
       // Heartbeat: a player may refresh their own presence and nothing else.
       //
       // Presence writes happen every few seconds, so they must not be able to
-      // touch the board, the turn, the counter or the other player's seat --
+      // touch the board, the turn, the counter or anyone else's seat --
       // otherwise the heartbeat becomes a way around every other rule here.
       function isValidPresenceUpdate() {
         return isPlayer(existing())
@@ -102,13 +127,13 @@ service cloud.firestore {
           && incoming().roomCode == existing().roomCode
           && incoming().board == existing().board
           // Only your own seat may change, and it stays yours.
+          && incoming().players.diff(existing().players).affectedKeys()
+             .hasOnly([string(seatOf(existing(), request.auth.uid))])
           && incoming().players[string(seatOf(existing(), request.auth.uid))].uid
-             == request.auth.uid
-          && incoming().players[string(otherSeat(existing(), request.auth.uid))]
-             == existing().players[string(otherSeat(existing(), request.auth.uid))];
+             == request.auth.uid;
       }
 
-      // Either player may abandon a game they are in.
+      // Any player may abandon a game they are in.
       function isValidAbandon() {
         return isPlayer(existing())
           && incoming().status == 'abandoned'
@@ -116,7 +141,7 @@ service cloud.firestore {
           && incoming().players == existing().players;
       }
 
-      // A game is private to the two people playing it. Looking one up by
+      // A game is private to the people playing it. Looking one up by
       // room code is a query against roomCode + status, which the rules below
       // permit for any signed-in caller only while the game is waiting -- a
       // six-character code is the shared secret that gates joining.

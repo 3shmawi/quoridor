@@ -79,7 +79,7 @@ void main() {
         status: OnlineGameStatus.waiting,
         players: const {1: alice},
       );
-      expect(waiting.hasBothPlayers, isFalse);
+      expect(waiting.isFull, isFalse);
       expect(
         OnlineSession.forUid(waiting, 'uid-alice').isLocalTurn,
         isFalse,

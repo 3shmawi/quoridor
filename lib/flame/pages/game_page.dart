@@ -1230,7 +1230,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         color = const Color(0xFFD97706);
         icon = Icons.cloud_off_rounded;
         text =
-            '${online.session?.opponent?.displayName ?? context.l10n.opponent} '
+            '${online.awayPlayer?.displayName ?? context.l10n.opponent} '
             'has gone quiet';
 
       case OnlineConnectionState.offline:
@@ -1251,7 +1251,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             : Icons.more_horiz_rounded;
         text = yourTurn
             ? context.l10n.yourTurn
-            : '${online.session?.opponent?.displayName ?? context.l10n.opponent} '
+            : '${online.playerToMove?.displayName ?? context.l10n.opponent} '
                   'is thinking…';
     }
 
@@ -1346,7 +1346,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   String _labelFor(Player player, int? localSeat) {
     if (localSeat != null) {
       if (player.id == localSeat) return context.l10n.you;
-      return _online?.session?.opponent?.displayName ?? context.l10n.opponent;
+      return _online?.game?.players[player.id]?.displayName ??
+          context.l10n.opponent;
     }
 
     if (player.isAI) return context.l10n.ai;
