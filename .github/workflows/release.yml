@@ -182,7 +182,9 @@ jobs:
   windows:
     name: Windows
     needs: [version, checks]
-    runs-on: windows-latest
+    # Pinned: Flutter 3.32 knows Visual Studio up to 2022, and newer
+    # windows-latest images ship a later one it cannot find.
+    runs-on: windows-2022
     env:
       VERSION: ${{ needs.version.outputs.version }}
       BUILD: ${{ needs.version.outputs.build_number }}
