@@ -64,6 +64,8 @@ class AppStrings {
   String get waitingForOpponent => _get('waitingForOpponent');
   String hasGoneQuiet(String name) => _fill('hasGoneQuiet', name);
   String get lostContact => _get('lostContact');
+  String nameGoneQuiet(String name) => _fill('nameGoneQuiet', name);
+  String nameThinking(String name) => _fill('nameThinking', name);
   String get gameOverShort => _get('gameOverShort');
   String get yourTurn => _get('yourTurn');
   String isThinking(String name) => _fill('isThinking', name);
@@ -228,6 +230,8 @@ class AppStrings {
     'waitingForOpponent': 'Waiting for an opponent',
     'hasGoneQuiet': '%s has gone quiet',
     'lostContact': 'Lost contact with the game',
+    'nameGoneQuiet': '%s has gone quiet',
+    'nameThinking': '%s is thinking…',
     'gameOverShort': 'Game over',
     'yourTurn': 'Your turn',
     'isThinking': '%s is thinking…',
@@ -383,6 +387,8 @@ class AppStrings {
     'waitingForOpponent': 'في انتظار خصم',
     'hasGoneQuiet': 'انقطع %s',
     'lostContact': 'انقطع الاتصال باللعبة',
+    'nameGoneQuiet': '%s فصل',
+    'nameThinking': '%s بيفكّر…',
     'gameOverShort': 'انتهت اللعبة',
     'yourTurn': 'دورك',
     'isThinking': '%s بيفكر…',
