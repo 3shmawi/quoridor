@@ -112,7 +112,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     // Nothing to count down while the computer is thinking, once somebody has
     // won, or under an open menu.
-    if (state.isGameOver || state.currentPlayer.isAI || _menuOpen) {
+    // Online, the clock waits for every seat to fill: until then nobody
+    // can move, so there is no turn to run out.
+    final online = _online;
+    final waitingForPlayers = online != null && !(online.game?.isFull ?? false);
+
+    if (state.isGameOver ||
+        state.currentPlayer.isAI ||
+        _menuOpen ||
+        waitingForPlayers) {
       _clock.stop();
       return;
     }
@@ -166,6 +174,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     // The server's board is the one being rendered from here on.
     _game.localPlayerId = controller.localPlayerId;
     _game.turnGate = () => controller.isLocalTurn;
+    _game.viewTurns = viewTurnsForSeat(controller.localPlayerId);
     _game.onSubmitMove = controller.submitMove;
     controller.onRemoteUpdate = _game.updateGameState;
     controller.onGameOver = _handleOnlineGameOver;
@@ -212,6 +221,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _game.localPlayerId = null;
     _game.turnGate = null;
+    _game.viewTurns = 0;
     _game.onSubmitMove = null;
   }
 
@@ -828,10 +838,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     // it can be watched but not touched until the turn
                     // comes back.
                     child: AnimatedOpacity(
-                      opacity: _isOnline && !_game.canActNow ? 0.6 : 1,
+                      opacity: _isOnline && !_game.canActNow ? 0.45 : 1,
                       duration: const Duration(milliseconds: 200),
-                      child: GameWidget<QuoridorGame>.controlled(
-                        gameFactory: () => _game,
+                      // Each online player sees the board from their own side,
+                      // with their pawn starting at the bottom.
+                      child: RotatedBox(
+                        quarterTurns: _game.viewTurns,
+                        child: GameWidget<QuoridorGame>.controlled(
+                          gameFactory: () => _game,
+                        ),
                       ),
                     ),
                   ),
@@ -1350,17 +1365,23 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
       pills.add(
         Expanded(
-          child: _buildPlayerStatus(
-            seat: player.id,
-            label: _labelFor(player, localSeat),
-            color: _seatColor(player.id),
-            walls: player.wallsRemaining,
-            isActive: state.currentPlayerId == player.id,
-            remaining: state.currentPlayerId == player.id ? remaining : null,
-            compact: compact,
-            // The last pill leans its badge outwards, so the row reads as a
-            // pair of ends rather than everything crowding to the left.
-            trailing: !compact && player.id != state.players.first.id,
+          // Everyone but the player to move fades well back, so whose turn
+          // it is reads at a glance.
+          child: AnimatedOpacity(
+            opacity: state.currentPlayerId == player.id ? 1 : 0.35,
+            duration: const Duration(milliseconds: 200),
+            child: _buildPlayerStatus(
+              seat: player.id,
+              label: _labelFor(player, localSeat),
+              color: _seatColor(player.id),
+              walls: player.wallsRemaining,
+              isActive: state.currentPlayerId == player.id,
+              remaining: state.currentPlayerId == player.id ? remaining : null,
+              compact: compact,
+              // The last pill leans its badge outwards, so the row reads as a
+              // pair of ends rather than everything crowding to the left.
+              trailing: !compact && player.id != state.players.first.id,
+            ),
           ),
         ),
       );
@@ -1631,5 +1652,22 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         ],
       ),
     );
+  }
+}
+
+/// Quarter turns (clockwise) that put [seat]'s starting edge at the bottom.
+///
+/// Seat 1 starts at the bottom already, seat 2 at the top, seat 3 on the left
+/// and seat 4 on the right.
+int viewTurnsForSeat(int? seat) {
+  switch (seat) {
+    case 2:
+      return 2;
+    case 3:
+      return 3;
+    case 4:
+      return 1;
+    default:
+      return 0;
   }
 }

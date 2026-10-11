@@ -69,6 +69,27 @@ class IdentityService {
     return _pending ??= _signIn();
   }
 
+  /// Longest name a player may choose. Long enough for a real name, short
+  /// enough to fit a status pill.
+  static const int maxNameLength = 20;
+
+  /// Changes the name other players see. Games already started keep the
+  /// name they were joined with; new ones use this.
+  Future<bool> setDisplayName(String raw) async {
+    final name = raw.trim();
+    if (name.isEmpty || name.length > maxNameLength) return false;
+    final current = await ensureSignedIn();
+    if (current == null) return false;
+    try {
+      await FirebaseAuth.instance.currentUser?.updateDisplayName(name);
+    } catch (error) {
+      // Still use it for this session; it is retried on the next change.
+      debugPrint('IdentityService: could not store display name: $error');
+    }
+    identity.value = LocalIdentity(uid: current.uid, displayName: name);
+    return true;
+  }
+
   Future<LocalIdentity?> _signIn() async {
     try {
       final ready = await FirebaseService.whenSettled.timeout(

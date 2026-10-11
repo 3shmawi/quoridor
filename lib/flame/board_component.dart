@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:quoridor/theme.dart';
@@ -37,6 +39,11 @@ class BoardComponent extends PositionComponent {
   /// you want it. Nothing is highlighted until you pick the pawn up, which
   /// keeps the board quiet while you are thinking.
   Position? _selectedPawn;
+
+  /// Quarter turns the whole board is shown rotated by, so each online
+  /// player sees their own pawn at the bottom. Numbers and flags are drawn
+  /// turned back the other way so they stay upright.
+  int viewTurns = 0;
 
   List<Position> _validMoves = const [];
 
@@ -322,7 +329,22 @@ class BoardComponent extends PositionComponent {
   }
 
   /// A small pennant on a pole, centred on [center].
-  void _drawFlag(Canvas canvas, Offset center, Color color) {
+  /// Runs [draw] with the canvas turned back against [viewTurns] around
+  /// [center], so what it draws reads upright on a rotated board.
+  void _upright(Canvas canvas, Offset center, void Function() draw) {
+    if (viewTurns % 4 == 0) return draw();
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(-viewTurns * math.pi / 2);
+    canvas.translate(-center.dx, -center.dy);
+    draw();
+    canvas.restore();
+  }
+
+  void _drawFlag(Canvas canvas, Offset center, Color color) =>
+      _upright(canvas, center, () => _drawFlagUpright(canvas, center, color));
+
+  void _drawFlagUpright(Canvas canvas, Offset center, Color color) {
     final height = _metrics.cellSize * 0.52;
     final width = _metrics.cellSize * 0.3;
     final poleWidth = _metrics.cellSize * 0.06;
@@ -483,11 +505,15 @@ class BoardComponent extends PositionComponent {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    textPainter.paint(
+    _upright(
       canvas,
-      Offset(
-        center.dx - textPainter.width / 2,
-        center.dy - textPainter.height / 2,
+      center,
+      () => textPainter.paint(
+        canvas,
+        Offset(
+          center.dx - textPainter.width / 2,
+          center.dy - textPainter.height / 2,
+        ),
       ),
     );
   }

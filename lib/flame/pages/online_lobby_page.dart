@@ -125,38 +125,75 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
       valueListenable: IdentityService.instance.identity,
       builder: (context, identity, child) {
         final scheme = Theme.of(context).colorScheme;
-        return Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: scheme.primary.withValues(alpha: 0.15),
-              child: Icon(Icons.person_outline, color: scheme.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    identity?.displayName ?? context.l10n.connecting,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  Text(
-                    context.l10n.opponentSeesThisName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: scheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
+        return InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: identity == null || _busy ? null : _editName,
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: scheme.primary.withValues(alpha: 0.15),
+                child: Icon(Icons.person_outline, color: scheme.primary),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      identity?.displayName ?? context.l10n.connecting,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      context.l10n.tapToChangeName,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.edit_outlined, size: 18),
+            ],
+          ),
         );
       },
     );
+  }
+
+  Future<void> _editName() async {
+    final controller = TextEditingController(
+      text: IdentityService.instance.current?.displayName ?? '',
+    );
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.yourName),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: IdentityService.maxNameLength,
+          textCapitalization: TextCapitalization.words,
+          onSubmitted: (value) => Navigator.of(context).pop(value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: Text(context.l10n.save),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null) return;
+    await IdentityService.instance.setDisplayName(name);
   }
 
   Widget _buildCreateCard() {
