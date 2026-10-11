@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:quoridor/flame/pages/game_page.dart';
@@ -27,8 +28,11 @@ void main() async {
   await SettingsService.instance.load();
 
   // Load the sound effects once for the whole app. Failures are handled
-  // inside the service and simply leave the game silent.
-  unawaited(AudioService.instance.initialize());
+  // inside the service and simply leave the game silent. Browsers refuse
+  // audio until the first tap or key, so on the web this waits for one (see
+  // [_QuoridorAppState.build]); anything played before it would fail and
+  // can leave a player broken.
+  if (!kIsWeb) unawaited(AudioService.instance.initialize());
 
   runApp(const QuoridorApp());
 }
@@ -77,9 +81,8 @@ class _QuoridorAppState extends State<QuoridorApp> with WidgetsBindingObserver {
       case AppLifecycleState.hidden:
         // Stop playback when the app goes to the background so no native
         // player is left holding the audio focus.
-        unawaited(AudioService.instance.stopAll());
+        AudioService.instance.stopAll();
       case AppLifecycleState.detached:
-        unawaited(AudioService.instance.dispose());
       case AppLifecycleState.resumed:
       case AppLifecycleState.inactive:
         break;
@@ -95,6 +98,13 @@ class _QuoridorAppState extends State<QuoridorApp> with WidgetsBindingObserver {
           valueListenable: isDarkModeNotifier,
           builder: (context, value, child) {
             return MaterialApp(
+              builder: kIsWeb
+                  ? (context, child) => Listener(
+                      onPointerDown: (_) =>
+                          unawaited(AudioService.instance.initialize()),
+                      child: child,
+                    )
+                  : null,
               onGenerateTitle: (context) => context.l10n.appTitle,
               theme: lightTheme,
               darkTheme: darkTheme,

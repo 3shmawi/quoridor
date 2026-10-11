@@ -86,10 +86,6 @@ class QuoridorGame extends FlameGame
     _boardComponent.onInteractionChanged = () => onInteractionChanged?.call();
     _boardComponent.canInteract = () => canActNow;
 
-    // Load the sound effects once, up front, so the first move does not stall
-    // on asset resolution.
-    unawaited(AudioService.instance.initialize());
-
     // Position board in center
     _boardComponent.position = Vector2(0, 0);
     add(_boardComponent);
@@ -107,7 +103,7 @@ class QuoridorGame extends FlameGame
       _announcedGameOver = true;
       onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
       onGameWon?.call();
-      AudioService.instance.play(GameSound.win);
+      AudioService.instance.play(Sfx.win);
     }
   }
 
@@ -151,8 +147,8 @@ class QuoridorGame extends FlameGame
     for (var i = 0; i < newMoves.length; i++) {
       final move = newMoves[i];
       final sound = move.type == MoveType.pawnMove
-          ? GameSound.move(move.playerId)
-          : GameSound.wall(move.playerId);
+          ? Sfx.move(move.playerId)
+          : Sfx.wall(move.playerId);
 
       if (i == 0) {
         AudioService.instance.play(sound);

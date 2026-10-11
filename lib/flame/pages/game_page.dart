@@ -355,7 +355,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     });
     if (!audio.enabled.value) {
       // Silence anything mid-playback so the toggle takes effect immediately.
-      unawaited(audio.stopAll());
+      audio.stopAll();
     }
     _showGameMessage(
       audio.enabled.value ? context.l10n.soundOn : context.l10n.soundOff,
@@ -739,9 +739,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                                   ? Icons.volume_up
                                   : Icons.volume_off,
                               context.l10n.soundEffects,
-                              AudioService.instance.isUnavailable
-                                  ? context.l10n.soundUnavailable
-                                  : context.l10n.soundEffectsSubtitle,
+                              context.l10n.soundEffectsSubtitle,
                               AudioService.instance.enabled.value,
                               _toggleSound,
                             ),
