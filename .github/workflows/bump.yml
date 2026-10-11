@@ -22,7 +22,7 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # A tag pushed with the default GITHUB_TOKEN does not start other
           # workflows. RELEASE_TOKEN (a fine-grained PAT with contents:write)
