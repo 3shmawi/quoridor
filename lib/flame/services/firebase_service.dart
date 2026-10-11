@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -15,8 +17,25 @@ class FirebaseService {
 
   static bool get isReady => _ready;
 
+  static final Completer<bool> _settled = Completer<bool>();
+
+  /// Why Firebase did not start, if it did not.
+  static String? startupError;
+
+  /// Completes with [isReady] once startup has finished trying.
+  ///
+  /// Anything that needs the backend waits on this rather than reading
+  /// [isReady] straight away: on a slow phone the lobby can open while
+  /// Firebase is still starting, and reading the flag then reported online
+  /// play as unavailable when it was merely not ready yet.
+  static Future<bool> get whenSettled => _settled.future;
+
   /// Called once startup has initialised (or failed to initialise) Firebase.
-  static void markReady({required bool available}) => _ready = available;
+  static void markReady({required bool available, String? error}) {
+    _ready = available;
+    startupError = available ? null : error;
+    if (!_settled.isCompleted) _settled.complete(available);
+  }
 
   static FirebaseFirestore? get _firestore =>
       _ready ? FirebaseFirestore.instance : null;

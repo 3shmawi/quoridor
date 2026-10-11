@@ -50,6 +50,10 @@ class IdentityService {
 
   Future<LocalIdentity?>? _pending;
 
+  /// Why the last sign-in did not produce an identity, for showing the
+  /// player something more useful than "unavailable".
+  String? lastError;
+
   /// The current identity, or null when the device has none yet.
   LocalIdentity? get current => identity.value;
 
@@ -67,7 +71,14 @@ class IdentityService {
 
   Future<LocalIdentity?> _signIn() async {
     try {
-      if (!FirebaseService.isReady) return null;
+      final ready = await FirebaseService.whenSettled.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => false,
+      );
+      if (!ready) {
+        lastError = FirebaseService.startupError ?? 'Firebase did not start';
+        return null;
+      }
 
       final auth = FirebaseAuth.instance;
       var user = auth.currentUser;
@@ -89,9 +100,18 @@ class IdentityService {
 
       final result = LocalIdentity(uid: user.uid, displayName: displayName);
       identity.value = result;
+      lastError = null;
       return result;
+    } on FirebaseAuthException catch (error) {
+      // The usual cause is Anonymous sign-in being switched off in the
+      // Firebase console, which reports as admin-restricted-operation or
+      // operation-not-allowed.
+      debugPrint('IdentityService: anonymous sign-in failed: $error');
+      lastError = error.code;
+      return null;
     } catch (error) {
       debugPrint('IdentityService: anonymous sign-in failed: $error');
+      lastError = '$error';
       return null;
     } finally {
       _pending = null;

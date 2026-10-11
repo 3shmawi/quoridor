@@ -239,6 +239,13 @@ class QuoridorGame extends FlameGame
     unawaited(_processMove(move));
   }
 
+  /// Puts down a lifted pawn or a wall being lined up. Called for taps that
+  /// land outside the game area altogether.
+  void clearInteraction() {
+    if (!_isInitialized) return;
+    _boardComponent.clearInteraction();
+  }
+
   Future<void> _processMove(GameMove move) async {
     final submit = onSubmitMove;
     if (submit != null) {

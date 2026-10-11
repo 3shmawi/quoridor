@@ -56,7 +56,9 @@ class OnlineResult<T> {
       case null:
         return 'Done';
       case OnlineFailure.unavailable:
-        return 'Online play is unavailable right now';
+        return detail == null
+            ? 'Online play is unavailable right now'
+            : 'Online play is unavailable right now ($detail)';
       case OnlineFailure.gameNotFound:
         return 'No game found with that code';
       case OnlineFailure.gameFull:
@@ -108,10 +110,15 @@ class OnlineGameService {
     int playerCount = 2,
   }) async {
     assert(playerCount >= 2 && playerCount <= 4);
-    final games = _games;
+    // Sign in first: it waits for Firebase to finish starting, and reading
+    // the collection before that finds nothing.
     final identity = await IdentityService.instance.ensureSignedIn();
+    final games = _games;
     if (games == null || identity == null) {
-      return const OnlineResult.failed(OnlineFailure.unavailable);
+      return OnlineResult.failed(
+        OnlineFailure.unavailable,
+        IdentityService.instance.lastError,
+      );
     }
 
     final creator = OnlinePlayer(
@@ -178,10 +185,15 @@ class OnlineGameService {
   /// The lowest empty seat is claimed in a transaction, so two people racing
   /// on the same code cannot both take it.
   Future<OnlineResult<OnlineSession>> joinByCode(String rawCode) async {
-    final games = _games;
+    // Sign in first: it waits for Firebase to finish starting, and reading
+    // the collection before that finds nothing.
     final identity = await IdentityService.instance.ensureSignedIn();
+    final games = _games;
     if (games == null || identity == null) {
-      return const OnlineResult.failed(OnlineFailure.unavailable);
+      return OnlineResult.failed(
+        OnlineFailure.unavailable,
+        IdentityService.instance.lastError,
+      );
     }
 
     final code = RoomCode.tryParse(rawCode);
@@ -294,7 +306,10 @@ class OnlineGameService {
     final games = _games;
     final identity = IdentityService.instance.current;
     if (games == null || identity == null) {
-      return const OnlineResult.failed(OnlineFailure.unavailable);
+      return OnlineResult.failed(
+        OnlineFailure.unavailable,
+        IdentityService.instance.lastError,
+      );
     }
 
     if (!session.isLocalTurn) {
@@ -421,10 +436,15 @@ class OnlineGameService {
 
   /// Reads a game once, for resuming a session.
   Future<OnlineResult<OnlineSession>> resume(String gameId) async {
-    final games = _games;
+    // Sign in first: it waits for Firebase to finish starting, and reading
+    // the collection before that finds nothing.
     final identity = await IdentityService.instance.ensureSignedIn();
+    final games = _games;
     if (games == null || identity == null) {
-      return const OnlineResult.failed(OnlineFailure.unavailable);
+      return OnlineResult.failed(
+        OnlineFailure.unavailable,
+        IdentityService.instance.lastError,
+      );
     }
 
     try {

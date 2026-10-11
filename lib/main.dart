@@ -45,7 +45,7 @@ Future<void> _connectFirebase() async {
     // never touches it, so a failure here costs nothing.
     await IdentityService.instance.ensureSignedIn();
   } catch (error) {
-    FirebaseService.markReady(available: false);
+    FirebaseService.markReady(available: false, error: '$error');
     debugPrint('Firebase unavailable, continuing offline: $error');
   }
 }

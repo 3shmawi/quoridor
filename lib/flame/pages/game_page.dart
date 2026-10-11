@@ -806,8 +806,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               spacing: 20,
               children: [
                 Expanded(
-                  child: GameWidget<QuoridorGame>.controlled(
-                    gameFactory: () => _game,
+                  // A tap anywhere off the game area -- the status strip, the
+                  // padding, the banner -- puts down whatever was lined up.
+                  child: TapRegion(
+                    onTapOutside: (_) => _game.clearInteraction(),
+                    child: GameWidget<QuoridorGame>.controlled(
+                      gameFactory: () => _game,
+                    ),
                   ),
                 ),
                 if (_isOnline) _buildOnlineBanner(),

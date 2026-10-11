@@ -106,6 +106,15 @@ class BoardComponent extends PositionComponent {
 
     _ensureMetrics();
     final offset = Offset(position.x, position.y);
+
+    // The game area is wider than the board on most screens. A tap in that
+    // margin used to aim a wall at the nearest edge slot; it now means "never
+    // mind", the same as a tap anywhere else off the board.
+    if (!isOnBoard(position)) {
+      clearInteraction();
+      return;
+    }
+
     final tapped = _metrics.positionAt(offset);
 
     // Tapping your own pawn picks it up, or puts it back down.
@@ -132,6 +141,13 @@ class BoardComponent extends PositionComponent {
     // Pawn down: the rest of the board aims a wall, which gives a whole cell
     // to aim with rather than the few pixels of the gap itself.
     if (_gameState.currentPlayer.hasWallsRemaining) _aimWall(offset);
+  }
+
+  /// Whether [position], in this component's coordinates, lands on the board
+  /// itself rather than the margin around it.
+  bool isOnBoard(Vector2 position) {
+    _ensureMetrics();
+    return _metrics.boardRect.contains(Offset(position.x, position.y));
   }
 
   /// Places, rotates or moves the wall being lined up, from one tap.
