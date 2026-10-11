@@ -41,10 +41,18 @@ class QuoridorGame extends FlameGame
   int? localPlayerId;
 
   /// Whether this device may act on the current turn.
+  /// Online, the server's view of whose turn it is. Set while a game is
+  /// online, so the board also stays still while seats are still filling or
+  /// a move is on its way to the server -- times when the board alone would
+  /// say this seat may move.
+  bool Function()? turnGate;
+
   bool get canActNow {
     final state = _gameState;
     if (state == null || state.isGameOver) return false;
     if (state.currentPlayer.isAI) return false;
+    final gate = turnGate;
+    if (gate != null && !gate()) return false;
     final seat = localPlayerId;
     return seat == null || state.currentPlayerId == seat;
   }

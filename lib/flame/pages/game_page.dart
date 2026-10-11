@@ -164,6 +164,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     // The server's board is the one being rendered from here on.
     _game.localPlayerId = controller.localPlayerId;
+    _game.turnGate = () => controller.isLocalTurn;
     _game.onSubmitMove = controller.submitMove;
     controller.onRemoteUpdate = _game.updateGameState;
     controller.onGameOver = _handleOnlineGameOver;
@@ -209,6 +210,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     controller.dispose();
 
     _game.localPlayerId = null;
+    _game.turnGate = null;
     _game.onSubmitMove = null;
   }
 
@@ -810,8 +812,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   // padding, the banner -- puts down whatever was lined up.
                   child: TapRegion(
                     onTapOutside: (_) => _game.clearInteraction(),
-                    child: GameWidget<QuoridorGame>.controlled(
-                      gameFactory: () => _game,
+                    // Online, the board dims while it is someone else's turn:
+                    // it can be watched but not touched until the turn
+                    // comes back.
+                    child: AnimatedOpacity(
+                      opacity: _isOnline && !_game.canActNow ? 0.6 : 1,
+                      duration: const Duration(milliseconds: 200),
+                      child: GameWidget<QuoridorGame>.controlled(
+                        gameFactory: () => _game,
+                      ),
                     ),
                   ),
                 ),
