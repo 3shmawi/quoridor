@@ -74,6 +74,22 @@ class BoardComponent extends PositionComponent {
 
   BoardMetrics get metrics => _metrics;
 
+  /// Seconds since the board appeared, driving the pulse around the pawn
+  /// whose turn it is.
+  double _pulseTime = 0;
+
+  /// One pulse, in seconds.
+  static const double pulsePeriod = 1.4;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _pulseTime = (_pulseTime + dt) % pulsePeriod;
+  }
+
+  /// 0 to 1 through the current pulse.
+  double get pulsePhase => _pulseTime / pulsePeriod;
+
   void updateGameState(GameState newGameState) {
     _gameState = newGameState;
     _wallComponent.gameState = newGameState;
@@ -481,15 +497,35 @@ class BoardComponent extends PositionComponent {
         ..strokeWidth = radius * 0.12,
     );
 
-    // A halo marks whose turn it is; a solid ring marks a pawn picked up.
-    if (isCurrentPlayer || isSelected) {
+    // A solid ring marks a pawn picked up. The pawn whose turn it is sends
+    // out a ripple that grows and fades, so whose move it is can be seen at
+    // a glance from every seat, even with the board dimmed.
+    if (isSelected) {
       canvas.drawCircle(
         center,
-        radius * (isSelected ? 1.34 : 1.22),
+        radius * 1.34,
         Paint()
-          ..color = color.withValues(alpha: isSelected ? 1 : 0.45)
+          ..color = color
           ..style = PaintingStyle.stroke
-          ..strokeWidth = radius * (isSelected ? 0.16 : 0.1),
+          ..strokeWidth = radius * 0.16,
+      );
+    } else if (isCurrentPlayer) {
+      final t = Curves.easeOut.transform(pulsePhase);
+      canvas.drawCircle(
+        center,
+        radius * (1.1 + 0.55 * t),
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.85 * (1 - t))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = radius * (0.16 - 0.1 * t),
+      );
+      canvas.drawCircle(
+        center,
+        radius * 1.22,
+        Paint()
+          ..color = color.withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = radius * 0.1,
       );
     }
 

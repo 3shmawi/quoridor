@@ -97,4 +97,12 @@ void main() {
       expect(board.pendingWall, isNull);
     });
   });
+
+  test('the turn pulse runs and wraps round', () {
+    expect(board.pulsePhase, 0);
+    board.update(BoardComponent.pulsePeriod / 2);
+    expect(board.pulsePhase, closeTo(0.5, 1e-9));
+    board.update(BoardComponent.pulsePeriod * 0.75);
+    expect(board.pulsePhase, closeTo(0.25, 1e-9));
+  });
 }

@@ -838,7 +838,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     // it can be watched but not touched until the turn
                     // comes back.
                     child: AnimatedOpacity(
-                      opacity: _isOnline && !_game.canActNow ? 0.45 : 1,
+                      opacity: _isOnline && !_game.canActNow ? 0.75 : 1,
                       duration: const Duration(milliseconds: 200),
                       // Each online player sees the board from their own side,
                       // with their pawn starting at the bottom.
