@@ -1,37 +1,37 @@
 {
-  "name": "quoridor",
-  "short_name": "quoridor",
+  "name": "Quoridor",
+  "short_name": "Quoridor",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#0175C2",
   "theme_color": "#0175C2",
-  "description": "A new Flutter game.",
+  "description": "Race your pawn across the board and block your opponents with walls.",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/favicon.ico",
+      "src": "icons/favicon.ico",
       "type": "image/x-icon",
       "sizes": "16x16 32x32"
     },
     {
-      "src": "/icon-192.png",
+      "src": "icons/icon-192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "/icon-512.png",
+      "src": "icons/icon-512.png",
       "type": "image/png",
       "sizes": "512x512"
     },
     {
-      "src": "/icon-192-maskable.png",
+      "src": "icons/icon-192-maskable.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-512-maskable.png",
+      "src": "icons/icon-512-maskable.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "maskable"
