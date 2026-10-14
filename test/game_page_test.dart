@@ -172,6 +172,34 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('the players are shown as soon as a game is picked', (
+    tester,
+  ) async {
+    // "Play vs AI" on a fresh launch keeps the board already loaded, so no
+    // move or new game announces it; the strip under the board used to
+    // stay hidden until the first move.
+    await openPage(tester, mode: 'Play vs AI');
+    expect(find.text('Player 1'), findsOneWidget);
+    expect(find.text('AI'), findsOneWidget);
+    await finish(tester);
+  });
+
+  testWidgets('a message never moves the board', (tester) async {
+    // Picking a mode puts up a message straight away. It used to sit in the
+    // column under the board, so the board shrank and shifted while it
+    // showed, and a tap in that moment landed on the wrong square.
+    await openPage(tester);
+    expect(find.text('Two player mode activated'), findsOneWidget);
+    final board = find.byType(GameWidget<QuoridorGame>);
+    final withMessage = tester.getRect(board);
+
+    await settle(tester, frames: 40);
+    expect(find.text('Two player mode activated'), findsNothing);
+    expect(tester.getRect(board), withMessage);
+
+    await finish(tester);
+  });
+
   testWidgets('an unfinished game can be continued after a restart', (
     tester,
   ) async {

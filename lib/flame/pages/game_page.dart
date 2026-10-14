@@ -71,9 +71,26 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     // Show game mode selection after the widget is built, with the game
     // left unfinished last time already on the board behind it.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _whenBoardLoaded();
       await _restoreSavedGame();
       if (mounted) _showGameModeSelection();
     });
+  }
+
+  /// Shows the strip under the board once the board exists.
+  ///
+  /// It used to wait for the first change of game state, and picking "Play
+  /// vs AI" on a fresh launch keeps the board already loaded rather than
+  /// changing it, so the players stayed hidden until somebody moved.
+  Future<void> _whenBoardLoaded() async {
+    try {
+      await _game.loaded.timeout(const Duration(seconds: 2));
+    } on TimeoutException {
+      return;
+    }
+    if (!mounted) return;
+    isInitializedProvider.value = true;
+    setState(() {});
   }
 
   /// Puts back the local game the app was closed in the middle of.
@@ -85,9 +102,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
     if (saved == null || !mounted) return;
 
-    // The board only exists once the game has loaded.
-    await _game.loaded;
-    if (!mounted || _isOnline) return;
+    if (!mounted || _isOnline || !_game.isInitialized) return;
     _game.updateGameState(saved);
   }
 
@@ -1055,19 +1070,30 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     return _buildStatusLine();
                   },
                 ),
-                if (_showMessage)
-                  AnimatedBuilder(
-                    animation: _messageController,
-                    builder: (context, child) {
-                      return Opacity(
-                        opacity: _messageController.value,
-                        child: _buildMessageToast(),
-                      );
-                    },
-                  ),
               ],
             ),
           ),
+          // Floats over the strip rather than taking a place in the column:
+          // in the column it shrank and moved the board while it showed, so
+          // a tap in that moment landed on the wrong square. Taps go through
+          // it to whatever is underneath.
+          if (_showMessage)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 20,
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _messageController,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _messageController.value,
+                      child: _buildMessageToast(),
+                    );
+                  },
+                ),
+              ),
+            ),
           Align(
             alignment: Alignment.topCenter,
             child: ConfettiWidget(
