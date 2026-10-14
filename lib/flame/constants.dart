@@ -217,7 +217,18 @@ enum GameStatus {
   }
 }
 
-enum MoveType { pawnMove, wallPlace }
+/// What a move does.
+///
+/// Stored by index, so new kinds go on the end.
+enum MoveType {
+  pawnMove,
+  wallPlace,
+
+  /// Giving up the turn, which is only legal with nothing else to play: at a
+  /// table of three or four a pawn can be boxed in by the others, out of
+  /// walls, and have no move at all until somebody steps aside.
+  pass,
+}
 
 class GameMove {
   final MoveType type;
@@ -233,6 +244,11 @@ class GameMove {
     : type = MoveType.wallPlace,
       newPosition = null;
 
+  const GameMove.pass(this.playerId)
+    : type = MoveType.pass,
+      newPosition = null,
+      wall = null;
+
   Map<String, dynamic> toJson() => {
     'type': type.index,
     'newPosition': newPosition?.toJson(),
@@ -244,13 +260,36 @@ class GameMove {
     final moveType = MoveType.values[json['type'] as int];
     final playerId = json['playerId'] as int;
 
-    if (moveType == MoveType.pawnMove) {
-      return GameMove.pawnMove(
-        Position.fromJson(json['newPosition']),
-        playerId,
-      );
-    } else {
-      return GameMove.wallPlace(Wall.fromJson(json['wall']), playerId);
+    switch (moveType) {
+      case MoveType.pawnMove:
+        return GameMove.pawnMove(
+          Position.fromJson(json['newPosition']),
+          playerId,
+        );
+      case MoveType.wallPlace:
+        return GameMove.wallPlace(Wall.fromJson(json['wall']), playerId);
+      case MoveType.pass:
+        return GameMove.pass(playerId);
     }
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is GameMove &&
+      other.type == type &&
+      other.playerId == playerId &&
+      other.newPosition == newPosition &&
+      other.wall == wall;
+
+  @override
+  int get hashCode => Object.hash(type, playerId, newPosition, wall);
+
+  @override
+  String toString() => switch (type) {
+    MoveType.pawnMove => 'GameMove.pawnMove($newPosition, $playerId)',
+    MoveType.wallPlace =>
+      'GameMove.wallPlace(${wall?.position} ${wall?.orientation.name}, '
+          '$playerId)',
+    MoveType.pass => 'GameMove.pass($playerId)',
+  };
 }

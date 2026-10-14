@@ -16,11 +16,42 @@ class GameService {
 
     final player = gameState.playerById(move.playerId);
 
-    if (move.type == MoveType.pawnMove) {
-      return _isValidPawnMove(gameState, player, move.newPosition!);
-    } else {
-      return _isValidWallPlacement(gameState, player, move.wall!);
+    switch (move.type) {
+      case MoveType.pawnMove:
+        return _isValidPawnMove(gameState, player, move.newPosition!);
+      case MoveType.wallPlace:
+        return _isValidWallPlacement(gameState, player, move.wall!);
+      case MoveType.pass:
+        return mustPass(gameState);
     }
+  }
+
+  /// Whether the player to move has nothing to play but a pass.
+  ///
+  /// True only when their pawn cannot step, jump or slip past anyone and
+  /// they have no wall they could legally place. Walls cannot do this on
+  /// their own -- every player always keeps a route -- but at a table of
+  /// three or four, pawns standing in a narrow passage can.
+  static bool mustPass(GameState gameState) {
+    if (gameState.isGameOver) return false;
+    final player = gameState.currentPlayer;
+    if (gameState.getValidMoves(player.position).isNotEmpty) return false;
+    if (!player.hasWallsRemaining) return true;
+    return !_anyValidWallPlacement(gameState);
+  }
+
+  static bool _anyValidWallPlacement(GameState gameState) {
+    for (int row = 0; row < GameConstants.boardSize; row++) {
+      for (int col = 0; col < GameConstants.boardSize; col++) {
+        for (final orientation in WallOrientation.values) {
+          final wall = Wall(Position(row, col), orientation);
+          if (_isValidWallPlacement(gameState, gameState.currentPlayer, wall)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   // Execute a validated move
@@ -36,12 +67,7 @@ class GameService {
       clonePlayers: true,
     );
 
-    // Execute the move
-    if (move.type == MoveType.pawnMove) {
-      newGameState.movePawn(move.newPosition!);
-    } else {
-      newGameState.addWall(move.wall!);
-    }
+    newGameState.apply(move);
 
     // Add move to history
     newGameState.addMoveToHistory(move);
@@ -74,6 +100,10 @@ class GameService {
       for (final wall in validWalls) {
         validMoves.add(GameMove.wallPlace(wall, currentPlayer.id));
       }
+    }
+
+    if (validMoves.isEmpty && !gameState.isGameOver) {
+      validMoves.add(GameMove.pass(currentPlayer.id));
     }
 
     return validMoves;

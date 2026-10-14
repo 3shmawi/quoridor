@@ -90,7 +90,12 @@ class QuoridorEngine {
 
     final me = state.currentPlayerId;
     final moves = _generateMoves(state);
-    if (moves.isEmpty) return null;
+    if (moves.isEmpty) {
+      // The search only looks at walls that cut a route, so with the pawn
+      // boxed in this can be empty while a wall elsewhere is still legal.
+      final any = GameService.getValidMoves(state);
+      return any.isEmpty ? null : any.first;
+    }
 
     final rng = random ?? Random();
 
@@ -571,11 +576,7 @@ class QuoridorEngine {
   static GameState applyMove(GameState state, GameMove move) {
     final next = state.copyWith(clonePlayers: true, moveHistory: <GameMove>[]);
 
-    if (move.type == MoveType.pawnMove) {
-      next.movePawn(move.newPosition!);
-    } else {
-      next.addWall(move.wall!);
-    }
+    next.apply(move);
 
     next.checkWinCondition();
     if (!next.isGameOver) next.switchTurn();

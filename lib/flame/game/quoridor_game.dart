@@ -76,6 +76,10 @@ class QuoridorGame extends FlameGame
 
   Function(GameState)? onGameStateChanged;
 
+  /// Fires for each pass that lands, with the seat that passed, so the page
+  /// can say why the turn moved on with nothing on the board changing.
+  void Function(int seat)? onTurnPassed;
+
   /// Fires once when a local game ends. Online, the controller announces the
   /// result instead, because only it knows which side this device was on.
   VoidCallback? onGameWon;
@@ -158,6 +162,8 @@ class QuoridorGame extends FlameGame
         !_gameState!.isGameOver &&
         _gameState!.currentPlayer.isAI) {
       _executeAIMove();
+    } else if (canActNow && GameService.mustPass(_gameState!)) {
+      _passWhenStuck();
     }
 
     onGameStateChanged?.call(_gameState!);
@@ -180,9 +186,15 @@ class QuoridorGame extends FlameGame
 
     for (var i = 0; i < newMoves.length; i++) {
       final move = newMoves[i];
-      final sound = move.type == MoveType.pawnMove
-          ? Sfx.move(move.playerId)
-          : Sfx.wall(move.playerId);
+      final sound = switch (move.type) {
+        MoveType.pawnMove => Sfx.move(move.playerId),
+        MoveType.wallPlace => Sfx.wall(move.playerId),
+        MoveType.pass => null,
+      };
+      if (sound == null) {
+        onTurnPassed?.call(move.playerId);
+        continue;
+      }
 
       if (i == 0) {
         AudioService.instance.play(sound);
@@ -193,6 +205,23 @@ class QuoridorGame extends FlameGame
         });
       }
     }
+  }
+
+  /// How long a boxed-in player's board stays up before their turn passes.
+  static const Duration forcedPassDelay = Duration(milliseconds: 1200);
+
+  /// Passes for the player to move, who has nothing else to play.
+  ///
+  /// Done for them rather than offered as a button: a pass is only ever legal
+  /// when it is the only move, so there is no choice to make, and a stuck
+  /// player left staring at a board that refuses every tap reads as a hang.
+  Future<void> _passWhenStuck() async {
+    final expected = _gameState!;
+    await Future.delayed(forcedPassDelay);
+    if (!identical(_gameState, expected) || !canActNow) return;
+
+    _boardComponent.clearInteraction();
+    await _processMove(GameMove.pass(expected.currentPlayerId));
   }
 
   /// How long the computer appears to think before it replies.

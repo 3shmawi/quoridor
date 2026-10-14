@@ -77,6 +77,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _game.onGameStateChanged = _handleGameStateChanged;
     _game.onGameWon = _showConfetti;
+    _game.onTurnPassed = _handleTurnPassed;
     _game.onInteractionChanged = () {
       if (mounted) setState(() {});
     };
@@ -120,6 +121,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _clock.beginTurn(
       '${state.gameId}:${state.moveHistory.length}:${state.currentPlayerId}',
+    );
+  }
+
+  void _handleTurnPassed(int seat) {
+    if (!mounted || !_game.isInitialized) return;
+    final player = _game.gameState.playerById(seat);
+    _showGameMessage(
+      context.l10n.turnPassed(_labelFor(player, _online?.localPlayerId)),
     );
   }
 
@@ -292,7 +301,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              context.l10n.nameWins('${_game.gameState.winner}'),
+              context.l10n.nameWins(_winnerLabel),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.bold,
@@ -1391,6 +1400,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     }
 
     return Row(children: pills);
+  }
+
+  /// The winner as the board names them: "AI" and "Player 2" are stored in
+  /// English, so they are never shown as they are.
+  String get _winnerLabel {
+    final id = _game.gameState.winnerId;
+    if (id == null) return '';
+    return _labelFor(_game.gameState.playerById(id), _online?.localPlayerId);
   }
 
   /// What to call a seat: you, the person you are playing, or its number.

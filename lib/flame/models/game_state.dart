@@ -116,6 +116,19 @@ class GameState {
     updatedAt = DateTime.now();
   }
 
+  /// Plays [move] for the player to move, without checking it or passing
+  /// the turn on.
+  void apply(GameMove move) {
+    switch (move.type) {
+      case MoveType.pawnMove:
+        movePawn(move.newPosition!);
+      case MoveType.wallPlace:
+        addWall(move.wall!);
+      case MoveType.pass:
+        updatedAt = DateTime.now();
+    }
+  }
+
   void checkWinCondition() {
     for (final player in players) {
       if (player.hasReachedGoal) {
