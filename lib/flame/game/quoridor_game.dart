@@ -414,6 +414,9 @@ class QuoridorGame extends FlameGame
   void startGame({int playerCount = 2, bool againstAI = true}) {
     _announcedGameOver = false;
     _soundedMoveCount = 0;
+    // Said outright rather than left to the new game's id: ids come from the
+    // clock, and two games started within a millisecond share one.
+    _undoStack.clear();
     updateGameState(
       GameStateFactory.createNewGame(
         playerCount: playerCount,
