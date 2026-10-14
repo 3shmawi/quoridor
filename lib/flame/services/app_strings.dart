@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'game_service.dart';
+import 'online/online_game_controller.dart';
 import 'online/online_game_service.dart';
 import 'settings_service.dart';
 
@@ -186,6 +187,9 @@ class AppStrings {
   String turnPassed(String name) => _fill('turnPassed', name);
   String get undo => _get('undo');
   String get continueGame => _get('continueGame');
+  String get rematch => _get('rematch');
+  String get joinRematch => _get('joinRematch');
+  String rematchOffered(String name) => _fill('rematchOffered', name);
   String movesPlayed(int n) => _fill('movesPlayed', '$n');
   String get moveHistory => _get('moveHistory');
   String get noMovesYet => _get('noMovesYet');
@@ -370,6 +374,9 @@ class AppStrings {
     'turnPassed': '%s: no move possible, the turn passes',
     'undo': 'Undo',
     'continueGame': 'Continue game',
+    'rematch': 'Rematch',
+    'joinRematch': 'Join',
+    'rematchOffered': '%s wants a rematch',
     'movesPlayed': 'Pick up where you left off, %s moves in',
     'moveHistory': 'Moves',
     'noMovesYet': 'No moves yet',
@@ -549,6 +556,9 @@ class AppStrings {
     'turnPassed': '%s: مفيش نقلة متاحة، الدور عدّى',
     'undo': 'تراجع',
     'continueGame': 'كمّل اللعبة',
+    'rematch': 'ماتش تاني',
+    'joinRematch': 'ادخل',
+    'rematchOffered': '%s عايز ماتش تاني',
     'movesPlayed': 'كمّل من مكان ما وقفت، بعد %s نقلة',
     'moveHistory': 'النقلات',
     'noMovesYet': 'لسه مفيش نقلات',
@@ -595,6 +605,12 @@ extension WallRejectionText on AppStrings {
       case WallRejection.blocksPlayer:
         return wallBlocksPlayer;
     }
+  }
+
+  /// What [controller] has to tell the player, in their language.
+  String? onlineNotice(OnlineGameController controller) {
+    final failure = controller.failure;
+    return failure == null ? controller.message : onlineFailure(failure);
   }
 
   /// The player-facing reason an online action did not go through.

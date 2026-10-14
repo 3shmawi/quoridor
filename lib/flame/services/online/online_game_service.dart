@@ -399,6 +399,49 @@ class OnlineGameService {
     }
   }
 
+  /// Offers [link] as the rematch of the finished game [gameId].
+  ///
+  /// Only one rematch is ever linked from a game, so when two players ask at
+  /// once the first link stands. The result is the link that stands -- this
+  /// one, or the one that got there first, which the caller should join
+  /// instead of its own.
+  Future<OnlineResult<RematchLink>> offerRematch(
+    String gameId,
+    RematchLink link,
+  ) async {
+    final games = _games;
+    if (games == null) {
+      return const OnlineResult.failed(OnlineFailure.unavailable);
+    }
+
+    final doc = games.doc(gameId);
+    try {
+      RematchLink? standing;
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(doc);
+        final existing = OnlineGameCodec.decodeRematch(
+          snapshot.data()?['rematch'],
+        );
+        if (existing != null) {
+          standing = existing;
+          return;
+        }
+        transaction.update(
+          doc,
+          OnlineGameCodec.encodeRematch(
+            link: link,
+            timestamp: FieldValue.serverTimestamp(),
+          ),
+        );
+        standing = link;
+      });
+      return OnlineResult.success(standing);
+    } catch (error) {
+      debugPrint('OnlineGameService: offerRematch failed: $error');
+      return OnlineResult.failed(OnlineFailure.backendError, '$error');
+    }
+  }
+
   /// Refreshes this player's presence on [gameId].
   ///
   /// Written as dotted paths so only this player's own seat is touched; the

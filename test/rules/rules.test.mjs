@@ -634,6 +634,64 @@ describe('moves the real client writes', () => {
   }
 });
 
+describe('rematch', () => {
+  async function setUpRematch(name, { status = 'finished', newSeat1 = BOB } = {}) {
+    await seed(`games/${name}`, { ...activeGame(), status });
+    await seed(`games/${name}-next`, {
+      ...waitingGame(newSeat1),
+      roomCode: 'NEXT22',
+    });
+    return doc(db(BOB), `games/${name}`);
+  }
+  const link = (name, by = 2) => ({
+    rematch: { gameId: `${name}-next`, roomCode: 'NEXT22', by },
+    updatedAt: serverTimestamp(),
+  });
+
+  it('lets a player link a rematch they created, once', async () => {
+    const old = await setUpRematch('rm-1');
+    await assertSucceeds(updateDoc(old, link('rm-1')));
+
+    // A second game of Bob's cannot replace the link once it is there.
+    await seed('games/rm-1-other', { ...waitingGame(BOB), roomCode: 'OTHER2' });
+    await assertFails(
+      updateDoc(old, {
+        rematch: { gameId: 'rm-1-other', roomCode: 'OTHER2', by: 2 },
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('refuses a rematch while the game is still on', async () => {
+    const old = await setUpRematch('rm-2', { status: 'active' });
+    await assertFails(updateDoc(old, link('rm-2')));
+  });
+
+  it('refuses linking a game the caller is not seated first in', async () => {
+    const old = await setUpRematch('rm-3', { newSeat1: MALLORY });
+    await assertFails(updateDoc(old, link('rm-3')));
+  });
+
+  it('refuses a rematch claimed for another seat', async () => {
+    const old = await setUpRematch('rm-4');
+    await assertFails(updateDoc(old, link('rm-4', 1)));
+  });
+
+  it('refuses a rematch link from outside the game', async () => {
+    await setUpRematch('rm-5', { newSeat1: MALLORY });
+    await assertFails(
+      updateDoc(doc(db(MALLORY), 'games/rm-5'), link('rm-5', 0)),
+    );
+  });
+
+  it('refuses smuggling other changes in with the link', async () => {
+    const old = await setUpRematch('rm-6');
+    await assertFails(
+      updateDoc(old, { ...link('rm-6'), outcome: { winner: 2, reason: 'goal' } }),
+    );
+  });
+});
+
 describe('presence', () => {
   it('lets a player refresh their own heartbeat', async () => {
     await seed('games/presence-1', activeGame());

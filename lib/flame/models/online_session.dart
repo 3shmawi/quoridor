@@ -58,6 +58,35 @@ class OnlinePlayer {
   int get hashCode => Object.hash(uid, displayName, connected, lastSeen);
 }
 
+/// A new game offered to the same table once a game has ended.
+@immutable
+class RematchLink {
+  /// The new game's document id.
+  final String gameId;
+
+  /// Its room code, which is how the others join it.
+  final String roomCode;
+
+  /// The seat that asked for it.
+  final int by;
+
+  const RematchLink({
+    required this.gameId,
+    required this.roomCode,
+    required this.by,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is RematchLink &&
+      other.gameId == gameId &&
+      other.roomCode == roomCode &&
+      other.by == by;
+
+  @override
+  int get hashCode => Object.hash(gameId, roomCode, by);
+}
+
 /// A snapshot of an online game as the server currently holds it.
 @immutable
 class OnlineGame {
@@ -85,6 +114,9 @@ class OnlineGame {
   final OnlineOutcomeReason? outcomeReason;
   final DateTime? updatedAt;
 
+  /// The rematch somebody offered once this game ended, if any.
+  final RematchLink? rematch;
+
   const OnlineGame({
     required this.gameId,
     required this.roomCode,
@@ -97,6 +129,7 @@ class OnlineGame {
     this.winnerPlayerId,
     this.outcomeReason,
     this.updatedAt,
+    this.rematch,
   });
 
   bool get isOver =>

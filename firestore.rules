@@ -255,6 +255,22 @@ service cloud.firestore {
              == request.auth.uid;
       }
 
+      // Once a game is over, one of its players may link a rematch from it,
+      // once: a game they have just created and sit first in.
+      function isValidRematchLink() {
+        let link = incoming().rematch;
+        let created = get(/databases/$(database)/documents/games/$(link.gameId)).data;
+        return isPlayer(existing())
+          && existing().status in ['finished', 'abandoned']
+          && !existing().keys().hasAny(['rematch'])
+          && incoming().diff(existing()).affectedKeys().hasOnly(['rematch', 'updatedAt'])
+          && link.keys().hasOnly(['gameId', 'roomCode', 'by'])
+          && link.by == seatOf(existing(), request.auth.uid)
+          && link.roomCode == created.roomCode
+          && created.status == 'waiting'
+          && sitsIn(created, '1', request.auth.uid);
+      }
+
       // Any player may abandon a game they are in.
       function isValidAbandon() {
         return isPlayer(existing())
@@ -275,7 +291,8 @@ service cloud.firestore {
       allow update: if isValidJoin()
                     || isValidMove()
                     || isValidPresenceUpdate()
-                    || isValidAbandon();
+                    || isValidAbandon()
+                    || isValidRematchLink();
 
       // Games are never deleted by clients; cleanup is a scheduled job.
       allow delete: if false;

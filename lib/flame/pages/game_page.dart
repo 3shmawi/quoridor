@@ -222,7 +222,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void _handleOnlineChanged() {
     if (!mounted) return;
 
-    final message = _online?.message;
+    // A rematch can seat this device differently from the game before it.
+    final online = _online;
+    if (online != null && online.localPlayerId != _game.localPlayerId) {
+      _game.localPlayerId = online.localPlayerId;
+      _game.viewTurns = viewTurnsForSeat(online.localPlayerId);
+    }
+
+    final message = online == null ? null : context.l10n.onlineNotice(online);
     if (message != null) {
       _showGameMessage(message);
       _online?.consumeMessage();
@@ -1487,9 +1494,27 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         text = context.l10n.lostContact;
 
       case OnlineConnectionState.ended:
-        color = scheme.onSurface.withValues(alpha: 0.7);
-        icon = Icons.flag_rounded;
-        text = context.l10n.gameOverShort;
+        final offer = online.rematchOffer;
+        color = offer != null
+            ? scheme.primary
+            : scheme.onSurface.withValues(alpha: 0.7);
+        icon = offer != null ? Icons.replay_rounded : Icons.flag_rounded;
+        text = offer != null
+            ? context.l10n.rematchOffered(
+                online.game?.players[offer.by]?.displayName ??
+                    context.l10n.opponent,
+              )
+            : context.l10n.gameOverShort;
+        if (online.canRematch || online.isRematching) {
+          action = TextButton.icon(
+            key: const Key('rematch'),
+            onPressed: online.canRematch ? _requestRematch : null,
+            icon: const Icon(Icons.replay_rounded, size: 16),
+            label: Text(
+              offer != null ? context.l10n.joinRematch : context.l10n.rematch,
+            ),
+          );
+        }
 
       case OnlineConnectionState.live:
         final yourTurn = online.isLocalTurn;
@@ -1528,6 +1553,23 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           if (action != null) action,
         ],
       ),
+    );
+  }
+
+  /// Starts or joins the rematch, and moves the board over to it.
+  Future<void> _requestRematch() async {
+    final online = _online;
+    if (online == null) return;
+
+    final joined = await online.requestRematch();
+    if (!mounted || !joined) return;
+
+    _syncClock();
+    setState(() {});
+    _showGameMessage(
+      online.connection == OnlineConnectionState.waitingForOpponent
+          ? context.l10n.shareCodeToInvite(online.roomCode ?? '')
+          : context.l10n.connectedGoodLuck,
     );
   }
 

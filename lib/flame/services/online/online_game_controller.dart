@@ -53,6 +53,7 @@ class OnlineGameController extends ChangeNotifier {
   OnlineConnectionState _connection = OnlineConnectionState.connecting;
   String? _message;
   bool _submitting = false;
+  bool _rematching = false;
   bool _disposed = false;
 
   /// True while a move is shown locally but not yet confirmed by the server.
@@ -73,8 +74,18 @@ class OnlineGameController extends ChangeNotifier {
   OnlineGame? get game => _session?.game;
   OnlineConnectionState get connection => _connection;
 
-  /// The last thing worth telling the player, if anything.
+  /// The last thing worth telling the player, if anything, in English.
   String? get message => _message;
+
+  /// What went wrong, when [message] is a failure. Screens show this in the
+  /// player's language rather than [message] as it is.
+  OnlineFailure? get failure => _failure;
+  OnlineFailure? _failure;
+
+  void _fail(OnlineResult<Object?> result) {
+    _failure = result.failure;
+    _message = result.message;
+  }
 
   bool get isSubmitting => _submitting;
   bool get isActive => _session != null;
@@ -95,6 +106,83 @@ class OnlineGameController extends ChangeNotifier {
     }
     return null;
   }
+
+  /// A rematch somebody else offered on the finished game, waiting to be
+  /// joined.
+  RematchLink? get rematchOffer {
+    final session = _session;
+    if (session == null || !session.game.isOver) return null;
+    final link = session.game.rematch;
+    if (link == null || link.by == session.localPlayerId) return null;
+    return link;
+  }
+
+  /// Whether this device can ask for, or join, a rematch right now.
+  bool get canRematch {
+    final session = _session;
+    return session != null &&
+        session.isParticipant &&
+        session.game.isOver &&
+        !_rematching;
+  }
+
+  bool get isRematching => _rematching;
+
+  /// Moves this table on to a new game once the current one has ended.
+  ///
+  /// The finished game cannot be reused: its move log is append-only, so a
+  /// second game would collide with the first one's moves. Instead the first
+  /// to ask creates a fresh game, seated first, and links it from the old
+  /// one; everyone else sees the link and joins it by its code. When two ask
+  /// at once, the first link stands and the second player's own new game is
+  /// abandoned in favour of joining it.
+  Future<bool> requestRematch() async {
+    final session = _session;
+    if (!canRematch || session == null) return false;
+
+    _rematching = true;
+    notifyListeners();
+    try {
+      final offered = session.game.rematch;
+      if (offered != null) return await _joinRematch(offered);
+
+      final created = await _service.createPrivateGame(
+        playerCount: session.game.playerCount,
+      );
+      final mine = created.value;
+      if (!created.isSuccess || mine == null) {
+        _fail(created);
+        return false;
+      }
+
+      final standing = await _service.offerRematch(
+        session.game.gameId,
+        RematchLink(
+          gameId: mine.game.gameId,
+          roomCode: mine.game.roomCode,
+          by: session.localPlayerId!,
+        ),
+      );
+      final link = standing.value;
+      if (!standing.isSuccess || link == null) {
+        await _service.abandon(mine.game.gameId);
+        _fail(standing);
+        return false;
+      }
+      if (link.gameId != mine.game.gameId) {
+        await _service.abandon(mine.game.gameId);
+        return await _joinRematch(link);
+      }
+
+      return _adopt(created);
+    } finally {
+      _rematching = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<bool> _joinRematch(RematchLink link) async =>
+      _adopt(await _service.joinByCode(link.roomCode));
 
   /// The player whose turn it is, as the server names them.
   OnlinePlayer? get playerToMove {
@@ -127,15 +215,18 @@ class OnlineGameController extends ChangeNotifier {
     if (_disposed) return false;
 
     if (!result.isSuccess || result.value == null) {
-      _message = result.message;
+      _fail(result);
       _setConnection(OnlineConnectionState.offline);
       return false;
     }
 
     _session = result.value;
     _message = null;
+    _failure = null;
     _startWatching();
     _refreshConnection();
+    // A rematch replaces the board on screen, which no move will announce.
+    onRemoteUpdate?.call(result.value!.game.board);
     return true;
   }
 
@@ -183,6 +274,10 @@ class OnlineGameController extends ChangeNotifier {
     }
     if (moved || _pendingLocalMove) onRemoteUpdate?.call(game.board);
 
+    // A rematch offered on a finished game changes nothing else, so nothing
+    // below would tell the screen about it.
+    if (game.rematch != previous?.game.rematch) notifyListeners();
+
     if (game.isOver && (previous == null || !previous.game.isOver)) {
       final didWin = _session?.didWin;
       _setConnection(OnlineConnectionState.ended);
@@ -197,6 +292,7 @@ class OnlineGameController extends ChangeNotifier {
   void _onStreamError(Object error) {
     debugPrint('OnlineGameController: stream error: $error');
     _message = 'Lost contact with the game';
+    _failure = OnlineFailure.backendError;
     _setConnection(OnlineConnectionState.offline);
   }
 
@@ -225,13 +321,12 @@ class OnlineGameController extends ChangeNotifier {
 
       if (!result.isSuccess) {
         _rollback(confirmed);
-        _message = result.failure == OnlineFailure.staleMove
-            ? 'Your opponent moved first'
-            : result.message;
+        _fail(result);
         return false;
       }
 
       _message = null;
+      _failure = null;
       return true;
     } finally {
       _submitting = false;
@@ -263,6 +358,7 @@ class OnlineGameController extends ChangeNotifier {
 
   static OnlineGame _withBoard(OnlineGame game, GameState board, int count) =>
       OnlineGame(
+        rematch: game.rematch,
         gameId: game.gameId,
         roomCode: game.roomCode,
         status: game.status,
@@ -323,6 +419,7 @@ class OnlineGameController extends ChangeNotifier {
   void consumeMessage() {
     if (_message == null) return;
     _message = null;
+    _failure = null;
     notifyListeners();
   }
 
