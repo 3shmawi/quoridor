@@ -14,6 +14,7 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore';
 
 /**
@@ -29,18 +30,78 @@ const MALLORY = 'uid-mallory';
 
 let testEnv;
 
-/** A minimal board, enough for the rules to see a well-formed document. */
-function board({ currentPlayerId = 1 } = {}) {
+const SEATS = {
+  1: { position: { row: 8, col: 4 }, goal: 'top' },
+  2: { position: { row: 0, col: 4 }, goal: 'bottom' },
+  3: { position: { row: 4, col: 0 }, goal: 'right' },
+  4: { position: { row: 4, col: 8 }, goal: 'left' },
+};
+const WALLS_FOR = { 2: 10, 3: 7, 4: 5 };
+
+/** A board as GameState.toJson writes it, for [count] seats. */
+function board({ currentPlayerId = 1, count = 2 } = {}) {
+  const players = [];
+  for (let id = 1; id <= count; id++) {
+    players.push({
+      id,
+      position: { ...SEATS[id].position },
+      wallsRemaining: WALLS_FOR[count],
+      goal: SEATS[id].goal,
+      name: `Player ${id}`,
+      isAI: false,
+    });
+  }
   return {
     gameId: 'game-1',
-    player1: { id: 1, position: { row: 8, col: 4 }, wallsRemaining: 10, goalRow: 0, name: 'Alice', isAI: false },
-    player2: { id: 2, position: { row: 0, col: 4 }, wallsRemaining: 10, goalRow: 8, name: 'Bob', isAI: false },
+    players,
+    player1: players[0],
+    player2: players[1],
     walls: [],
     currentPlayerId,
     status: 0,
     createdAt: 0,
     updatedAt: 0,
     moveHistory: [],
+  };
+}
+
+/** [b] after the player to move plays [move], as GameService would. */
+function play(b, move) {
+  const next = structuredClone(b);
+  const seat = b.currentPlayerId;
+  const mover = next.players[seat - 1];
+  if (move.type === 0) mover.position = move.newPosition;
+  if (move.type === 1) {
+    next.walls.push(move.wall);
+    mover.wallsRemaining -= 1;
+  }
+  next.moveHistory.push({
+    type: move.type,
+    newPosition: move.newPosition ?? null,
+    wall: move.wall ?? null,
+    playerId: seat,
+  });
+  next.player1 = next.players[0];
+  next.player2 = next.players[1];
+  next.updatedAt = 1;
+  next.currentPlayerId = (seat % next.players.length) + 1;
+  return next;
+}
+
+const step = (row, col) => ({ type: 0, newPosition: { row, col } });
+const wall = (row, col, orientation) => ({
+  type: 1,
+  wall: { position: { row, col }, orientation },
+});
+const pass = { type: 2 };
+
+/** The update a client writes for [next], the board after move [count]. */
+function moveWrite(next, count) {
+  return {
+    board: next,
+    currentPlayerId: next.currentPlayerId,
+    moveCount: count,
+    updatedAt: serverTimestamp(),
   };
 }
 
@@ -201,7 +262,12 @@ describe('three and four players', () => {
   function tableOf(count, seated) {
     const players = {};
     seated.forEach((uid, i) => (players[i + 1] = player(uid, uid)));
-    return { ...waitingGame(ALICE), playerCount: count, players };
+    return {
+      ...waitingGame(ALICE),
+      playerCount: count,
+      players,
+      board: board({ count: Math.min(count, 4) }),
+    };
   }
 
   it('lets a game be created for four', async () => {
@@ -267,20 +333,22 @@ describe('three and four players', () => {
   });
 
   it('lets seat three move on its turn only', async () => {
+    const before = board({ count: 3, currentPlayerId: 3 });
     const live = {
       ...tableOf(3, [ALICE, BOB, CAROL]),
       status: 'active',
       currentPlayerId: 3,
+      board: before,
     };
     await seed('games/four-6', live);
+    const after = play(before, step(4, 1));
     await assertFails(
-      updateDoc(doc(db(BOB), 'games/four-6'), { moveCount: 1 }),
+      updateDoc(doc(db(BOB), 'games/four-6'), moveWrite(after, 1)),
     );
+    // After seat three comes seat one again.
+    assert.equal(after.currentPlayerId, 1);
     await assertSucceeds(
-      updateDoc(doc(db(CAROL), 'games/four-6'), {
-        moveCount: 1,
-        currentPlayerId: 1,
-      }),
+      updateDoc(doc(db(CAROL), 'games/four-6'), moveWrite(after, 1)),
     );
   });
 
@@ -306,12 +374,10 @@ describe('playing a move', () => {
   it('lets the player to move advance the counter by one', async () => {
     await seed('games/move-1', activeGame({ currentPlayerId: 1 }));
     await assertSucceeds(
-      updateDoc(doc(db(ALICE), 'games/move-1'), {
-        board: board({ currentPlayerId: 2 }),
-        currentPlayerId: 2,
-        moveCount: 1,
-        updatedAt: serverTimestamp(),
-      }),
+      updateDoc(
+        doc(db(ALICE), 'games/move-1'),
+        moveWrite(play(board(), step(7, 4)), 1),
+      ),
     );
   });
 
@@ -391,6 +457,183 @@ describe('playing a move', () => {
   });
 });
 
+describe('the board a move writes', () => {
+  // Each case starts from a fresh two-player game, Alice (seat 1) to move.
+  let n = 0;
+  async function fresh(start = board()) {
+    const path = `games/board-${++n}`;
+    await seed(path, { ...activeGame(), board: start });
+    return doc(db(ALICE), path);
+  }
+
+  it('accepts a step, a jump-length step, a wall and a pass', async () => {
+    await assertSucceeds(updateDoc(await fresh(), moveWrite(play(board(), step(7, 4)), 1)));
+    await assertSucceeds(updateDoc(await fresh(), moveWrite(play(board(), step(6, 4)), 1)));
+    await assertSucceeds(updateDoc(await fresh(), moveWrite(play(board(), wall(4, 3, 0)), 1)));
+    await assertSucceeds(updateDoc(await fresh(), moveWrite(play(board(), pass), 1)));
+  });
+
+  it('refuses a step of more than two squares', async () => {
+    // Straight to the goal row from the start.
+    await assertFails(updateDoc(await fresh(), moveWrite(play(board(), step(4, 4)), 1)));
+  });
+
+  it('refuses standing still and calling it a step', async () => {
+    await assertFails(updateDoc(await fresh(), moveWrite(play(board(), step(8, 4)), 1)));
+  });
+
+  it('refuses stepping onto another pawn', async () => {
+    const start = board();
+    start.players[1].position = { row: 7, col: 4 };
+    start.player2 = start.players[1];
+    await assertFails(updateDoc(await fresh(start), moveWrite(play(start, step(7, 4)), 1)));
+  });
+
+  it('refuses moving somebody else’s pawn', async () => {
+    const next = play(board(), step(7, 4));
+    next.players[1].position = { row: 1, col: 4 };
+    await assertFails(updateDoc(await fresh(), moveWrite(next, 1)));
+  });
+
+  it('refuses taking walls from somebody else', async () => {
+    const next = play(board(), step(7, 4));
+    next.players[1].wallsRemaining = 0;
+    await assertFails(updateDoc(await fresh(), moveWrite(next, 1)));
+  });
+
+  it('refuses a wall that costs nothing', async () => {
+    const next = play(board(), wall(4, 3, 0));
+    next.players[0].wallsRemaining = 10;
+    await assertFails(updateDoc(await fresh(), moveWrite(next, 1)));
+  });
+
+  it('refuses a wall with none left', async () => {
+    const start = board();
+    start.players[0].wallsRemaining = 0;
+    const next = play(start, wall(4, 3, 0));
+    next.players[0].wallsRemaining = 0;
+    await assertFails(updateDoc(await fresh(start), moveWrite(next, 1)));
+  });
+
+  it('refuses a wall on the edge of the board', async () => {
+    await assertFails(updateDoc(await fresh(), moveWrite(play(board(), wall(0, 3, 0)), 1)));
+  });
+
+  it('refuses a wall placed exactly on another', async () => {
+    const start = board();
+    start.walls.push({ position: { row: 4, col: 3 }, orientation: 0 });
+    await assertFails(updateDoc(await fresh(start), moveWrite(play(start, wall(4, 3, 0)), 1)));
+  });
+
+  it('refuses taking a wall off the board', async () => {
+    const start = board();
+    start.walls.push({ position: { row: 4, col: 3 }, orientation: 0 });
+    const next = play(start, step(7, 4));
+    next.walls = [];
+    await assertFails(updateDoc(await fresh(start), moveWrite(next, 1)));
+  });
+
+  it('refuses rewriting the history', async () => {
+    const start = play(play(board(), step(7, 4)), step(1, 4));
+    const path = `games/board-${++n}`;
+    await seed(path, { ...activeGame({ moveCount: 2 }), board: start });
+    const next = play(start, step(6, 4));
+    next.moveHistory[0] = { ...next.moveHistory[0], newPosition: { row: 0, col: 0 } };
+    await assertFails(updateDoc(doc(db(ALICE), path), moveWrite(next, 3)));
+  });
+
+  it('refuses keeping the turn', async () => {
+    const next = play(board(), step(7, 4));
+    next.currentPlayerId = 1;
+    await assertFails(updateDoc(await fresh(), moveWrite(next, 1)));
+  });
+
+  it('refuses claiming a win short of the goal', async () => {
+    const next = play(board(), step(7, 4));
+    next.currentPlayerId = 1;
+    next.status = 1;
+    await assertFails(
+      updateDoc(await fresh(), {
+        ...moveWrite(next, 1),
+        status: 'finished',
+        outcome: { winner: 1, reason: 'goal' },
+      }),
+    );
+  });
+
+  it('accepts a win on reaching the goal, and not carrying on past it', async () => {
+    const start = board();
+    start.players[0].position = { row: 1, col: 0 };
+    start.player1 = start.players[0];
+    const won = play(start, step(0, 0));
+    won.currentPlayerId = 1;
+    won.status = 1;
+    await assertSucceeds(
+      updateDoc(await fresh(start), {
+        ...moveWrite(won, 1),
+        status: 'finished',
+        outcome: { winner: 1, reason: 'goal' },
+      }),
+    );
+    // Reaching the goal and playing on as if nothing happened is refused.
+    await assertFails(updateDoc(await fresh(start), moveWrite(play(start, step(0, 0)), 1)));
+  });
+});
+
+describe('moves the real client writes', () => {
+  // Boards produced by GameService itself (see
+  // test/online_rules_fixture_test.dart), so these prove the rules accept
+  // what the game actually writes rather than what these tests think it
+  // writes.
+  const games = JSON.parse(
+    readFileSync(new URL('./fixtures/real_games.json', import.meta.url), 'utf8'),
+  );
+  const UIDS = { 1: ALICE, 2: BOB, 3: 'uid-carol', 4: 'uid-dan' };
+
+  for (const [name, boards] of Object.entries(games)) {
+    it(`accepts every move of the ${name} game`, async () => {
+      const count = boards[0].players.length;
+      const seats = {};
+      for (let seat = 1; seat <= count; seat++) seats[seat] = player(UIDS[seat], UIDS[seat]);
+      const path = `games/real-${name}`;
+
+      for (let i = 0; i + 1 < boards.length; i++) {
+        const [before, after] = [boards[i], boards[i + 1]];
+        await seed(path, {
+          ...activeGame(),
+          playerCount: count,
+          players: seats,
+          currentPlayerId: before.currentPlayerId,
+          moveCount: i,
+          board: before,
+        });
+
+        // What OnlineGameService.submitMove writes, in one transaction.
+        const mover = UIDS[before.currentPlayerId];
+        const store = db(mover);
+        const write = {
+          board: after,
+          currentPlayerId: after.currentPlayerId,
+          moveCount: i + 1,
+          updatedAt: serverTimestamp(),
+        };
+        if (after.status !== 0) {
+          write.status = 'finished';
+          write.outcome = { winner: before.currentPlayerId, reason: 'goal' };
+        }
+        const batch = writeBatch(store);
+        batch.set(doc(store, `${path}/moves/${String(i).padStart(6, '0')}`), {
+          ...after.moveHistory[after.moveHistory.length - 1],
+          submittedBy: mover,
+          submittedAt: serverTimestamp(),
+        });
+        batch.update(doc(store, path), write);
+        await assertSucceeds(batch.commit());
+      }
+    });
+  }
+});
+
 describe('presence', () => {
   it('lets a player refresh their own heartbeat', async () => {
     await seed('games/presence-1', activeGame());
@@ -461,6 +704,33 @@ describe('moves subcollection', () => {
         submittedAt: serverTimestamp(),
       }),
     );
+  });
+
+  it('refuses a move logged by somebody not in the game', async () => {
+    await seed('games/log-5', activeGame());
+    await assertFails(
+      setDoc(doc(db(MALLORY), 'games/log-5/moves/000000'), {
+        type: 0,
+        newPosition: { row: 7, col: 4 },
+        playerId: 1,
+        submittedBy: MALLORY,
+        submittedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('refuses logging a move out of turn or at the wrong index', async () => {
+    await seed('games/log-6', activeGame({ currentPlayerId: 1, moveCount: 3 }));
+    const entry = (uid, playerId) => ({
+      type: 0,
+      newPosition: { row: 7, col: 4 },
+      playerId,
+      submittedBy: uid,
+      submittedAt: serverTimestamp(),
+    });
+    await assertFails(setDoc(doc(db(BOB), 'games/log-6/moves/000003'), entry(BOB, 2)));
+    await assertFails(setDoc(doc(db(ALICE), 'games/log-6/moves/000007'), entry(ALICE, 1)));
+    await assertSucceeds(setDoc(doc(db(ALICE), 'games/log-6/moves/000003'), entry(ALICE, 1)));
   });
 
   it('refuses appending a move attributed to somebody else', async () => {
