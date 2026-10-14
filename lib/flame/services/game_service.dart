@@ -5,8 +5,15 @@ import '../../flame/models/player.dart';
 import 'ai_service.dart';
 
 class GameService {
-  // Validate if a move is legal
+  /// Whether [move] is legal for the player to move.
+  ///
+  /// A move for any other seat, or after the game has ended, is not: checking
+  /// the mover's own pieces was not enough, because [executeMove] always
+  /// applies a move to whoever is on turn.
   static bool isValidMove(GameState gameState, GameMove move) {
+    if (gameState.isGameOver) return false;
+    if (move.playerId != gameState.currentPlayerId) return false;
+
     final player = gameState.playerById(move.playerId);
 
     if (move.type == MoveType.pawnMove) {
@@ -22,8 +29,12 @@ class GameService {
       throw ArgumentError('Invalid move attempted');
     }
 
-    // Create a new game state (immutable approach)
-    final newGameState = gameState.copyWith(updatedAt: DateTime.now());
+    // A new state with its own players: sharing them meant moving the pawn
+    // here moved it in the state passed in as well.
+    final newGameState = gameState.copyWith(
+      updatedAt: DateTime.now(),
+      clonePlayers: true,
+    );
 
     // Execute the move
     if (move.type == MoveType.pawnMove) {
@@ -152,19 +163,7 @@ class GameService {
 
     // A wall may never seal anyone off from their goal. Every seat is
     // checked, so a four-player game cannot shut out the third or fourth.
-    final tempGameState = _createTempGameStateWithWall(gameState, wall);
-
-    final sealsSomeoneIn = tempGameState.players.any(
-      (player) =>
-          Pathfinding.findShortestPath(
-            tempGameState,
-            player.position,
-            player.goal,
-          ) ==
-          null,
-    );
-
-    if (sealsSomeoneIn) {
+    if (Pathfinding.wouldWallBlockAllPaths(gameState, wall)) {
       return const WallPlacementResult(WallRejection.blocksPlayer);
     }
 
@@ -192,10 +191,6 @@ class GameService {
         col <= GameConstants.boardSize - 1 &&
         row >= 0 &&
         row <= GameConstants.boardSize - 2;
-  }
-
-  static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
-    return original.copyWith(walls: [...original.walls, wall]);
   }
 
   static List<Wall> _getValidWallPlacements(GameState gameState) {

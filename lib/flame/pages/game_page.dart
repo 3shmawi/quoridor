@@ -82,7 +82,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     }
 
     _game.onGameStateChanged = _handleGameStateChanged;
-    _game.onGameMessage = _showGameMessage;
     _game.onGameWon = _showConfetti;
     _game.onInteractionChanged = () {
       if (mounted) setState(() {});
@@ -205,7 +204,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _handleOnlineGameOver(bool didWin) {
     if (!mounted) return;
-    if (didWin) _showConfetti();
+    if (didWin) _showConfetti(offerReplay: false);
     _showGameMessage(didWin ? context.l10n.youWin : context.l10n.opponentWins);
   }
 
@@ -263,8 +262,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     });
   }
 
-  void _showConfetti() {
+  /// Celebrates a win, then offers another game.
+  ///
+  /// Online there is no "play again" to offer: a new game there means leaving
+  /// this one, which the menu already does.
+  void _showConfetti({bool offerReplay = true}) {
     _confettiController.play();
+    if (!offerReplay) return;
     // Show replay dialog after confetti animation
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
@@ -387,6 +391,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _togglePlayerMode() {
     _game.togglePlayerMode();
+    _showGameMessage(
+      _game.gameState.player2.isAI
+          ? context.l10n.switchedToAI
+          : context.l10n.switchedToTwoPlayers,
+    );
     closeMenu();
   }
 
@@ -723,7 +732,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                               context.l10n.saveGameSubtitle,
                               _saveGame,
                             ),
-                            if (_game.isInitialized)
+                            if (_game.canTogglePlayerMode)
                               _buildMenuItem(
                                 Icons.people,
                                 context.l10n.togglePlayerMode,
