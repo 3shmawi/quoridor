@@ -19,6 +19,7 @@ import '../../flame/models/move_notation.dart';
 import '../../flame/models/player.dart';
 import '../../flame/services/ai_service.dart';
 import '../../flame/services/firebase_service.dart';
+import '../../flame/services/saved_game_service.dart';
 import '../../theme.dart';
 
 class GamePage extends StatefulWidget {
@@ -67,11 +68,35 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       duration: const Duration(seconds: 3),
     );
 
-    // Show game mode selection after the widget is built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showGameModeSelection();
+    // Show game mode selection after the widget is built, with the game
+    // left unfinished last time already on the board behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _restoreSavedGame();
+      if (mounted) _showGameModeSelection();
     });
   }
+
+  /// Puts back the local game the app was closed in the middle of.
+  Future<void> _restoreSavedGame() async {
+    // Storage that never answers must not keep the mode sheet away.
+    final saved = await SavedGameService.instance.load().timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => null,
+    );
+    if (saved == null || !mounted) return;
+
+    // The board only exists once the game has loaded.
+    await _game.loaded;
+    if (!mounted || _isOnline) return;
+    _game.updateGameState(saved);
+  }
+
+  /// Whether the board holds a local game worth going back to.
+  bool get _canContinue =>
+      _game.isInitialized &&
+      !_isOnline &&
+      !_game.gameState.isGameOver &&
+      _game.gameState.moveHistory.isNotEmpty;
 
   void _initializeGame() {
     _game = QuoridorGame();
@@ -241,6 +266,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     if (FirebaseService.currentUser != null) {
       FirebaseService.updateGame(gameState);
     }
+
+    // Local games are kept so closing the app does not lose them; an online
+    // game is the server's to keep.
+    if (!_isOnline) unawaited(SavedGameService.instance.save(gameState));
 
     isInitializedProvider.value = true;
     _syncClock();
@@ -587,6 +616,21 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   shrinkWrap: true,
                   children: [
+                    if (_canContinue) ...[
+                      _buildModeCard(
+                        icon: Icons.play_arrow_rounded,
+                        title: context.l10n.continueGame,
+                        subtitle: context.l10n.movesPlayed(
+                          _game.gameState.moveHistory.length,
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _syncClock();
+                          setState(() {});
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     _buildModeCard(
                       icon: Icons.computer,
                       title: context.l10n.playVsAI,
@@ -595,8 +639,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         _detachOnline(abandon: true);
                         // Coming back from a four-player game has to put the
                         // board back to two, not just swap in the computer.
+                        // A game under way is left through "Continue", so
+                        // this always means a fresh one.
                         if (_game.gameState.playerCount != 2 ||
-                            !_game.gameState.player2.isAI) {
+                            !_game.gameState.player2.isAI ||
+                            _game.gameState.moveHistory.isNotEmpty) {
                           _game.startGame(playerCount: 2, againstAI: true);
                         }
                         Navigator.pop(context);

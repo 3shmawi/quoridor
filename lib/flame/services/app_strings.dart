@@ -180,6 +180,8 @@ class AppStrings {
   String get aiPlayedTheirMove => _get('aiPlayedTheirMove');
   String turnPassed(String name) => _fill('turnPassed', name);
   String get undo => _get('undo');
+  String get continueGame => _get('continueGame');
+  String movesPlayed(int n) => _fill('movesPlayed', '$n');
   String get moveHistory => _get('moveHistory');
   String get noMovesYet => _get('noMovesYet');
   String get passed => _get('passed');
@@ -357,6 +359,8 @@ class AppStrings {
     'aiPlayedTheirMove': 'AI played their move',
     'turnPassed': '%s: no move possible, the turn passes',
     'undo': 'Undo',
+    'continueGame': 'Continue game',
+    'movesPlayed': 'Pick up where you left off, %s moves in',
     'moveHistory': 'Moves',
     'noMovesYet': 'No moves yet',
     'passed': 'passed',
@@ -529,6 +533,8 @@ class AppStrings {
     'aiPlayedTheirMove': 'الكمبيوتر لعب',
     'turnPassed': '%s: مفيش نقلة متاحة، الدور عدّى',
     'undo': 'تراجع',
+    'continueGame': 'كمّل اللعبة',
+    'movesPlayed': 'كمّل من مكان ما وقفت، بعد %s نقلة',
     'moveHistory': 'النقلات',
     'noMovesYet': 'لسه مفيش نقلات',
     'passed': 'عدّى الدور',

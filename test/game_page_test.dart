@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -9,8 +11,10 @@ import 'package:quoridor/flame/pages/game_page.dart';
 import 'package:quoridor/flame/services/ai_service.dart';
 import 'package:quoridor/flame/services/audio/audio_out.dart';
 import 'package:quoridor/flame/services/audio_service.dart';
+import 'package:quoridor/flame/services/game_service.dart';
 import 'package:quoridor/flame/services/settings_service.dart';
 import 'package:quoridor/theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _SilentAudio implements AudioOut {
   @override
@@ -25,6 +29,7 @@ class _SilentAudio implements AudioOut {
 
 void main() {
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     AIService.search = AIService.searchInline;
     AudioService.instance.debugOut = _SilentAudio();
   });
@@ -35,10 +40,11 @@ void main() {
     }
   }
 
-  /// Opens the page and picks [mode] from the sheet it starts with.
+  /// Opens the page and picks [mode] from the sheet it starts with, or
+  /// leaves the sheet up when [mode] is null.
   Future<QuoridorGame> openPage(
     WidgetTester tester, {
-    String mode = 'Two Players',
+    String? mode = 'Two Players',
     Locale locale = const Locale('en'),
   }) async {
     tester.view.physicalSize = const Size(1080, 2340);
@@ -59,6 +65,8 @@ void main() {
       ),
     );
     await settle(tester);
+    if (mode == null) return _gameOf(tester);
+
     // The sheet scrolls, and builds its lower cards only once scrolled to.
     await tester.scrollUntilVisible(
       find.text(mode),
@@ -68,12 +76,7 @@ void main() {
     await settle(tester, frames: 3);
     await tester.tap(find.text(mode));
     await settle(tester);
-
-    return tester
-        .state<GameWidgetState<QuoridorGame>>(
-          find.byType(GameWidget<QuoridorGame>),
-        )
-        .currentGame;
+    return _gameOf(tester);
   }
 
   /// Takes the page down and lets its toasts and clock run out, so no timer
@@ -154,4 +157,54 @@ void main() {
 
     await finish(tester);
   });
+
+  testWidgets('an unfinished game can be continued after a restart', (
+    tester,
+  ) async {
+    final saved = GameService.executeMove(
+      GameStateFactory.createNewGame(gameId: 'saved', player2IsAI: false),
+      const GameMove.pawnMove(Position(7, 4), 1),
+    );
+    SharedPreferences.setMockInitialValues({
+      'savedGame.local': jsonEncode(saved.toJson()),
+    });
+
+    final game = await openPage(tester, mode: 'Continue game');
+
+    expect(game.gameState.gameId, 'saved');
+    expect(game.gameState.player1.position, const Position(7, 4));
+    expect(game.gameState.currentPlayerId, 2);
+
+    await finish(tester);
+  });
+
+  testWidgets('choosing a mode instead starts afresh', (tester) async {
+    final saved = GameService.executeMove(
+      GameStateFactory.createNewGame(gameId: 'saved'),
+      const GameMove.pawnMove(Position(7, 4), 1),
+    );
+    SharedPreferences.setMockInitialValues({
+      'savedGame.local': jsonEncode(saved.toJson()),
+    });
+
+    final game = await openPage(tester, mode: 'Play vs AI');
+
+    expect(game.gameState.gameId, isNot('saved'));
+    expect(game.gameState.moveHistory, isEmpty);
+
+    await finish(tester);
+  });
+
+  testWidgets('with nothing saved there is nothing to continue', (
+    tester,
+  ) async {
+    await openPage(tester, mode: null);
+    expect(find.text('Choose Game Mode'), findsOneWidget);
+    expect(find.text('Continue game', skipOffstage: false), findsNothing);
+    await finish(tester);
+  });
 }
+
+QuoridorGame _gameOf(WidgetTester tester) => tester
+    .state<GameWidgetState<QuoridorGame>>(find.byType(GameWidget<QuoridorGame>))
+    .currentGame;
