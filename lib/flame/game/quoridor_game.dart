@@ -142,6 +142,13 @@ class QuoridorGame extends FlameGame
     AudioService.instance.play(Sfx.win);
   }
 
+  /// Boards this game has been through, oldest first, for [undo].
+  final List<GameState> _undoStack = [];
+
+  /// Set while [undo] puts an earlier board back, so that board is not
+  /// itself recorded as a step to undo.
+  bool _restoring = false;
+
   void updateGameState(GameState newGameState) {
     final previous = _gameState;
     _gameState = newGameState;
@@ -152,6 +159,10 @@ class QuoridorGame extends FlameGame
       _soundedMoveCount = 0;
       _announcedGameOver = false;
     }
+    // An undone win is a game in play again, and winning it a second time
+    // deserves its celebration too.
+    if (!newGameState.isGameOver) _announcedGameOver = false;
+    _recordForUndo(previous, newGameState);
     _playSoundsForNewMoves(newGameState);
 
     _updateUI();
@@ -167,6 +178,59 @@ class QuoridorGame extends FlameGame
     }
 
     onGameStateChanged?.call(_gameState!);
+  }
+
+  void _recordForUndo(GameState? previous, GameState next) {
+    if (_isOnline || previous == null || previous.gameId != next.gameId) {
+      _undoStack.clear();
+      return;
+    }
+    if (_restoring) return;
+    if (next.moveHistory.length > previous.moveHistory.length) {
+      _undoStack.add(previous);
+    }
+  }
+
+  /// Where [undo] would go back to: the latest board on which a person was
+  /// to move. Against the computer that skips its reply, so one undo takes
+  /// back the player's own move rather than leaving the computer to replay
+  /// the same answer at once.
+  int? get _undoTarget {
+    for (var i = _undoStack.length - 1; i >= 0; i--) {
+      if (!_undoStack[i].currentPlayer.isAI) return i;
+    }
+    return null;
+  }
+
+  /// Whether there is a move to take back. Never online, where the move is
+  /// already on the server and the other players have seen it.
+  bool get canUndo => !_isOnline && _undoTarget != null;
+
+  /// Takes back the last move made by a person, and the computer's reply to
+  /// it if there was one.
+  void undo() {
+    final index = _undoTarget;
+    if (_isOnline || index == null) return;
+
+    final target = _undoStack[index];
+    _undoStack.removeRange(index, _undoStack.length);
+
+    // Keep who is the computer as it is now: switching seat 2 between the
+    // computer and a person is a choice about the table, not a move.
+    final current = _gameState!;
+    final restored = target.copyWith(
+      players: [
+        for (final player in target.players)
+          player.copyWith(isAI: current.playerById(player.id).isAI),
+      ],
+    );
+
+    _restoring = true;
+    try {
+      updateGameState(restored);
+    } finally {
+      _restoring = false;
+    }
   }
 
   /// Plays one effect per move that has landed since the last update.

@@ -197,6 +197,95 @@ void main() {
     });
   });
 
+  group('undo', () {
+    testWidgets('takes back a move between two people', (tester) async {
+      final game = await loaded();
+      game.updateGameState(
+        GameStateFactory.createNewGame(gameId: 'g', player2IsAI: false),
+      );
+      expect(game.canUndo, isFalse);
+
+      game.playForCurrentPlayer();
+      game.playForCurrentPlayer();
+      expect(game.gameState.moveHistory, hasLength(2));
+
+      game.undo();
+      expect(game.gameState.moveHistory, hasLength(1));
+      expect(game.gameState.currentPlayerId, 2);
+
+      game.undo();
+      expect(game.gameState.moveHistory, isEmpty);
+      expect(game.gameState.player1.position, GameConstants.player1Start);
+      expect(game.canUndo, isFalse);
+    });
+
+    testWidgets('against the computer, takes back its reply too', (
+      tester,
+    ) async {
+      final game = await loaded(difficulty: AIDifficulty.easy);
+      game.updateGameState(againstAI());
+
+      game.playForCurrentPlayer();
+      await tester.pump(QuoridorGame.aiThinkingDelay);
+      await tester.pump();
+      expect(game.gameState.moveHistory, hasLength(2));
+
+      game.undo();
+      expect(game.gameState.moveHistory, isEmpty);
+      expect(game.gameState.currentPlayerId, 1);
+    });
+
+    testWidgets('while the computer is thinking, it does not then reply', (
+      tester,
+    ) async {
+      final game = await loaded(difficulty: AIDifficulty.easy);
+      game.updateGameState(againstAI());
+
+      game.playForCurrentPlayer();
+      game.undo();
+      await tester.pump(QuoridorGame.aiThinkingDelay);
+      await tester.pump();
+
+      expect(game.gameState.moveHistory, isEmpty);
+      expect(game.gameState.currentPlayerId, 1);
+    });
+
+    testWidgets('keeps who is the computer as it is now', (tester) async {
+      final game = await loaded(difficulty: AIDifficulty.easy);
+      game.updateGameState(againstAI());
+      game.playForCurrentPlayer();
+      await tester.pump(QuoridorGame.aiThinkingDelay);
+      await tester.pump();
+
+      game.togglePlayerMode();
+      game.undo();
+
+      expect(game.gameState.moveHistory, isEmpty);
+      expect(game.gameState.player2.isAI, isFalse);
+    });
+
+    test('is never offered online', () async {
+      final game = await loaded();
+      game.updateGameState(
+        GameStateFactory.createNewGame(gameId: 'g', player2IsAI: false),
+      );
+      game.playForCurrentPlayer();
+      expect(game.canUndo, isTrue);
+
+      goOnline(game);
+      game.updateGameState(game.gameState);
+      expect(game.canUndo, isFalse);
+    });
+
+    test('a new game starts with nothing to undo', () async {
+      final game = await loaded();
+      game.startGame(playerCount: 2, againstAI: false);
+      game.playForCurrentPlayer();
+      game.startGame(playerCount: 2, againstAI: false);
+      expect(game.canUndo, isFalse);
+    });
+  });
+
   test('the board sends the page no text of its own', () {
     // Its messages were hard-coded English -- "AI played their move" after
     // every reply -- and showed as they were in the Arabic game. The page

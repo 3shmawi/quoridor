@@ -179,6 +179,10 @@ class AppStrings {
   String get invalidWallPlacement => _get('invalidWallPlacement');
   String get aiPlayedTheirMove => _get('aiPlayedTheirMove');
   String turnPassed(String name) => _fill('turnPassed', name);
+  String get undo => _get('undo');
+  String get moveHistory => _get('moveHistory');
+  String get noMovesYet => _get('noMovesYet');
+  String get passed => _get('passed');
 
   // --- Game over ---------------------------------------------------------
   String get gameOverTitle => _get('gameOverTitle');
@@ -352,6 +356,10 @@ class AppStrings {
     'invalidWallPlacement': 'Invalid wall placement!',
     'aiPlayedTheirMove': 'AI played their move',
     'turnPassed': '%s: no move possible, the turn passes',
+    'undo': 'Undo',
+    'moveHistory': 'Moves',
+    'noMovesYet': 'No moves yet',
+    'passed': 'passed',
 
     'gameOverTitle': 'Game Over!',
     'nameWins': '%s wins!',
@@ -520,6 +528,10 @@ class AppStrings {
     'invalidWallPlacement': 'مكان الحاجز غير متاح!',
     'aiPlayedTheirMove': 'الكمبيوتر لعب',
     'turnPassed': '%s: مفيش نقلة متاحة، الدور عدّى',
+    'undo': 'تراجع',
+    'moveHistory': 'النقلات',
+    'noMovesYet': 'لسه مفيش نقلات',
+    'passed': 'عدّى الدور',
 
     'gameOverTitle': 'انتهت اللعبة!',
     'nameWins': '%s كسب!',

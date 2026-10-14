@@ -15,6 +15,7 @@ import '../../flame/services/turn_clock.dart';
 import '../services/update/update_service.dart';
 import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
+import '../../flame/models/move_notation.dart';
 import '../../flame/models/player.dart';
 import '../../flame/services/ai_service.dart';
 import '../../flame/services/firebase_service.dart';
@@ -293,7 +294,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               size: 28,
             ),
             const SizedBox(width: 12),
-            Text(context.l10n.gameOverTitle),
+            // Wraps rather than overflowing when the title runs long.
+            Flexible(child: Text(context.l10n.gameOverTitle)),
           ],
         ),
         content: Column(
@@ -420,6 +422,99 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _showGameMessage(gameId != null ? saved : failed);
     closeMenu();
+  }
+
+  void _undo() {
+    _game.clearInteraction();
+    _game.undo();
+    setState(() {});
+  }
+
+  /// Every move of the game so far, newest at the bottom.
+  void _showMoveHistory() {
+    final state = _game.gameState;
+    final localSeat = _online?.localPlayerId;
+
+    _whileMenuOpen(
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        builder: (context) {
+          final theme = Theme.of(context);
+          final moves = state.moveHistory;
+          return SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  child: Text(
+                    context.l10n.moveHistory,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (moves.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      context.l10n.noMovesYet,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      reverse: true,
+                      itemCount: moves.length,
+                      itemBuilder: (context, index) {
+                        final number = moves.length - index;
+                        final move = moves[number - 1];
+                        final player = state.playerById(move.playerId);
+                        return ListTile(
+                          dense: true,
+                          leading: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: _seatColor(move.playerId),
+                            child: Text(
+                              '$number',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(_labelFor(player, localSeat)),
+                          trailing: Text(
+                            MoveNotation.of(move) ?? context.l10n.passed,
+                            // Squares are written in Latin letters either
+                            // way, and read left to right.
+                            textDirection: TextDirection.ltr,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showGameInfo() {
@@ -988,6 +1083,24 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             ),
           ),
         ),
+
+        if (_game.isInitialized && !_isOnline)
+          IconButton(
+            key: const Key('undo'),
+            tooltip: context.l10n.undo,
+            onPressed: _game.canUndo ? _undo : null,
+            icon: const Icon(Icons.undo_rounded),
+          ),
+
+        if (_game.isInitialized)
+          IconButton(
+            key: const Key('moveHistory'),
+            tooltip: context.l10n.moveHistory,
+            onPressed: _showMoveHistory,
+            icon: const Icon(Icons.format_list_numbered_rounded),
+          ),
+
+        const SizedBox(width: 4),
 
         // Game Info Button
         IconButton(
