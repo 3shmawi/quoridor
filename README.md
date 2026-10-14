@@ -4,8 +4,8 @@ A Quoridor board game built with Flutter and Flame. Race your pawn to the far
 side of a 9×9 board while spending ten walls to slow your opponent down — and
 never quite sealing them in, because that is against the rules.
 
-Play against an AI opponent, with two, three or four people on the same
-device, or online with up to four players using a six-character code. In
+Play against one, two or three AI opponents, with two, three or four people on
+the same device, or online with up to four players using a six-character code. In
 English and Arabic. Runs on Android, iOS, web, macOS, Windows and Linux from
 one codebase.
 
@@ -57,7 +57,8 @@ You win by reaching the edge on the opposite side of the board. Player 1
 starts at the bottom and runs to the top; player 2 does the reverse. With
 three or four players, players 3 and 4 start on the left and right edges and
 cross the board sideways, everyone has fewer walls, and turns go round the
-table. On each turn
+table. If a pawn is boxed in by the others and its player has no wall they can
+place, that player's turn passes; the game says so and moves on. On each turn
 the board tints and flags the goal row belonging to whoever is to move, so the
 strip swaps ends as play alternates.
 
@@ -77,6 +78,13 @@ Walls carry the colour of whoever placed them. **Your** goal row is tinted and
 flagged in your colour on your turn, and the strip moves to the other end when
 the turn passes — so which way you are running is answered without reading
 anything.
+
+In the top bar, **undo** takes back your last move (and the computer's reply
+to it) in a game on one device, and the **move list** shows every move so far,
+in `e2` / `e3h` notation: columns `a`–`i` from player 1's left, rows `1`–`9`
+from player 1's end, and walls named by the top-left square of the four they
+sit between plus `h` or `v`. A game on one device is kept if the app is
+closed, and offered as **Continue game** next time.
 
 Under the board is a single line with each player's name and how many walls
 they have left. The player to move stands out and the others fade back, and
@@ -148,9 +156,15 @@ Three strengths in the settings drawer, by how far ahead they look:
 
 | Strength | Looks ahead | Plays like |
 |---|---|---|
-| Easy | one move | sound but not always the best choice |
-| Medium | your reply | blocks when blocking is worth it |
-| Hard | two moves deep | sets walls up a move in advance |
+| Easy | its own move | sound but not always the best choice |
+| Medium | its move and your reply | blocks when blocking is worth it |
+| Hard | four moves | sets walls up a move in advance |
+
+In self-play from varied openings, Hard beat Medium 9–3 and Medium beat Easy
+8–4. The search runs on a background isolate (in place on the web), so the
+board never freezes while the computer thinks. At a table of three or four,
+**Play vs 2 or 3 AIs** gives every other seat to the computer, each playing for
+itself.
 
 ### Settings
 
@@ -182,7 +196,7 @@ lib/
     ├── models/                  Game state, players, online session
     ├── game/
     │   ├── quoridor_game.dart   Flame game loop, turn flow, sound sequencing
-    │   └── pathfinding.dart     Shortest path, used for rules and for the AI
+    │   └── pathfinding.dart     Route checks behind the wall rule
     ├── services/
     │   ├── game_service.dart    Move validation and execution (pure, no UI)
     │   ├── ai/                  Search engine for the AI opponent
@@ -191,6 +205,7 @@ lib/
     │   ├── update/              Version info, update checker, web/native split
     │   ├── app_strings.dart     English and Arabic text
     │   ├── settings_service.dart Settings kept across restarts
+    │   ├── saved_game_service.dart The local game kept across restarts
     │   ├── identity_service.dart Anonymous identity and chosen name
     │   ├── firebase_service.dart Save / load games
     │   └── online/              Room codes, codec, service, controller
@@ -225,11 +240,21 @@ Each player sees the board from their own side, with their pawn starting at
 the bottom. While it is someone else's turn the board dims and cannot be
 touched.
 
+When a game ends, **Rematch** starts a new game for the same table: the first
+to tap it creates the game, and everyone else is offered a **Join** button.
+
 The code alphabet leaves out `I`, `L` and `0`, and the join field folds a typed
 `0` onto `O` and `I` or `L` onto `1`, so a code read aloud over the phone still
 works.
 
 Resign and draw are not built yet — see the plan for what is and is not done.
+
+The Security Rules check what each move does to the board as far as rules can
+without a path search: only the mover's own pawn or walls change, a step covers
+one or two squares, a wall costs one and lands in bounds, walls and history
+only grow, the turn passes on, and only a pawn on its goal edge ends the game.
+Whether a wall seals someone in, or a step runs through a wall, is still
+checked by the client.
 
 Deploying the Security Rules is a separate step from shipping the app; until
 they are pushed, online play is refused:
@@ -282,9 +307,12 @@ working version in `release/min_version.txt`.
 - [x] Three and four players, on one device and online
 - [x] Arabic, kept settings, per-turn timer
 - [x] In-app update notice and automated releases
+- [x] Undo, move list, continue after closing the app
+- [x] AI at tables of three and four; distinct strengths
+- [x] Online rematch; board checks in the Security Rules
 - [ ] Resign and draw
 - [ ] Public matchmaking
-- [ ] Server-authoritative move validation
+- [ ] Server-authoritative move validation (paths and walls in the way)
 - [ ] Ranked play
 
 ## Credits
