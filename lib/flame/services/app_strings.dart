@@ -169,6 +169,11 @@ class AppStrings {
   String get switchedToAI => _get('switchedToAI');
   String get switchedToTwoPlayers => _get('switchedToTwoPlayers');
   String get aiModeActivated => _get('aiModeActivated');
+  String get playVsAIs => _get('playVsAIs');
+  String get playVsAIsSubtitle => _get('playVsAIsSubtitle');
+  String get howManyAIs => _get('howManyAIs');
+  String aiOpponents(int n) => _fill('aiOpponents', '$n');
+  String aiN(int n) => _fill('aiN', '$n');
   String get twoPlayerModeActivated => _get('twoPlayerModeActivated');
   String get signInToSave => _get('signInToSave');
   String get gameSaved => _get('gameSaved');
@@ -312,7 +317,7 @@ class AppStrings {
     'saveGame': 'Save Game',
     'saveGameSubtitle': 'Save current progress',
     'togglePlayerMode': 'Toggle Player Mode',
-    'switchToTwoPlayers': 'Switch to 2 players',
+    'switchToTwoPlayers': 'Switch to human players',
     'switchToAI': 'Switch to AI',
     'displayOptions': 'Display Options',
     'showValidMoves': 'Show Valid Moves',
@@ -346,8 +351,13 @@ class AppStrings {
     'soundOff': 'Sound off',
     'difficultySetTo': 'Difficulty: %s',
     'switchedToAI': 'Switched to AI opponent',
-    'switchedToTwoPlayers': 'Switched to human opponent',
+    'switchedToTwoPlayers': 'Switched to human players',
     'aiModeActivated': 'Playing against AI',
+    'playVsAIs': 'Play vs 2 or 3 AIs',
+    'playVsAIsSubtitle': 'A crowded board, every rival the computer',
+    'howManyAIs': 'How many computer opponents?',
+    'aiOpponents': '%s computer opponents',
+    'aiN': 'AI %s',
     'twoPlayerModeActivated': 'Two player mode activated',
     'signInToSave': 'Please sign in to save game',
     'gameSaved': 'Game saved successfully!',
@@ -486,7 +496,7 @@ class AppStrings {
     'saveGame': 'حفظ اللعبة',
     'saveGameSubtitle': 'احفظ التقدم الحالي',
     'togglePlayerMode': 'تبديل وضع اللاعب',
-    'switchToTwoPlayers': 'التبديل للاعبين',
+    'switchToTwoPlayers': 'التبديل للاعيبة',
     'switchToAI': 'التبديل للكمبيوتر',
     'displayOptions': 'خيارات العرض',
     'showValidMoves': 'إظهار النقلات المتاحة',
@@ -520,8 +530,13 @@ class AppStrings {
     'soundOff': 'الصوت مقفول',
     'difficultySetTo': 'المستوى: %s',
     'switchedToAI': 'اتحولت للعب ضد الكمبيوتر',
-    'switchedToTwoPlayers': 'اتحولت للعب مع صديق',
+    'switchedToTwoPlayers': 'اتحولت للعب مع أصحابك',
     'aiModeActivated': 'اللعب ضد الكمبيوتر',
+    'playVsAIs': 'ضد 2 أو 3 كمبيوتر',
+    'playVsAIsSubtitle': 'لوحة زحمة، وكل منافسينك كمبيوتر',
+    'howManyAIs': 'كام منافس كمبيوتر؟',
+    'aiOpponents': '%s منافسين كمبيوتر',
+    'aiN': 'الكمبيوتر %s',
     'twoPlayerModeActivated': 'وضع اللاعبين اتفعّل',
     'signInToSave': 'سجّل الدخول عشان تحفظ اللعبة',
     'gameSaved': 'تم حفظ اللعبة',

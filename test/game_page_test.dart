@@ -127,13 +127,27 @@ void main() {
     await finish(tester);
   });
 
-  testWidgets('switching seat 2 is only in the menu for two players', (
+  testWidgets('several computers can be chosen, and are told apart', (
     tester,
   ) async {
-    await openPage(tester, mode: 'Four Players');
-    await tester.tap(find.byIcon(Icons.menu));
+    await openPage(tester, mode: 'Play vs 2 or 3 AIs');
+    await tester.tap(find.text('3 computer opponents'));
     await settle(tester);
-    expect(find.text('Toggle Player Mode'), findsNothing);
+
+    final game = _gameOf(tester);
+    expect(game.gameState.playerCount, 4);
+    expect(game.gameState.players.where((p) => p.isAI), hasLength(3));
+
+    // Let the three computers reply, then read who played what.
+    game.playForCurrentPlayer();
+    await settle(tester, frames: 40);
+    expect(game.gameState.moveHistory, hasLength(4));
+
+    await tester.tap(find.byKey(const Key('moveHistory')));
+    await settle(tester);
+    for (final name in ['Player 1', 'AI 2', 'AI 3', 'AI 4']) {
+      expect(find.text(name), findsOneWidget, reason: name);
+    }
 
     await finish(tester);
   });

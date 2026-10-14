@@ -407,18 +407,19 @@ class QuoridorGame extends FlameGame
 
   /// Starts a fresh game with [playerCount] at the board.
   ///
-  /// Three and four play each other: the computer opponent reads the board
-  /// through one pair of eyes — mine against the nearest rival — which is
-  /// enough to hold its own, but it has not been played enough hands at a
-  /// crowded board to be offered as one of them yet.
+  /// [againstAI] makes every seat but the first the computer. At a table of
+  /// three or four it plays each seat for itself, against whoever is nearest
+  /// to getting home; self-play games at both sizes run to a finish in
+  /// seventy to ninety moves with every wall spent.
   void startGame({int playerCount = 2, bool againstAI = true}) {
     _announcedGameOver = false;
     _soundedMoveCount = 0;
     updateGameState(
       GameStateFactory.createNewGame(
         playerCount: playerCount,
-        player2IsAI: againstAI && playerCount == 2,
-        player2Name: againstAI && playerCount == 2 ? 'AI' : 'Player 2',
+        player2IsAI: againstAI,
+        player2Name: againstAI ? 'AI' : 'Player 2',
+        othersAreAI: againstAI,
       ),
     );
   }
@@ -433,22 +434,20 @@ class QuoridorGame extends FlameGame
     _boardComponent.showValidMoves = show;
   }
 
-  /// Whether seat 2 can be switched between the computer and a person.
-  ///
-  /// Only in a local two-player game: online, a computer seat here would play
-  /// moves the server never hears about, and the computer is not offered at a
-  /// table of three or four.
-  bool get canTogglePlayerMode =>
-      _isInitialized && !_isOnline && _gameState!.playerCount == 2;
+  /// Whether the other seats can be switched between the computer and
+  /// people. Never online: a computer seat here would play moves the server
+  /// never hears about.
+  bool get canTogglePlayerMode => _isInitialized && !_isOnline;
 
+  /// Hands every seat but the first to the computer, or back to people.
   void togglePlayerMode() {
     if (!canTogglePlayerMode) return;
 
-    // Switch between AI and human player 2
+    final toAI = !_gameState!.player2.isAI;
     final newGameState = _gameState!.copyWith(
       players: [
         for (final player in _gameState!.players)
-          player.id == 2 ? player.copyWith(isAI: !player.isAI) : player,
+          player.id == 1 ? player : player.copyWith(isAI: toAI),
       ],
       updatedAt: DateTime.now(),
     );

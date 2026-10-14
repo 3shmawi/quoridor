@@ -308,6 +308,9 @@ class GameStateFactory {
     String player2Name = 'AI',
     bool player2IsAI = true,
     int playerCount = 2,
+
+    /// Whether seats three and four are the computer too.
+    bool othersAreAI = false,
   }) {
     gameId ??= 'game_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -322,7 +325,12 @@ class GameStateFactory {
           playerCount: playerCount,
         ),
         for (var seat = 3; seat <= playerCount; seat++)
-          PlayerFactory.seat(seat, playerCount: playerCount),
+          PlayerFactory.seat(
+            seat,
+            playerCount: playerCount,
+            isAI: othersAreAI,
+            name: othersAreAI ? 'AI' : null,
+          ),
       ],
     );
   }

@@ -124,7 +124,7 @@ void main() {
     });
   });
 
-  group('switching seat 2 between computer and person', () {
+  group('switching the other seats between computer and people', () {
     test('is offered in a local two-player game', () async {
       final game = await loaded();
       game.updateGameState(againstAI());
@@ -144,13 +144,43 @@ void main() {
       expect(game.gameState.player2.isAI, isFalse);
     });
 
-    test('is not offered with three or four at the table', () async {
+    test('with three or four, hands every other seat over at once', () async {
       final game = await loaded();
       game.startGame(playerCount: 4, againstAI: false);
+      expect(game.canTogglePlayerMode, isTrue);
 
-      expect(game.canTogglePlayerMode, isFalse);
+      game.togglePlayerMode();
+      expect(
+        [for (final p in game.gameState.players) p.isAI],
+        [false, true, true, true],
+      );
+
       game.togglePlayerMode();
       expect(game.gameState.players.any((p) => p.isAI), isFalse);
+    });
+
+    testWidgets('a table of computers plays round to the person again', (
+      tester,
+    ) async {
+      final game = await loaded(difficulty: AIDifficulty.easy);
+      game.startGame(playerCount: 4, againstAI: true);
+      expect(
+        [for (final p in game.gameState.players) p.isAI],
+        [false, true, true, true],
+      );
+
+      game.playForCurrentPlayer();
+      for (var reply = 0; reply < 3; reply++) {
+        await tester.pump(QuoridorGame.aiThinkingDelay);
+        await tester.pump();
+      }
+
+      expect(game.gameState.moveHistory, hasLength(4));
+      expect(game.gameState.currentPlayerId, 1);
+
+      // One undo takes back the whole round, back to the person's turn.
+      game.undo();
+      expect(game.gameState.moveHistory, isEmpty);
     });
   });
 

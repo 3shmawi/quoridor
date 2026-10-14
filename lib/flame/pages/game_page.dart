@@ -654,6 +654,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 16),
                     _buildModeCard(
+                      icon: Icons.smart_toy_outlined,
+                      title: context.l10n.playVsAIs,
+                      subtitle: context.l10n.playVsAIsSubtitle,
+                      onTap: _startGameAgainstSeveralAIs,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModeCard(
                       icon: Icons.public,
                       title: context.l10n.playOnline,
                       subtitle: context.l10n.playOnlineSubtitle,
@@ -694,6 +701,34 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   /// Starts a hotseat game for [playerCount] on this device.
+  /// Asks how many computers to play, then starts that table.
+  Future<void> _startGameAgainstSeveralAIs() async {
+    final opponents = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(context.l10n.howManyAIs),
+        children: [
+          for (final n in const [2, 3])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, n),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(context.l10n.aiOpponents(n)),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (opponents == null || !mounted) return;
+
+    _detachOnline(abandon: true);
+    _game.startGame(playerCount: opponents + 1, againstAI: true);
+    Navigator.pop(context);
+    _syncClock();
+    setState(() {});
+    _showGameMessage(context.l10n.aiModeActivated);
+  }
+
   void _startLocalGame(int playerCount) {
     _detachOnline(abandon: true);
     _game.startGame(playerCount: playerCount, againstAI: false);
@@ -1578,7 +1613,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           context.l10n.opponent;
     }
 
-    if (player.isAI) return context.l10n.ai;
+    if (player.isAI) {
+      // One computer is "AI"; several are told apart by their seat.
+      final computers = _game.gameState.players.where((p) => p.isAI).length;
+      return computers > 1 ? context.l10n.aiN(player.id) : context.l10n.ai;
+    }
     return context.l10n.playerN(player.id);
   }
 
