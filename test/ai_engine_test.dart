@@ -265,4 +265,14 @@ void _timeoutMoveTests() {
       expect(after.player1.hasReachedGoal, isTrue);
     });
   });
+
+  test('each strength looks further ahead than the one below it', () {
+    // Medium used to search exactly as deep as hard, so on an open board the
+    // two played the same game and "hard" was hard in name only.
+    final depths = [
+      for (final strength in EngineStrength.values)
+        QuoridorEngine.profileFor(strength).depth,
+    ];
+    expect(depths, orderedEquals([1, 2, 4]));
+  });
 }

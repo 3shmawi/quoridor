@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import '../../constants.dart';
 import '../../models/game_state.dart';
 import '../../models/player.dart';
@@ -13,7 +15,7 @@ enum EngineStrength {
   /// Sees the reply. Blocks when blocking is worth it.
   medium,
 
-  /// Searches deep enough to set up walls a move in advance.
+  /// Looks four moves ahead, deep enough to set up walls a move in advance.
   hard,
 }
 
@@ -40,45 +42,40 @@ class QuoridorEngine {
   /// Upper bound on nodes per move, so a turn never hangs the UI.
   static const int _nodeBudget = 200000;
 
-  /// Wall-clock cap per move, per strength.
+  /// How deep each strength searches, and how long it may take.
   ///
-  /// Node counts are a poor proxy for time once the board fills up and each
-  /// node costs a path search, so the search also stops on the clock. This is
-  /// what separates medium from hard: both look four moves ahead, but on a
-  /// crowded board — the only place the difference shows — medium runs out of
-  /// time and settles for what it has seen, while hard finishes the line.
+  /// Depth is the target for iterative deepening; the clock stops the search
+  /// sooner on a crowded board, where every node costs a path search, and the
+  /// engine then plays from the deepest pass it finished.
   ///
-  /// Searching deeper than four was tried and plays *worse*: the budget cuts
-  /// a depth-six search off mid-tree, leaving the root comparing scores taken
-  /// at different depths, which is how the engine talks itself into a step
-  /// backwards.
-  static Duration _timeBudgetFor(EngineStrength strength) {
+  /// Medium used to search as deep as hard, four moves, with less time; on
+  /// an open board both finished, so they mostly played the same moves, and
+  /// in eight self-play games hard won two.
+  /// Medium now looks two moves ahead -- its own and the reply -- and hard
+  /// beat it 9 to 3 over twelve games from varied openings, while medium beat
+  /// easy 8 to 4. Hard searching six deep with two seconds did *not* play
+  /// better than four: the extra plies are mostly wall noise this evaluation
+  /// cannot rank.
+  static ({int depth, Duration time}) profileFor(EngineStrength strength) {
     switch (strength) {
       case EngineStrength.easy:
-        return const Duration(milliseconds: 150);
+        return (depth: 1, time: const Duration(milliseconds: 150));
       case EngineStrength.medium:
-        return const Duration(milliseconds: 400);
+        return (depth: 2, time: const Duration(milliseconds: 400));
       case EngineStrength.hard:
-        return const Duration(milliseconds: 900);
+        return (depth: 4, time: const Duration(milliseconds: 900));
     }
   }
+
+  /// Replaces [profileFor] in experiments and tests.
+  @visibleForTesting
+  static ({int depth, Duration time}) Function(EngineStrength)? debugProfile;
 
   /// How many of its own recent squares the engine will avoid returning to.
   ///
   /// One is not enough: a pawn can circle three or four squares without ever
   /// stepping straight back, which is what "it repeats itself" looks like.
   static const int _repetitionWindow = 6;
-
-  static int _depthFor(EngineStrength strength) {
-    switch (strength) {
-      case EngineStrength.easy:
-        return 1;
-      case EngineStrength.medium:
-        return 4;
-      case EngineStrength.hard:
-        return 4;
-    }
-  }
 
   /// Picks a move for the player to move, or null if there is none.
   static GameMove? bestMove(
@@ -99,8 +96,9 @@ class QuoridorEngine {
 
     final rng = random ?? Random();
 
-    final budget = _SearchBudget(_nodeBudget, _timeBudgetFor(strength));
-    final target = _depthFor(strength);
+    final profile = (debugProfile ?? profileFor)(strength);
+    final budget = _SearchBudget(_nodeBudget, profile.time);
+    final target = profile.depth;
 
     // Where this pawn has been lately, so the search can prefer not to
     // revisit it when nothing else separates the moves.
@@ -127,11 +125,14 @@ class QuoridorEngine {
         final child = applyMove(state, move);
         final raw = _search(child, depth - 1, alpha, _winScore * 2, me, budget);
 
+        // Running out inside this move's subtree leaves its score as
+        // whatever the cut-off line evaluated to, so it is not kept -- even
+        // when it was the last root move and the pass would look complete.
+        if (budget.exhausted) break;
+
         final score = _withRepetitionPenalty(raw, move, recent);
         if (score > alpha) alpha = score;
         pass.add((move: move, score: score));
-
-        if (budget.exhausted) break;
       }
 
       // A pass that did not see every root move cannot be compared with one
