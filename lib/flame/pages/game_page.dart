@@ -21,9 +21,7 @@ import '../../flame/services/firebase_service.dart';
 import '../../theme.dart';
 
 class GamePage extends StatefulWidget {
-  final GameState? initialGameState;
-
-  const GamePage({super.key, this.initialGameState});
+  const GamePage({super.key});
 
   @override
   State<GamePage> createState() => _GamePageState();
@@ -76,10 +74,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _initializeGame() {
     _game = QuoridorGame();
-
-    if (widget.initialGameState != null) {
-      _game.updateGameState(widget.initialGameState!);
-    }
 
     _game.onGameStateChanged = _handleGameStateChanged;
     _game.onGameWon = _showConfetti;

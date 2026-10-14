@@ -29,6 +29,8 @@ void main() {
   late FakeAudioOut audio;
 
   setUp(() {
+    // A real isolate never finishes on the fake clock these tests run on.
+    AIService.search = AIService.searchInline;
     audio = FakeAudioOut();
     AudioService.instance.debugOut = audio;
     AudioService.instance.enabled.value = true;

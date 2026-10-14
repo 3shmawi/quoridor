@@ -224,10 +224,7 @@ class QuoridorGame extends FlameGame
   }
 
   void _handleMoveAttempt(Position newPosition) {
-    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId) ||
-        !canActNow) {
-      return;
-    }
+    if (!canActNow) return;
 
     final move = GameMove.pawnMove(newPosition, _gameState!.currentPlayerId);
 
@@ -239,10 +236,7 @@ class QuoridorGame extends FlameGame
   }
 
   void _handleWallPlaceAttempt(Wall wall) {
-    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId) ||
-        !canActNow) {
-      return;
-    }
+    if (!canActNow) return;
 
     final move = GameMove.wallPlace(wall, _gameState!.currentPlayerId);
 

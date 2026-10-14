@@ -103,20 +103,6 @@ class GameService {
     return gameState;
   }
 
-  // Analyze game state for UI feedback
-  static GameAnalysis analyzeGameState(GameState gameState) {
-    final pathLengths = Pathfinding.calculatePathLengths(gameState);
-    final validMoves = getValidMoves(gameState);
-
-    return GameAnalysis(
-      playerPathLengths: pathLengths,
-      validMoves: validMoves,
-      gamePhase: _determineGamePhase(gameState),
-      winner: gameState.winner,
-      isGameOver: gameState.isGameOver,
-    );
-  }
-
   // Private helper methods
   static bool _isValidPawnMove(
     GameState gameState,
@@ -258,39 +244,7 @@ class GameService {
     return horizontal.position.row == vertical.position.row + 1 &&
         horizontal.position.col + 1 == vertical.position.col;
   }
-
-  static GamePhase _determineGamePhase(GameState gameState) {
-    final totalMoves = gameState.moveHistory.length;
-    final wallsPlaced = gameState.walls.length;
-
-    if (totalMoves < 6 && wallsPlaced < 2) {
-      return GamePhase.opening;
-    } else if (wallsPlaced < 12 && totalMoves < 25) {
-      return GamePhase.midgame;
-    } else {
-      return GamePhase.endgame;
-    }
-  }
 }
-
-// Data classes for game analysis
-class GameAnalysis {
-  final Map<int, int> playerPathLengths;
-  final List<GameMove> validMoves;
-  final GamePhase gamePhase;
-  final String? winner;
-  final bool isGameOver;
-
-  GameAnalysis({
-    required this.playerPathLengths,
-    required this.validMoves,
-    required this.gamePhase,
-    this.winner,
-    required this.isGameOver,
-  });
-}
-
-enum GamePhase { opening, midgame, endgame }
 
 /// Why a wall placement was refused.
 enum WallRejection {
@@ -326,51 +280,5 @@ class WallPlacementResult {
       case WallRejection.blocksPlayer:
         return 'This would leave a player with no way to their goal';
     }
-  }
-}
-
-// Utility class for game creation and management
-class GameManager {
-  static GameState createNewGame({
-    String player1Name = 'Player 1',
-    String player2Name = 'AI',
-    bool enableAI = true,
-    AIDifficulty aiDifficulty = AIDifficulty.medium,
-  }) {
-    return GameStateFactory.createNewGame(
-      player1Name: player1Name,
-      player2Name: player2Name,
-      player2IsAI: enableAI,
-    );
-  }
-
-  static Future<GameState> processPlayerMove(
-    GameState gameState,
-    GameMove move, {
-    AIDifficulty aiDifficulty = AIDifficulty.medium,
-  }) async {
-    // Execute player move
-    var newGameState = GameService.executeMove(gameState, move);
-
-    // Execute AI turn if next player is AI
-    if (!newGameState.isGameOver && newGameState.currentPlayer.isAI) {
-      newGameState = await GameService.executeAITurn(
-        newGameState,
-        aiDifficulty,
-      );
-    }
-
-    return newGameState;
-  }
-
-  static bool canPlayerMove(GameState gameState, int playerId) {
-    return gameState.currentPlayerId == playerId && !gameState.isGameOver;
-  }
-
-  static List<Position> getValidMovesForPosition(
-    GameState gameState,
-    Position position,
-  ) {
-    return gameState.getValidMoves(position);
   }
 }

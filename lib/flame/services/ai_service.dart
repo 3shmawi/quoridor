@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../flame/constants.dart';
 import '../../flame/models/game_state.dart';
 import 'ai/quoridor_engine.dart';
@@ -19,6 +21,35 @@ enum AIDifficulty { easy, medium, hard }
 class AIService {
   AIService._();
 
+  /// Runs the search where it cannot stall the screen.
+  ///
+  /// The engine thinks for up to a second or two, and on the UI thread that
+  /// froze the board -- the pulse stopped and taps queued up -- every time the
+  /// computer moved. [compute] runs it on a background isolate; on the web,
+  /// which has none, it runs in place as before.
+  ///
+  /// Tests that drive the game on a fake clock swap this for an inline
+  /// search, since a real isolate never finishes inside one.
+  @visibleForTesting
+  static Future<GameMove?> Function(GameState state, EngineStrength strength)
+  search = _searchInBackground;
+
+  static Future<GameMove?> _searchInBackground(
+    GameState state,
+    EngineStrength strength,
+  ) => compute(_searchFor, (state: state, strength: strength));
+
+  static GameMove? _searchFor(
+    ({GameState state, EngineStrength strength}) request,
+  ) => QuoridorEngine.bestMove(request.state, request.strength);
+
+  /// Searches on the calling thread.
+  @visibleForTesting
+  static Future<GameMove?> searchInline(
+    GameState state,
+    EngineStrength strength,
+  ) async => QuoridorEngine.bestMove(state, strength);
+
   static EngineStrength strengthFor(AIDifficulty difficulty) {
     switch (difficulty) {
       case AIDifficulty.easy:
@@ -34,7 +65,5 @@ class AIService {
   static Future<GameMove?> generateMove(
     GameState gameState,
     AIDifficulty difficulty,
-  ) async {
-    return QuoridorEngine.bestMove(gameState, strengthFor(difficulty));
-  }
+  ) => search(gameState, strengthFor(difficulty));
 }
