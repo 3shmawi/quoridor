@@ -256,8 +256,11 @@ only grow, the turn passes on, and only a pawn on its goal edge ends the game.
 Whether a wall seals someone in, or a step runs through a wall, is still
 checked by the client.
 
-Deploying the Security Rules is a separate step from shipping the app; until
-they are pushed, online play is refused:
+Once a change reaches `main` and both test suites pass, CI deploys the
+Security Rules itself (the **Deploy Firestore rules** job), provided the
+`FIREBASE_SERVICE_ACCOUNT_JSON` secret is set; without it the job is skipped
+with a warning. Until the rules are live, online play is refused. To deploy
+by hand, or to deploy the indexes, which CI leaves alone:
 
 ```bash
 firebase deploy --only firestore:rules,firestore:indexes --project quoridor-290f6
@@ -278,6 +281,8 @@ Everything is in GitHub Actions:
   pull request, plus the Security Rules tests.
 - **Pages** (`pages.yml`) — every push to `main` is tested, then deployed to
   the web with a `latest.json` the app reads to spot a newer build.
+- **Rules deploy** (part of `ci.yml`) — every push to `main` that passes the
+  tests puts `firestore.rules` live, using `FIREBASE_SERVICE_ACCOUNT_JSON`.
 - **Bump version** (`bump.yml`) — run it from the Actions tab and pick patch,
   minor or major. It commits the new version and pushes a `vX.Y.Z` tag.
 - **Release** (`release.yml`) — on that tag: builds Android, Linux, Windows
@@ -291,6 +296,13 @@ reads the values all your apps share from `~/.app-secrets/shared.env`
 keystore once in `~/.app-secrets/apps/<repo>/`, and sets every secret with
 `gh`. Run it with `--dry-run` first to see what it would set. Back up
 `~/.app-secrets/`: Google Play needs the same upload key for every update.
+
+For the rules deploy, create a service account in the Google Cloud console
+for project `quoridor-290f6` (IAM & Admin → Service accounts) with the roles
+**Firebase Rules Admin** and **Service Usage Consumer**, download a JSON key,
+and save it as `~/.app-secrets/apps/quoridor/firebase-service-account.json`
+before running the script. The key can change your production rules, so
+give it no other roles.
 
 Installed apps and open browser tabs check for a newer build at start and
 when they come back to the foreground, and offer it in a card at the top. To
