@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../constants.dart';
 import '../../models/game_state.dart';
 import '../../models/online_session.dart';
-import '../ai/quoridor_engine.dart';
+import '../game_service.dart';
 import '../identity_service.dart';
 import 'online_game_service.dart';
 
@@ -58,6 +58,13 @@ class OnlineGameController extends ChangeNotifier {
 
   /// True while a move is shown locally but not yet confirmed by the server.
   bool _pendingLocalMove = false;
+
+  /// The game as the server last sent it, whatever is on screen.
+  ///
+  /// A refused move falls back to this. Falling back to the board from when
+  /// the move was made instead threw away anything that had arrived since,
+  /// such as the very move that made this one stale.
+  OnlineGame? _serverGame;
 
   StreamSubscription<OnlineGame>? _subscription;
   Timer? _heartbeat;
@@ -221,6 +228,7 @@ class OnlineGameController extends ChangeNotifier {
     }
 
     _session = result.value;
+    _serverGame = result.value!.game;
     _message = null;
     _failure = null;
     _startWatching();
@@ -260,6 +268,24 @@ class OnlineGameController extends ChangeNotifier {
     if (_disposed) return;
 
     final previous = _session;
+    _serverGame = game;
+
+    // While this device's move is on its way, the server can still send the
+    // game from before it: every player's heartbeat rewrites the document
+    // every few seconds. Taking that board took the move back off the screen
+    // until the server caught up, so it vanished and came back, and its
+    // sound played twice. Until the server is at least as far along as the
+    // screen, only its presence is taken; the board stays as shown.
+    if (_pendingLocalMove &&
+        previous != null &&
+        game.moveCount < previous.game.moveCount) {
+      _session = previous.copyWith(
+        game: _withBoard(game, previous.game.board, previous.game.moveCount),
+      );
+      _refreshConnection();
+      return;
+    }
+
     final identity = IdentityService.instance.current;
     _session = identity == null
         ? previous?.copyWith(game: game)
@@ -312,6 +338,7 @@ class OnlineGameController extends ChangeNotifier {
     if (session == null || _submitting) return false;
 
     final confirmed = session.game;
+    if (!GameService.isValidMove(confirmed.board, move)) return false;
     _submitting = true;
 
     try {
@@ -320,7 +347,7 @@ class OnlineGameController extends ChangeNotifier {
       final result = await _service.submitMove(session, move);
 
       if (!result.isSuccess) {
-        _rollback(confirmed);
+        _rollback(_serverGame ?? confirmed);
         _fail(result);
         return false;
       }
@@ -339,7 +366,10 @@ class OnlineGameController extends ChangeNotifier {
     final session = _session;
     if (session == null) return;
 
-    final board = QuoridorEngine.applyMove(session.game.board, move);
+    // The real rules, not the engine's shortcut: that drops the move history
+    // to keep its search cheap, which emptied the move list while a move was
+    // in flight and made every earlier move sound again once it landed.
+    final board = GameService.executeMove(session.game.board, move);
     _pendingLocalMove = true;
     _session = session.copyWith(
       game: _withBoard(session.game, board, session.game.moveCount + 1),
@@ -348,7 +378,7 @@ class OnlineGameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Restores the last board the server confirmed.
+  /// Puts back the server's game in place of a refused move.
   void _rollback(OnlineGame confirmed) {
     _pendingLocalMove = false;
     _session = _session?.copyWith(game: confirmed);

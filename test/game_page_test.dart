@@ -200,6 +200,18 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('messages drop in at the top', (tester) async {
+    await openPage(tester);
+    final toast = tester.getRect(find.byKey(const Key('toast')));
+    final board = tester.getRect(find.byType(GameWidget<QuoridorGame>));
+
+    // Above the board, not over the players under it.
+    expect(toast.top, lessThan(board.top));
+    expect(toast.bottom, lessThan(board.center.dy));
+
+    await finish(tester);
+  });
+
   testWidgets('an unfinished game can be continued after a restart', (
     tester,
   ) async {
