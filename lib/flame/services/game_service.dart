@@ -5,15 +5,53 @@ import '../../flame/models/player.dart';
 import 'ai_service.dart';
 
 class GameService {
-  // Validate if a move is legal
+  /// Whether [move] is legal for the player to move.
+  ///
+  /// A move for any other seat, or after the game has ended, is not: checking
+  /// the mover's own pieces was not enough, because [executeMove] always
+  /// applies a move to whoever is on turn.
   static bool isValidMove(GameState gameState, GameMove move) {
+    if (gameState.isGameOver) return false;
+    if (move.playerId != gameState.currentPlayerId) return false;
+
     final player = gameState.playerById(move.playerId);
 
-    if (move.type == MoveType.pawnMove) {
-      return _isValidPawnMove(gameState, player, move.newPosition!);
-    } else {
-      return _isValidWallPlacement(gameState, player, move.wall!);
+    switch (move.type) {
+      case MoveType.pawnMove:
+        return _isValidPawnMove(gameState, player, move.newPosition!);
+      case MoveType.wallPlace:
+        return _isValidWallPlacement(gameState, player, move.wall!);
+      case MoveType.pass:
+        return mustPass(gameState);
     }
+  }
+
+  /// Whether the player to move has nothing to play but a pass.
+  ///
+  /// True only when their pawn cannot step, jump or slip past anyone and
+  /// they have no wall they could legally place. Walls cannot do this on
+  /// their own -- every player always keeps a route -- but at a table of
+  /// three or four, pawns standing in a narrow passage can.
+  static bool mustPass(GameState gameState) {
+    if (gameState.isGameOver) return false;
+    final player = gameState.currentPlayer;
+    if (gameState.getValidMoves(player.position).isNotEmpty) return false;
+    if (!player.hasWallsRemaining) return true;
+    return !_anyValidWallPlacement(gameState);
+  }
+
+  static bool _anyValidWallPlacement(GameState gameState) {
+    for (int row = 0; row < GameConstants.boardSize; row++) {
+      for (int col = 0; col < GameConstants.boardSize; col++) {
+        for (final orientation in WallOrientation.values) {
+          final wall = Wall(Position(row, col), orientation);
+          if (_isValidWallPlacement(gameState, gameState.currentPlayer, wall)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   // Execute a validated move
@@ -22,15 +60,14 @@ class GameService {
       throw ArgumentError('Invalid move attempted');
     }
 
-    // Create a new game state (immutable approach)
-    final newGameState = gameState.copyWith(updatedAt: DateTime.now());
+    // A new state with its own players: sharing them meant moving the pawn
+    // here moved it in the state passed in as well.
+    final newGameState = gameState.copyWith(
+      updatedAt: DateTime.now(),
+      clonePlayers: true,
+    );
 
-    // Execute the move
-    if (move.type == MoveType.pawnMove) {
-      newGameState.movePawn(move.newPosition!);
-    } else {
-      newGameState.addWall(move.wall!);
-    }
+    newGameState.apply(move);
 
     // Add move to history
     newGameState.addMoveToHistory(move);
@@ -65,6 +102,10 @@ class GameService {
       }
     }
 
+    if (validMoves.isEmpty && !gameState.isGameOver) {
+      validMoves.add(GameMove.pass(currentPlayer.id));
+    }
+
     return validMoves;
   }
 
@@ -90,20 +131,6 @@ class GameService {
     }
 
     return gameState;
-  }
-
-  // Analyze game state for UI feedback
-  static GameAnalysis analyzeGameState(GameState gameState) {
-    final pathLengths = Pathfinding.calculatePathLengths(gameState);
-    final validMoves = getValidMoves(gameState);
-
-    return GameAnalysis(
-      playerPathLengths: pathLengths,
-      validMoves: validMoves,
-      gamePhase: _determineGamePhase(gameState),
-      winner: gameState.winner,
-      isGameOver: gameState.isGameOver,
-    );
   }
 
   // Private helper methods
@@ -152,19 +179,7 @@ class GameService {
 
     // A wall may never seal anyone off from their goal. Every seat is
     // checked, so a four-player game cannot shut out the third or fourth.
-    final tempGameState = _createTempGameStateWithWall(gameState, wall);
-
-    final sealsSomeoneIn = tempGameState.players.any(
-      (player) =>
-          Pathfinding.findShortestPath(
-            tempGameState,
-            player.position,
-            player.goal,
-          ) ==
-          null,
-    );
-
-    if (sealsSomeoneIn) {
+    if (Pathfinding.wouldWallBlockAllPaths(gameState, wall)) {
       return const WallPlacementResult(WallRejection.blocksPlayer);
     }
 
@@ -192,10 +207,6 @@ class GameService {
         col <= GameConstants.boardSize - 1 &&
         row >= 0 &&
         row <= GameConstants.boardSize - 2;
-  }
-
-  static GameState _createTempGameStateWithWall(GameState original, Wall wall) {
-    return original.copyWith(walls: [...original.walls, wall]);
   }
 
   static List<Wall> _getValidWallPlacements(GameState gameState) {
@@ -263,39 +274,7 @@ class GameService {
     return horizontal.position.row == vertical.position.row + 1 &&
         horizontal.position.col + 1 == vertical.position.col;
   }
-
-  static GamePhase _determineGamePhase(GameState gameState) {
-    final totalMoves = gameState.moveHistory.length;
-    final wallsPlaced = gameState.walls.length;
-
-    if (totalMoves < 6 && wallsPlaced < 2) {
-      return GamePhase.opening;
-    } else if (wallsPlaced < 12 && totalMoves < 25) {
-      return GamePhase.midgame;
-    } else {
-      return GamePhase.endgame;
-    }
-  }
 }
-
-// Data classes for game analysis
-class GameAnalysis {
-  final Map<int, int> playerPathLengths;
-  final List<GameMove> validMoves;
-  final GamePhase gamePhase;
-  final String? winner;
-  final bool isGameOver;
-
-  GameAnalysis({
-    required this.playerPathLengths,
-    required this.validMoves,
-    required this.gamePhase,
-    this.winner,
-    required this.isGameOver,
-  });
-}
-
-enum GamePhase { opening, midgame, endgame }
 
 /// Why a wall placement was refused.
 enum WallRejection {
@@ -331,51 +310,5 @@ class WallPlacementResult {
       case WallRejection.blocksPlayer:
         return 'This would leave a player with no way to their goal';
     }
-  }
-}
-
-// Utility class for game creation and management
-class GameManager {
-  static GameState createNewGame({
-    String player1Name = 'Player 1',
-    String player2Name = 'AI',
-    bool enableAI = true,
-    AIDifficulty aiDifficulty = AIDifficulty.medium,
-  }) {
-    return GameStateFactory.createNewGame(
-      player1Name: player1Name,
-      player2Name: player2Name,
-      player2IsAI: enableAI,
-    );
-  }
-
-  static Future<GameState> processPlayerMove(
-    GameState gameState,
-    GameMove move, {
-    AIDifficulty aiDifficulty = AIDifficulty.medium,
-  }) async {
-    // Execute player move
-    var newGameState = GameService.executeMove(gameState, move);
-
-    // Execute AI turn if next player is AI
-    if (!newGameState.isGameOver && newGameState.currentPlayer.isAI) {
-      newGameState = await GameService.executeAITurn(
-        newGameState,
-        aiDifficulty,
-      );
-    }
-
-    return newGameState;
-  }
-
-  static bool canPlayerMove(GameState gameState, int playerId) {
-    return gameState.currentPlayerId == playerId && !gameState.isGameOver;
-  }
-
-  static List<Position> getValidMovesForPosition(
-    GameState gameState,
-    Position position,
-  ) {
-    return gameState.getValidMoves(position);
   }
 }

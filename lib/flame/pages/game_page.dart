@@ -15,15 +15,15 @@ import '../../flame/services/turn_clock.dart';
 import '../services/update/update_service.dart';
 import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
+import '../../flame/models/move_notation.dart';
 import '../../flame/models/player.dart';
 import '../../flame/services/ai_service.dart';
 import '../../flame/services/firebase_service.dart';
+import '../../flame/services/saved_game_service.dart';
 import '../../theme.dart';
 
 class GamePage extends StatefulWidget {
-  final GameState? initialGameState;
-
-  const GamePage({super.key, this.initialGameState});
+  const GamePage({super.key});
 
   @override
   State<GamePage> createState() => _GamePageState();
@@ -68,22 +68,57 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       duration: const Duration(seconds: 3),
     );
 
-    // Show game mode selection after the widget is built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showGameModeSelection();
+    // Show game mode selection after the widget is built, with the game
+    // left unfinished last time already on the board behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _whenBoardLoaded();
+      await _restoreSavedGame();
+      if (mounted) _showGameModeSelection();
     });
   }
+
+  /// Shows the strip under the board once the board exists.
+  ///
+  /// It used to wait for the first change of game state, and picking "Play
+  /// vs AI" on a fresh launch keeps the board already loaded rather than
+  /// changing it, so the players stayed hidden until somebody moved.
+  Future<void> _whenBoardLoaded() async {
+    try {
+      await _game.loaded.timeout(const Duration(seconds: 2));
+    } on TimeoutException {
+      return;
+    }
+    if (!mounted) return;
+    isInitializedProvider.value = true;
+    setState(() {});
+  }
+
+  /// Puts back the local game the app was closed in the middle of.
+  Future<void> _restoreSavedGame() async {
+    // Storage that never answers must not keep the mode sheet away.
+    final saved = await SavedGameService.instance.load().timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => null,
+    );
+    if (saved == null || !mounted) return;
+
+    if (!mounted || _isOnline || !_game.isInitialized) return;
+    _game.updateGameState(saved);
+  }
+
+  /// Whether the board holds a local game worth going back to.
+  bool get _canContinue =>
+      _game.isInitialized &&
+      !_isOnline &&
+      !_game.gameState.isGameOver &&
+      _game.gameState.moveHistory.isNotEmpty;
 
   void _initializeGame() {
     _game = QuoridorGame();
 
-    if (widget.initialGameState != null) {
-      _game.updateGameState(widget.initialGameState!);
-    }
-
     _game.onGameStateChanged = _handleGameStateChanged;
-    _game.onGameMessage = _showGameMessage;
     _game.onGameWon = _showConfetti;
+    _game.onTurnPassed = _handleTurnPassed;
     _game.onInteractionChanged = () {
       if (mounted) setState(() {});
     };
@@ -127,6 +162,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _clock.beginTurn(
       '${state.gameId}:${state.moveHistory.length}:${state.currentPlayerId}',
+    );
+  }
+
+  void _handleTurnPassed(int seat) {
+    if (!mounted || !_game.isInitialized) return;
+    final player = _game.gameState.playerById(seat);
+    _showGameMessage(
+      context.l10n.turnPassed(_labelFor(player, _online?.localPlayerId)),
     );
   }
 
@@ -194,7 +237,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void _handleOnlineChanged() {
     if (!mounted) return;
 
-    final message = _online?.message;
+    // A rematch can seat this device differently from the game before it.
+    final online = _online;
+    if (online != null && online.localPlayerId != _game.localPlayerId) {
+      _game.localPlayerId = online.localPlayerId;
+      _game.viewTurns = viewTurnsForSeat(online.localPlayerId);
+    }
+
+    final message = online == null ? null : context.l10n.onlineNotice(online);
     if (message != null) {
       _showGameMessage(message);
       _online?.consumeMessage();
@@ -205,7 +255,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _handleOnlineGameOver(bool didWin) {
     if (!mounted) return;
-    if (didWin) _showConfetti();
+    if (didWin) _showConfetti(offerReplay: false);
     _showGameMessage(didWin ? context.l10n.youWin : context.l10n.opponentWins);
   }
 
@@ -239,6 +289,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       FirebaseService.updateGame(gameState);
     }
 
+    // Local games are kept so closing the app does not lose them; an online
+    // game is the server's to keep.
+    if (!_isOnline) unawaited(SavedGameService.instance.save(gameState));
+
     isInitializedProvider.value = true;
     _syncClock();
     setState(() {});
@@ -263,8 +317,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     });
   }
 
-  void _showConfetti() {
+  /// Celebrates a win, then offers another game.
+  ///
+  /// Online there is no "play again" to offer: a new game there means leaving
+  /// this one, which the menu already does.
+  void _showConfetti({bool offerReplay = true}) {
     _confettiController.play();
+    if (!offerReplay) return;
     // Show replay dialog after confetti animation
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
@@ -286,7 +345,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               size: 28,
             ),
             const SizedBox(width: 12),
-            Text(context.l10n.gameOverTitle),
+            // Wraps rather than overflowing when the title runs long.
+            Flexible(child: Text(context.l10n.gameOverTitle)),
           ],
         ),
         content: Column(
@@ -294,7 +354,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              context.l10n.nameWins('${_game.gameState.winner}'),
+              context.l10n.nameWins(_winnerLabel),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.bold,
@@ -387,6 +447,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _togglePlayerMode() {
     _game.togglePlayerMode();
+    _showGameMessage(
+      _game.gameState.player2.isAI
+          ? context.l10n.switchedToAI
+          : context.l10n.switchedToTwoPlayers,
+    );
     closeMenu();
   }
 
@@ -408,6 +473,99 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _showGameMessage(gameId != null ? saved : failed);
     closeMenu();
+  }
+
+  void _undo() {
+    _game.clearInteraction();
+    _game.undo();
+    setState(() {});
+  }
+
+  /// Every move of the game so far, newest at the bottom.
+  void _showMoveHistory() {
+    final state = _game.gameState;
+    final localSeat = _online?.localPlayerId;
+
+    _whileMenuOpen(
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        builder: (context) {
+          final theme = Theme.of(context);
+          final moves = state.moveHistory;
+          return SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  child: Text(
+                    context.l10n.moveHistory,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (moves.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      context.l10n.noMovesYet,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      reverse: true,
+                      itemCount: moves.length,
+                      itemBuilder: (context, index) {
+                        final number = moves.length - index;
+                        final move = moves[number - 1];
+                        final player = state.playerById(move.playerId);
+                        return ListTile(
+                          dense: true,
+                          leading: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: _seatColor(move.playerId),
+                            child: Text(
+                              '$number',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(_labelFor(player, localSeat)),
+                          trailing: Text(
+                            MoveNotation.of(move) ?? context.l10n.passed,
+                            // Squares are written in Latin letters either
+                            // way, and read left to right.
+                            textDirection: TextDirection.ltr,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showGameInfo() {
@@ -480,6 +638,21 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   shrinkWrap: true,
                   children: [
+                    if (_canContinue) ...[
+                      _buildModeCard(
+                        icon: Icons.play_arrow_rounded,
+                        title: context.l10n.continueGame,
+                        subtitle: context.l10n.movesPlayed(
+                          _game.gameState.moveHistory.length,
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _syncClock();
+                          setState(() {});
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     _buildModeCard(
                       icon: Icons.computer,
                       title: context.l10n.playVsAI,
@@ -488,8 +661,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         _detachOnline(abandon: true);
                         // Coming back from a four-player game has to put the
                         // board back to two, not just swap in the computer.
+                        // A game under way is left through "Continue", so
+                        // this always means a fresh one.
                         if (_game.gameState.playerCount != 2 ||
-                            !_game.gameState.player2.isAI) {
+                            !_game.gameState.player2.isAI ||
+                            _game.gameState.moveHistory.isNotEmpty) {
                           _game.startGame(playerCount: 2, againstAI: true);
                         }
                         Navigator.pop(context);
@@ -497,6 +673,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                         setState(() {});
                         _showGameMessage(context.l10n.aiModeActivated);
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildModeCard(
+                      icon: Icons.smart_toy_outlined,
+                      title: context.l10n.playVsAIs,
+                      subtitle: context.l10n.playVsAIsSubtitle,
+                      onTap: _startGameAgainstSeveralAIs,
                     ),
                     const SizedBox(height: 16),
                     _buildModeCard(
@@ -540,6 +723,34 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   /// Starts a hotseat game for [playerCount] on this device.
+  /// Asks how many computers to play, then starts that table.
+  Future<void> _startGameAgainstSeveralAIs() async {
+    final opponents = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(context.l10n.howManyAIs),
+        children: [
+          for (final n in const [2, 3])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, n),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(context.l10n.aiOpponents(n)),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (opponents == null || !mounted) return;
+
+    _detachOnline(abandon: true);
+    _game.startGame(playerCount: opponents + 1, againstAI: true);
+    Navigator.pop(context);
+    _syncClock();
+    setState(() {});
+    _showGameMessage(context.l10n.aiModeActivated);
+  }
+
   void _startLocalGame(int playerCount) {
     _detachOnline(abandon: true);
     _game.startGame(playerCount: playerCount, againstAI: false);
@@ -723,7 +934,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                               context.l10n.saveGameSubtitle,
                               _saveGame,
                             ),
-                            if (_game.isInitialized)
+                            if (_game.canTogglePlayerMode)
                               _buildMenuItem(
                                 Icons.people,
                                 context.l10n.togglePlayerMode,
@@ -859,19 +1070,30 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     return _buildStatusLine();
                   },
                 ),
-                if (_showMessage)
-                  AnimatedBuilder(
-                    animation: _messageController,
-                    builder: (context, child) {
-                      return Opacity(
-                        opacity: _messageController.value,
-                        child: _buildMessageToast(),
-                      );
-                    },
-                  ),
               ],
             ),
           ),
+          // Floats over the strip rather than taking a place in the column:
+          // in the column it shrank and moved the board while it showed, so
+          // a tap in that moment landed on the wrong square. Taps go through
+          // it to whatever is underneath.
+          if (_showMessage)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 20,
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _messageController,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _messageController.value,
+                      child: _buildMessageToast(),
+                    );
+                  },
+                ),
+              ),
+            ),
           Align(
             alignment: Alignment.topCenter,
             child: ConfettiWidget(
@@ -976,6 +1198,24 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             ),
           ),
         ),
+
+        if (_game.isInitialized && !_isOnline)
+          IconButton(
+            key: const Key('undo'),
+            tooltip: context.l10n.undo,
+            onPressed: _game.canUndo ? _undo : null,
+            icon: const Icon(Icons.undo_rounded),
+          ),
+
+        if (_game.isInitialized)
+          IconButton(
+            key: const Key('moveHistory'),
+            tooltip: context.l10n.moveHistory,
+            onPressed: _showMoveHistory,
+            icon: const Icon(Icons.format_list_numbered_rounded),
+          ),
+
+        const SizedBox(width: 4),
 
         // Game Info Button
         IconButton(
@@ -1280,9 +1520,27 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         text = context.l10n.lostContact;
 
       case OnlineConnectionState.ended:
-        color = scheme.onSurface.withValues(alpha: 0.7);
-        icon = Icons.flag_rounded;
-        text = context.l10n.gameOverShort;
+        final offer = online.rematchOffer;
+        color = offer != null
+            ? scheme.primary
+            : scheme.onSurface.withValues(alpha: 0.7);
+        icon = offer != null ? Icons.replay_rounded : Icons.flag_rounded;
+        text = offer != null
+            ? context.l10n.rematchOffered(
+                online.game?.players[offer.by]?.displayName ??
+                    context.l10n.opponent,
+              )
+            : context.l10n.gameOverShort;
+        if (online.canRematch || online.isRematching) {
+          action = TextButton.icon(
+            key: const Key('rematch'),
+            onPressed: online.canRematch ? _requestRematch : null,
+            icon: const Icon(Icons.replay_rounded, size: 16),
+            label: Text(
+              offer != null ? context.l10n.joinRematch : context.l10n.rematch,
+            ),
+          );
+        }
 
       case OnlineConnectionState.live:
         final yourTurn = online.isLocalTurn;
@@ -1321,6 +1579,23 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           if (action != null) action,
         ],
       ),
+    );
+  }
+
+  /// Starts or joins the rematch, and moves the board over to it.
+  Future<void> _requestRematch() async {
+    final online = _online;
+    if (online == null) return;
+
+    final joined = await online.requestRematch();
+    if (!mounted || !joined) return;
+
+    _syncClock();
+    setState(() {});
+    _showGameMessage(
+      online.connection == OnlineConnectionState.waitingForOpponent
+          ? context.l10n.shareCodeToInvite(online.roomCode ?? '')
+          : context.l10n.connectedGoodLuck,
     );
   }
 
@@ -1390,6 +1665,14 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     return Row(children: pills);
   }
 
+  /// The winner as the board names them: "AI" and "Player 2" are stored in
+  /// English, so they are never shown as they are.
+  String get _winnerLabel {
+    final id = _game.gameState.winnerId;
+    if (id == null) return '';
+    return _labelFor(_game.gameState.playerById(id), _online?.localPlayerId);
+  }
+
   /// What to call a seat: you, the person you are playing, or its number.
   String _labelFor(Player player, int? localSeat) {
     if (localSeat != null) {
@@ -1398,7 +1681,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           context.l10n.opponent;
     }
 
-    if (player.isAI) return context.l10n.ai;
+    if (player.isAI) {
+      // One computer is "AI"; several are told apart by their seat.
+      final computers = _game.gameState.players.where((p) => p.isAI).length;
+      return computers > 1 ? context.l10n.aiN(player.id) : context.l10n.ai;
+    }
     return context.l10n.playerN(player.id);
   }
 

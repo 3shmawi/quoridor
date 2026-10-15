@@ -68,7 +68,8 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
     if (!ok) {
       setState(() {
         _busy = false;
-        _error = controller.message ?? context.l10n.couldNotStart;
+        _error =
+            context.l10n.onlineNotice(controller) ?? context.l10n.couldNotStart;
       });
       controller.dispose();
       return;

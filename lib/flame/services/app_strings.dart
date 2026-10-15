@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'game_service.dart';
+import 'online/online_game_controller.dart';
 import 'online/online_game_service.dart';
 import 'settings_service.dart';
 
@@ -169,6 +170,11 @@ class AppStrings {
   String get switchedToAI => _get('switchedToAI');
   String get switchedToTwoPlayers => _get('switchedToTwoPlayers');
   String get aiModeActivated => _get('aiModeActivated');
+  String get playVsAIs => _get('playVsAIs');
+  String get playVsAIsSubtitle => _get('playVsAIsSubtitle');
+  String get howManyAIs => _get('howManyAIs');
+  String aiOpponents(int n) => _fill('aiOpponents', '$n');
+  String aiN(int n) => _fill('aiN', '$n');
   String get twoPlayerModeActivated => _get('twoPlayerModeActivated');
   String get signInToSave => _get('signInToSave');
   String get gameSaved => _get('gameSaved');
@@ -178,6 +184,16 @@ class AppStrings {
   String get noWallsRemaining => _get('noWallsRemaining');
   String get invalidWallPlacement => _get('invalidWallPlacement');
   String get aiPlayedTheirMove => _get('aiPlayedTheirMove');
+  String turnPassed(String name) => _fill('turnPassed', name);
+  String get undo => _get('undo');
+  String get continueGame => _get('continueGame');
+  String get rematch => _get('rematch');
+  String get joinRematch => _get('joinRematch');
+  String rematchOffered(String name) => _fill('rematchOffered', name);
+  String movesPlayed(int n) => _fill('movesPlayed', '$n');
+  String get moveHistory => _get('moveHistory');
+  String get noMovesYet => _get('noMovesYet');
+  String get passed => _get('passed');
 
   // --- Game over ---------------------------------------------------------
   String get gameOverTitle => _get('gameOverTitle');
@@ -305,7 +321,7 @@ class AppStrings {
     'saveGame': 'Save Game',
     'saveGameSubtitle': 'Save current progress',
     'togglePlayerMode': 'Toggle Player Mode',
-    'switchToTwoPlayers': 'Switch to 2 players',
+    'switchToTwoPlayers': 'Switch to human players',
     'switchToAI': 'Switch to AI',
     'displayOptions': 'Display Options',
     'showValidMoves': 'Show Valid Moves',
@@ -339,8 +355,13 @@ class AppStrings {
     'soundOff': 'Sound off',
     'difficultySetTo': 'Difficulty: %s',
     'switchedToAI': 'Switched to AI opponent',
-    'switchedToTwoPlayers': 'Switched to human opponent',
+    'switchedToTwoPlayers': 'Switched to human players',
     'aiModeActivated': 'Playing against AI',
+    'playVsAIs': 'Play vs 2 or 3 AIs',
+    'playVsAIsSubtitle': 'A crowded board, every rival the computer',
+    'howManyAIs': 'How many computer opponents?',
+    'aiOpponents': '%s computer opponents',
+    'aiN': 'AI %s',
     'twoPlayerModeActivated': 'Two player mode activated',
     'signInToSave': 'Please sign in to save game',
     'gameSaved': 'Game saved successfully!',
@@ -350,6 +371,16 @@ class AppStrings {
     'noWallsRemaining': 'No walls remaining!',
     'invalidWallPlacement': 'Invalid wall placement!',
     'aiPlayedTheirMove': 'AI played their move',
+    'turnPassed': '%s: no move possible, the turn passes',
+    'undo': 'Undo',
+    'continueGame': 'Continue game',
+    'rematch': 'Rematch',
+    'joinRematch': 'Join',
+    'rematchOffered': '%s wants a rematch',
+    'movesPlayed': 'Pick up where you left off, %s moves in',
+    'moveHistory': 'Moves',
+    'noMovesYet': 'No moves yet',
+    'passed': 'passed',
 
     'gameOverTitle': 'Game Over!',
     'nameWins': '%s wins!',
@@ -472,7 +503,7 @@ class AppStrings {
     'saveGame': 'حفظ اللعبة',
     'saveGameSubtitle': 'احفظ التقدم الحالي',
     'togglePlayerMode': 'تبديل وضع اللاعب',
-    'switchToTwoPlayers': 'التبديل للاعبين',
+    'switchToTwoPlayers': 'التبديل للاعيبة',
     'switchToAI': 'التبديل للكمبيوتر',
     'displayOptions': 'خيارات العرض',
     'showValidMoves': 'إظهار النقلات المتاحة',
@@ -506,8 +537,13 @@ class AppStrings {
     'soundOff': 'الصوت مقفول',
     'difficultySetTo': 'المستوى: %s',
     'switchedToAI': 'اتحولت للعب ضد الكمبيوتر',
-    'switchedToTwoPlayers': 'اتحولت للعب مع صديق',
+    'switchedToTwoPlayers': 'اتحولت للعب مع أصحابك',
     'aiModeActivated': 'اللعب ضد الكمبيوتر',
+    'playVsAIs': 'ضد 2 أو 3 كمبيوتر',
+    'playVsAIsSubtitle': 'لوحة زحمة، وكل منافسينك كمبيوتر',
+    'howManyAIs': 'كام منافس كمبيوتر؟',
+    'aiOpponents': '%s منافسين كمبيوتر',
+    'aiN': 'الكمبيوتر %s',
     'twoPlayerModeActivated': 'وضع اللاعبين اتفعّل',
     'signInToSave': 'سجّل الدخول عشان تحفظ اللعبة',
     'gameSaved': 'تم حفظ اللعبة',
@@ -517,6 +553,16 @@ class AppStrings {
     'noWallsRemaining': 'مفيش حواجز متبقية!',
     'invalidWallPlacement': 'مكان الحاجز غير متاح!',
     'aiPlayedTheirMove': 'الكمبيوتر لعب',
+    'turnPassed': '%s: مفيش نقلة متاحة، الدور عدّى',
+    'undo': 'تراجع',
+    'continueGame': 'كمّل اللعبة',
+    'rematch': 'ماتش تاني',
+    'joinRematch': 'ادخل',
+    'rematchOffered': '%s عايز ماتش تاني',
+    'movesPlayed': 'كمّل من مكان ما وقفت، بعد %s نقلة',
+    'moveHistory': 'النقلات',
+    'noMovesYet': 'لسه مفيش نقلات',
+    'passed': 'عدّى الدور',
 
     'gameOverTitle': 'انتهت اللعبة!',
     'nameWins': '%s كسب!',
@@ -559,6 +605,12 @@ extension WallRejectionText on AppStrings {
       case WallRejection.blocksPlayer:
         return wallBlocksPlayer;
     }
+  }
+
+  /// What [controller] has to tell the player, in their language.
+  String? onlineNotice(OnlineGameController controller) {
+    final failure = controller.failure;
+    return failure == null ? controller.message : onlineFailure(failure);
   }
 
   /// The player-facing reason an online action did not go through.

@@ -87,3 +87,50 @@ jobs:
           --only firestore
           --project quoridor-rules-test
           "cd test/rules && npm test"
+
+  # On main, once both suites have passed, the tested rules go live. Rules
+  # deployed by hand drifted from the app: a merge that tightened them was
+  # only enforced whenever somebody remembered to deploy.
+  deploy-rules:
+    name: Deploy Firestore rules
+    needs: [check, rules]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Two merges in quick succession deploy one after the other, never side
+    # by side.
+    concurrency:
+      group: deploy-firestore-rules
+      cancel-in-progress: false
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      # Without the key there is nothing to deploy with. A forked or fresh
+      # copy of the repo should not go red over it, so say so and stop.
+      - name: Say why nothing was deployed
+        if: env.HAS_KEY != 'true'
+        run: |
+          echo "::warning::FIREBASE_SERVICE_ACCOUNT_JSON is not set, so the Firestore rules were not deployed. Add it with tool/setup_secrets.sh, or deploy by hand: firebase deploy --only firestore:rules --project quoridor-290f6"
+
+      - uses: actions/checkout@v5
+        if: env.HAS_KEY == 'true'
+
+      - uses: google-github-actions/auth@v2
+        if: env.HAS_KEY == 'true'
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
+      - uses: actions/setup-node@v5
+        if: env.HAS_KEY == 'true'
+        with:
+          node-version: 20
+
+      # The same firebase-tools the rules were just tested with. Unchanged
+      # rules are left as they are, so a merge that does not touch them
+      # deploys nothing.
+      - name: Deploy the rules
+        if: env.HAS_KEY == 'true'
+        run: >
+          npx --yes firebase-tools@13 deploy
+          --only firestore:rules
+          --project quoridor-290f6
+          --non-interactive

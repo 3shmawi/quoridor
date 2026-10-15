@@ -2,14 +2,16 @@ rules_version = '2';
 
 // Security Rules for online Quoridor games.
 //
-// These rules enforce *structure and turn order*, not the rules of Quoridor.
-// Whether a wall leaves an opponent a path is a pathfinding question and is
-// not expressible here; that check lives in GameService, runs on the
-// submitting client and again on the receiving one, and moves to a Cloud
-// Function in a later phase. What these rules do guarantee is that only a
-// game's own players can read or write it, that a player can only move on
-// their own turn, that the move counter advances exactly one step at a time,
-// and that recorded moves are never altered after the fact.
+// These rules enforce structure, turn order, and as much of Quoridor as can
+// be said without pathfinding. Whether a wall leaves somebody a route, or
+// whether a step runs through a wall, needs a search and is not expressible
+// here; that check lives in GameService and runs on the submitting client.
+// What these rules do guarantee is that only a game's own players can read
+// or write it, that a player can only move on their own turn and only their
+// own pawn or wall supply, that a step covers at most two squares, that a
+// wall costs one and lands on the board, that walls and history only ever
+// grow, that the turn passes to the next seat, that only a pawn on its goal
+// edge can end the game, and that recorded moves are never altered.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -110,7 +112,127 @@ service cloud.firestore {
           && incoming().players == existing().players
           && playerCountOf(incoming()) == playerCountOf(existing())
           && incoming().roomCode == existing().roomCode
-          && incoming().status in ['active', 'finished'];
+          && incoming().status in ['active', 'finished']
+          && isLegalBoardStep(existing().board, incoming().board,
+               existing().currentPlayerId, playerCountOf(existing()));
+      }
+
+      // --- The board -------------------------------------------------------
+      //
+      // A board is GameState.toJson: `players` in seat order, `walls`,
+      // `moveHistory`, `currentPlayerId` and `status` (a GameStatus index).
+
+      // Whether [p] stands on its goal edge (GoalEdge.contains).
+      function atGoal(p) {
+        return (p.goal == 'top' && p.position.row == 0)
+          || (p.goal == 'bottom' && p.position.row == 8)
+          || (p.goal == 'left' && p.position.col == 0)
+          || (p.goal == 'right' && p.position.col == 8);
+      }
+
+      // GameStatus.wonBy(seat).index: seats three and four were appended
+      // after `draw`, so they skip an index.
+      function wonStatus(seat) {
+        return seat == 1 ? 1 : (seat == 2 ? 2 : (seat == 3 ? 4 : 5));
+      }
+
+      // Seat [seat]'s entry, unchanged, when it is not the mover's.
+      function untouched(b0, b1, n, me, seat) {
+        return n < seat || me == seat
+          || b1.players[seat - 1] == b0.players[seat - 1];
+      }
+
+      // Whether [pos] is free of every pawn but the mover's.
+      function unoccupied(b1, n, me, pos) {
+        return (me == 1 || b1.players[0].position != pos)
+          && (me == 2 || b1.players[1].position != pos)
+          && (n < 3 || me == 3 || b1.players[2].position != pos)
+          && (n < 4 || me == 4 || b1.players[3].position != pos);
+      }
+
+      function onBoard(pos) {
+        return pos.row >= 0 && pos.row <= 8 && pos.col >= 0 && pos.col <= 8;
+      }
+
+      // A pawn step covers one square, or two when jumping straight over a
+      // pawn or round one diagonally. Walls in the way are the client's to
+      // check.
+      function isPawnStep(b0, b1, n, me, p0, p1, last) {
+        let dr = math.abs(p1.position.row - p0.position.row);
+        let dc = math.abs(p1.position.col - p0.position.col);
+        return b1.walls.size() == b0.walls.size()
+          && p1.wallsRemaining == p0.wallsRemaining
+          && last.newPosition == p1.position
+          && onBoard(p1.position)
+          && dr + dc >= 1 && dr + dc <= 2
+          && unoccupied(b1, n, me, p1.position);
+      }
+
+      // GameService.isWallInBounds.
+      function wallInBounds(w) {
+        return (w.orientation == 0
+            && w.position.row >= 1 && w.position.row <= 8
+            && w.position.col >= 0 && w.position.col <= 7)
+          || (w.orientation == 1
+            && w.position.row >= 0 && w.position.row <= 7
+            && w.position.col >= 1 && w.position.col <= 8);
+      }
+
+      // One wall spent and one wall added, where the move says it went.
+      // Overlaps, crossings and sealing anyone in are the client's to check;
+      // an exact repeat of a placed wall is refused here.
+      function isWallPlacement(b0, b1, p0, p1, last) {
+        let placed = b1.walls[b1.walls.size() - 1];
+        return b1.walls.size() == b0.walls.size() + 1
+          && p0.wallsRemaining > 0
+          && p1.wallsRemaining == p0.wallsRemaining - 1
+          && p1.position == p0.position
+          && last.wall == placed
+          && wallInBounds(placed)
+          && !b0.walls.hasAny([placed]);
+      }
+
+      // A pass changes nothing on the board.
+      function isPass(b0, b1, p0, p1) {
+        return b1.walls.size() == b0.walls.size() && p1 == p0;
+      }
+
+      // The board after the mover's move, compared with the one before.
+      function isLegalBoardStep(b0, b1, me, n) {
+        let p0 = b0.players[me - 1];
+        let p1 = b1.players[me - 1];
+        let last = b1.moveHistory[b1.moveHistory.size() - 1];
+        let finished = incoming().status == 'finished';
+        return b1.gameId == b0.gameId
+          && b0.players.size() == n
+          && b1.players.size() == n
+          // History and walls only grow, by exactly this move.
+          && b1.moveHistory.size() == b0.moveHistory.size() + 1
+          && b1.moveHistory.hasAll(b0.moveHistory)
+          && b1.walls.hasAll(b0.walls)
+          && last.playerId == me
+          // Nobody else's pawn or walls change, and the mover keeps who
+          // they are.
+          && untouched(b0, b1, n, me, 1)
+          && untouched(b0, b1, n, me, 2)
+          && untouched(b0, b1, n, me, 3)
+          && untouched(b0, b1, n, me, 4)
+          && p1.diff(p0).affectedKeys().hasOnly(['position', 'wallsRemaining'])
+          && ((last.type == 0 && isPawnStep(b0, b1, n, me, p0, p1, last))
+            || (last.type == 1 && isWallPlacement(b0, b1, p0, p1, last))
+            || (last.type == 2 && isPass(b0, b1, p0, p1)))
+          // The game ends exactly when the mover reaches their goal, and
+          // otherwise the turn goes to the next seat.
+          && b1.currentPlayerId == incoming().currentPlayerId
+          && (finished
+            ? (atGoal(p1)
+              && incoming().currentPlayerId == me
+              && b1.status == wonStatus(me)
+              && incoming().outcome.winner == me)
+            : (!atGoal(p1)
+              && incoming().currentPlayerId == me % n + 1
+              && b1.status == 0
+              && !incoming().keys().hasAny(['outcome'])));
       }
 
       // Heartbeat: a player may refresh their own presence and nothing else.
@@ -133,6 +255,22 @@ service cloud.firestore {
              == request.auth.uid;
       }
 
+      // Once a game is over, one of its players may link a rematch from it,
+      // once: a game they have just created and sit first in.
+      function isValidRematchLink() {
+        let link = incoming().rematch;
+        let created = get(/databases/$(database)/documents/games/$(link.gameId)).data;
+        return isPlayer(existing())
+          && existing().status in ['finished', 'abandoned']
+          && !existing().keys().hasAny(['rematch'])
+          && incoming().diff(existing()).affectedKeys().hasOnly(['rematch', 'updatedAt'])
+          && link.keys().hasOnly(['gameId', 'roomCode', 'by'])
+          && link.by == seatOf(existing(), request.auth.uid)
+          && link.roomCode == created.roomCode
+          && created.status == 'waiting'
+          && sitsIn(created, '1', request.auth.uid);
+      }
+
       // Any player may abandon a game they are in.
       function isValidAbandon() {
         return isPlayer(existing())
@@ -153,17 +291,28 @@ service cloud.firestore {
       allow update: if isValidJoin()
                     || isValidMove()
                     || isValidPresenceUpdate()
-                    || isValidAbandon();
+                    || isValidAbandon()
+                    || isValidRematchLink();
 
       // Games are never deleted by clients; cleanup is a scheduled job.
       allow delete: if false;
 
       match /moves/{moveId} {
+        function game() {
+          return get(/databases/$(database)/documents/games/$(gameId)).data;
+        }
+
         // Moves are an append-only log. Once written, a move is the record of
-        // what happened and may not be edited or removed.
-        allow read: if isPlayer(get(/databases/$(database)/documents/games/$(gameId)).data);
-        allow create: if signedIn()
-                      && request.resource.data.submittedBy == request.auth.uid;
+        // what happened and may not be edited or removed. Only the player on
+        // turn may append, as themselves, at the index the game is on.
+        allow read: if isPlayer(game());
+        allow create: if isPlayer(game())
+                      && request.resource.data.submittedBy == request.auth.uid
+                      && request.resource.data.playerId
+                         == seatOf(game(), request.auth.uid)
+                      && game().currentPlayerId
+                         == seatOf(game(), request.auth.uid)
+                      && int(moveId) == game().moveCount;
         allow update, delete: if false;
       }
     }

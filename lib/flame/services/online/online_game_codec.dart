@@ -98,6 +98,28 @@ class OnlineGameCodec {
     return data;
   }
 
+  /// The fields written when [link] is offered on a finished game.
+  static Map<String, dynamic> encodeRematch({
+    required RematchLink link,
+    required Object timestamp,
+  }) => {
+    'rematch': {
+      'gameId': link.gameId,
+      'roomCode': link.roomCode,
+      'by': link.by,
+    },
+    'updatedAt': timestamp,
+  };
+
+  static RematchLink? decodeRematch(Object? data) {
+    if (data is! Map) return null;
+    final gameId = data['gameId'];
+    final roomCode = data['roomCode'];
+    final by = data['by'];
+    if (gameId is! String || roomCode is! String || by is! int) return null;
+    return RematchLink(gameId: gameId, roomCode: roomCode, by: by);
+  }
+
   static Map<String, dynamic> encodePlayer(OnlinePlayer player) => {
     'uid': player.uid,
     'displayName': player.displayName,
@@ -148,6 +170,7 @@ class OnlineGameCodec {
       winnerPlayerId: outcome?['winner'] as int?,
       outcomeReason: _decodeReason(outcome?['reason'] as String?),
       updatedAt: _decodeTime(data['updatedAt']),
+      rematch: decodeRematch(data['rematch']),
     );
   }
 

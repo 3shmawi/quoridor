@@ -12,11 +12,18 @@ import '../models/game_state.dart';
 import '../services/ai/quoridor_engine.dart';
 import '../services/ai_service.dart';
 import '../services/game_service.dart';
+import '../services/settings_service.dart';
 
 final isInitializedProvider = ValueNotifier(false);
 
 class QuoridorGame extends FlameGame
     with TapCallbacks, HasKeyboardHandlerComponents, HoverCallbacks {
+  /// [difficulty] defaults to the one saved in settings. It used to default
+  /// to medium, so after a restart the menu showed the saved choice while the
+  /// computer quietly played medium until the player picked it again.
+  QuoridorGame({AIDifficulty? difficulty})
+    : _difficulty = difficulty ?? SettingsService.instance.difficulty.value;
+
   GameState? _gameState;
   late BoardComponent _boardComponent;
   bool _isInitialized = false;
@@ -30,7 +37,7 @@ class QuoridorGame extends FlameGame
   int _soundedMoveCount = 0;
 
   /// How hard the computer opponent plays. Set from the settings drawer.
-  AIDifficulty _difficulty = AIDifficulty.medium;
+  AIDifficulty _difficulty;
 
   /// Which seat this device plays, when the game is online.
   ///
@@ -68,7 +75,13 @@ class QuoridorGame extends FlameGame
   }
 
   Function(GameState)? onGameStateChanged;
-  Function(String)? onGameMessage;
+
+  /// Fires for each pass that lands, with the seat that passed, so the page
+  /// can say why the turn moved on with nothing on the board changing.
+  void Function(int seat)? onTurnPassed;
+
+  /// Fires once when a local game ends. Online, the controller announces the
+  /// result instead, because only it knows which side this device was on.
   VoidCallback? onGameWon;
 
   /// Fires when the board's interaction state changes (mode, pending wall),
@@ -109,14 +122,32 @@ class QuoridorGame extends FlameGame
   @override
   Color backgroundColor() => Colors.transparent;
 
+  /// Whether the board follows a server rather than playing on its own.
+  bool get _isOnline => onSubmitMove != null;
+
   void _updateUI() {
-    if (_gameState!.isGameOver && !_announcedGameOver) {
-      _announcedGameOver = true;
-      onGameMessage?.call('Game Over! ${_gameState!.winner} wins!');
-      onGameWon?.call();
-      AudioService.instance.play(Sfx.win);
+    final state = _gameState!;
+    if (!state.isGameOver || _announcedGameOver) return;
+    _announcedGameOver = true;
+
+    // Online, the losing device used to get the fanfare, the confetti and a
+    // "play again" dialog too, and the winner got that dialog twice: once
+    // from here and once from the controller's own game-over callback.
+    if (_isOnline) {
+      if (state.winnerId == localPlayerId) AudioService.instance.play(Sfx.win);
+      return;
     }
+
+    onGameWon?.call();
+    AudioService.instance.play(Sfx.win);
   }
+
+  /// Boards this game has been through, oldest first, for [undo].
+  final List<GameState> _undoStack = [];
+
+  /// Set while [undo] puts an earlier board back, so that board is not
+  /// itself recorded as a step to undo.
+  bool _restoring = false;
 
   void updateGameState(GameState newGameState) {
     final previous = _gameState;
@@ -128,16 +159,78 @@ class QuoridorGame extends FlameGame
       _soundedMoveCount = 0;
       _announcedGameOver = false;
     }
+    // An undone win is a game in play again, and winning it a second time
+    // deserves its celebration too.
+    if (!newGameState.isGameOver) _announcedGameOver = false;
+    _recordForUndo(previous, newGameState);
     _playSoundsForNewMoves(newGameState);
 
     _updateUI();
 
-    // Trigger AI move if needed
-    if (!_gameState!.isGameOver && _gameState!.currentPlayer.isAI) {
+    // Trigger AI move if needed. Never online: the server's board is the
+    // truth there, and a move made here would never reach it.
+    if (!_isOnline &&
+        !_gameState!.isGameOver &&
+        _gameState!.currentPlayer.isAI) {
       _executeAIMove();
+    } else if (canActNow && GameService.mustPass(_gameState!)) {
+      _passWhenStuck();
     }
 
     onGameStateChanged?.call(_gameState!);
+  }
+
+  void _recordForUndo(GameState? previous, GameState next) {
+    if (_isOnline || previous == null || previous.gameId != next.gameId) {
+      _undoStack.clear();
+      return;
+    }
+    if (_restoring) return;
+    if (next.moveHistory.length > previous.moveHistory.length) {
+      _undoStack.add(previous);
+    }
+  }
+
+  /// Where [undo] would go back to: the latest board on which a person was
+  /// to move. Against the computer that skips its reply, so one undo takes
+  /// back the player's own move rather than leaving the computer to replay
+  /// the same answer at once.
+  int? get _undoTarget {
+    for (var i = _undoStack.length - 1; i >= 0; i--) {
+      if (!_undoStack[i].currentPlayer.isAI) return i;
+    }
+    return null;
+  }
+
+  /// Whether there is a move to take back. Never online, where the move is
+  /// already on the server and the other players have seen it.
+  bool get canUndo => !_isOnline && _undoTarget != null;
+
+  /// Takes back the last move made by a person, and the computer's reply to
+  /// it if there was one.
+  void undo() {
+    final index = _undoTarget;
+    if (_isOnline || index == null) return;
+
+    final target = _undoStack[index];
+    _undoStack.removeRange(index, _undoStack.length);
+
+    // Keep who is the computer as it is now: switching seat 2 between the
+    // computer and a person is a choice about the table, not a move.
+    final current = _gameState!;
+    final restored = target.copyWith(
+      players: [
+        for (final player in target.players)
+          player.copyWith(isAI: current.playerById(player.id).isAI),
+      ],
+    );
+
+    _restoring = true;
+    try {
+      updateGameState(restored);
+    } finally {
+      _restoring = false;
+    }
   }
 
   /// Plays one effect per move that has landed since the last update.
@@ -157,9 +250,15 @@ class QuoridorGame extends FlameGame
 
     for (var i = 0; i < newMoves.length; i++) {
       final move = newMoves[i];
-      final sound = move.type == MoveType.pawnMove
-          ? Sfx.move(move.playerId)
-          : Sfx.wall(move.playerId);
+      final sound = switch (move.type) {
+        MoveType.pawnMove => Sfx.move(move.playerId),
+        MoveType.wallPlace => Sfx.wall(move.playerId),
+        MoveType.pass => null,
+      };
+      if (sound == null) {
+        onTurnPassed?.call(move.playerId);
+        continue;
+      }
 
       if (i == 0) {
         AudioService.instance.play(sound);
@@ -172,59 +271,71 @@ class QuoridorGame extends FlameGame
     }
   }
 
+  /// How long a boxed-in player's board stays up before their turn passes.
+  static const Duration forcedPassDelay = Duration(milliseconds: 1200);
+
+  /// Passes for the player to move, who has nothing else to play.
+  ///
+  /// Done for them rather than offered as a button: a pass is only ever legal
+  /// when it is the only move, so there is no choice to make, and a stuck
+  /// player left staring at a board that refuses every tap reads as a hang.
+  Future<void> _passWhenStuck() async {
+    final expected = _gameState!;
+    await Future.delayed(forcedPassDelay);
+    if (!identical(_gameState, expected) || !canActNow) return;
+
+    _boardComponent.clearInteraction();
+    await _processMove(GameMove.pass(expected.currentPlayerId));
+  }
+
+  /// How long the computer appears to think before it replies.
+  static const Duration aiThinkingDelay = Duration(milliseconds: 800);
+
   Future<void> _executeAIMove() async {
-    // Add delay for better UX
-    await Future.delayed(const Duration(milliseconds: 800));
+    final expected = _gameState;
+
+    // A pause, so the player sees their own move land before the reply.
+    await Future.delayed(aiThinkingDelay);
+
+    // Anything that replaced the board meanwhile -- a new game, a switch to
+    // two players -- has scheduled its own reply if it needs one.
+    if (!identical(_gameState, expected)) return;
 
     try {
       final newGameState = await GameService.executeAITurn(
-        _gameState!,
+        expected!,
         _difficulty,
       );
 
-      if (newGameState != _gameState) {
+      if (identical(_gameState, expected) &&
+          !identical(newGameState, expected)) {
         updateGameState(newGameState);
-        onGameMessage?.call('AI played their move');
       }
     } catch (e) {
-      onGameMessage?.call('AI move failed: $e');
+      debugPrint('QuoridorGame: AI move failed: $e');
     }
   }
 
   void _handleMoveAttempt(Position newPosition) {
-    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId) ||
-        !canActNow) {
-      return;
-    }
+    if (!canActNow) return;
 
     final move = GameMove.pawnMove(newPosition, _gameState!.currentPlayerId);
 
     if (GameService.isValidMove(_gameState!, move)) {
       _processMove(move);
     } else {
-      onGameMessage?.call('Invalid move!');
       HapticFeedback.lightImpact();
     }
   }
 
   void _handleWallPlaceAttempt(Wall wall) {
-    if (!GameManager.canPlayerMove(_gameState!, _gameState!.currentPlayerId) ||
-        !canActNow) {
-      return;
-    }
-
-    if (!_gameState!.currentPlayer.hasWallsRemaining) {
-      onGameMessage?.call('No walls remaining!');
-      HapticFeedback.lightImpact();
-      return;
-    }
+    if (!canActNow) return;
 
     final move = GameMove.wallPlace(wall, _gameState!.currentPlayerId);
 
     if (GameService.isValidMove(_gameState!, move)) {
       _processMove(move);
     } else {
-      onGameMessage?.call('Invalid wall placement!');
       HapticFeedback.lightImpact();
     }
   }
@@ -270,22 +381,18 @@ class QuoridorGame extends FlameGame
       return;
     }
 
+    // Only the player's own move is applied here. The computer's reply used
+    // to be worked out in the same call, before the board was redrawn, so the
+    // player's pawn sat still for as long as the engine thought and then both
+    // moves appeared at once. [updateGameState] schedules the reply instead.
     try {
-      final newGameState = await GameManager.processPlayerMove(
-        _gameState!,
-        move,
-        aiDifficulty: _difficulty,
-      );
+      final newGameState = GameService.executeMove(_gameState!, move);
       updateGameState(newGameState);
 
       HapticFeedback.selectionClick();
-
-      if (newGameState.isGameOver) {
-        onGameMessage?.call('${newGameState.winner} wins!');
-        HapticFeedback.mediumImpact();
-      }
+      if (newGameState.isGameOver) HapticFeedback.mediumImpact();
     } catch (e) {
-      onGameMessage?.call('Move failed: $e');
+      debugPrint('QuoridorGame: move failed: $e');
       HapticFeedback.lightImpact();
     }
   }
@@ -300,26 +407,28 @@ class QuoridorGame extends FlameGame
 
   /// Starts a fresh game with [playerCount] at the board.
   ///
-  /// Three and four play each other: the computer opponent reads the board
-  /// through one pair of eyes — mine against the nearest rival — which is
-  /// enough to hold its own, but it has not been played enough hands at a
-  /// crowded board to be offered as one of them yet.
+  /// [againstAI] makes every seat but the first the computer. At a table of
+  /// three or four it plays each seat for itself, against whoever is nearest
+  /// to getting home; self-play games at both sizes run to a finish in
+  /// seventy to ninety moves with every wall spent.
   void startGame({int playerCount = 2, bool againstAI = true}) {
     _announcedGameOver = false;
     _soundedMoveCount = 0;
+    // Said outright rather than left to the new game's id: ids come from the
+    // clock, and two games started within a millisecond share one.
+    _undoStack.clear();
     updateGameState(
       GameStateFactory.createNewGame(
         playerCount: playerCount,
-        player2IsAI: againstAI && playerCount == 2,
-        player2Name: againstAI && playerCount == 2 ? 'AI' : 'Player 2',
+        player2IsAI: againstAI,
+        player2Name: againstAI ? 'AI' : 'Player 2',
+        othersAreAI: againstAI,
       ),
     );
-    onGameMessage?.call('New game started!');
   }
 
   void setDifficulty(AIDifficulty difficulty) {
     _difficulty = difficulty;
-    onGameMessage?.call('Difficulty set to ${difficulty.name}');
   }
 
   AIDifficulty get difficulty => _difficulty;
@@ -328,22 +437,25 @@ class QuoridorGame extends FlameGame
     _boardComponent.showValidMoves = show;
   }
 
+  /// Whether the other seats can be switched between the computer and
+  /// people. Never online: a computer seat here would play moves the server
+  /// never hears about.
+  bool get canTogglePlayerMode => _isInitialized && !_isOnline;
+
+  /// Hands every seat but the first to the computer, or back to people.
   void togglePlayerMode() {
-    // Switch between AI and human player 2
+    if (!canTogglePlayerMode) return;
+
+    final toAI = !_gameState!.player2.isAI;
     final newGameState = _gameState!.copyWith(
       players: [
         for (final player in _gameState!.players)
-          player.id == 2 ? player.copyWith(isAI: !player.isAI) : player,
+          player.id == 1 ? player : player.copyWith(isAI: toAI),
       ],
       updatedAt: DateTime.now(),
     );
 
     updateGameState(newGameState);
-    onGameMessage?.call(
-      newGameState.player2.isAI
-          ? 'Switched to AI opponent'
-          : 'Switched to human opponent',
-    );
   }
 
   // Input handling

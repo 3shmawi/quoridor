@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quoridor/flame/constants.dart';
 import 'package:quoridor/flame/models/game_state.dart';
+import 'package:quoridor/flame/models/player.dart';
 import 'package:quoridor/flame/services/game_service.dart';
 
 void main() {
@@ -165,6 +166,50 @@ void main() {
         const Wall(Position(4, 3), WallOrientation.horizontal),
       );
       expect(result.rejection, WallRejection.noWallsLeft);
+    });
+  });
+
+  group('pawns in the way', () {
+    // Column 0 is a one-wide corridor from row 7 up to the goal, entered only
+    // from (8, 0); horizontal walls close row 8 off from the rest of the
+    // board but for the gap at columns 7-8. Players 2 and 3 stand one behind
+    // the other in the corridor, so player 1 could neither step past nor
+    // jump over them -- not this turn. Pawns move; walls do not.
+    GameState corridor() => GameState(
+      gameId: 'corridor',
+      players: [
+        PlayerFactory.seat(1, playerCount: 4)..position = const Position(8, 3),
+        PlayerFactory.seat(2, playerCount: 4)..position = const Position(4, 0),
+        PlayerFactory.seat(3, playerCount: 4)..position = const Position(5, 0),
+        PlayerFactory.seat(4, playerCount: 4)..position = const Position(8, 5),
+      ],
+      walls: [
+        for (final row in [0, 2, 4, 6])
+          Wall(Position(row, 1), WallOrientation.vertical),
+        for (final col in [1, 3, 5])
+          Wall(Position(8, col), WallOrientation.horizontal),
+      ],
+    );
+
+    test('do not make a wall illegal', () {
+      // Closing the last gap leaves player 1 the corridor, which is a route.
+      final result = check(
+        corridor(),
+        const Wall(Position(8, 7), WallOrientation.horizontal),
+      );
+      expect(result.rejection, WallRejection.none);
+    });
+
+    test('a wall that really seals someone in is still refused', () {
+      final state = corridor()
+        ..walls.add(const Wall(Position(8, 7), WallOrientation.horizontal));
+
+      // Closing the corridor halfway up leaves player 1 no way up at all.
+      final result = check(
+        state,
+        const Wall(Position(2, 0), WallOrientation.horizontal),
+      );
+      expect(result.rejection, WallRejection.blocksPlayer);
     });
   });
 

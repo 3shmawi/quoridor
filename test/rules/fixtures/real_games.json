@@ -1,0 +1,2978 @@
+{
+  "twoPlayers": [
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 8,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 8,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": []
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 7,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 7,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [],
+      "currentPlayerId": 2,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 7,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 9,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 7,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 9,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 6,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 9,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 6,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 9,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 2,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 6,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 8,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 6,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 8,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 5,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 8,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 5,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 8,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 2,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 5,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 7,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 5,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 7,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 4,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 7,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 4,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 7,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 2,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 4,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 6,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 4,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 6,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 3,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 6,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 3,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 6,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 2,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 3,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 3,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 5,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 3,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 5,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 5,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 3,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 5,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 2,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 5,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 2,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 5,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 5,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 2,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 3,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 5,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 2,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 2,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 4,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 2,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 4,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 5,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 6,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 3,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 5,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 2,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 6,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 1,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 4,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 1,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 4,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 5,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 6,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 2,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 3,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 5,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 2,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 6,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 1,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 1,
+            "col": 4
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 3,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 1,
+          "col": 4
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 3,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 5,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 6,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 7,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 3,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 5,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 2,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 6,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 1,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 7,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-2",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 0,
+            "col": 3
+          },
+          "wallsRemaining": 10,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Alice",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 3,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "Bob",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 0,
+          "col": 3
+        },
+        "wallsRemaining": 10,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Alice",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 3,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "Bob",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 2,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 3,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 5,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 6,
+            "col": 0
+          },
+          "orientation": 0
+        },
+        {
+          "position": {
+            "row": 7,
+            "col": 0
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 1,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 1,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 6,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 2,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 5,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 3,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 3,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 5,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 2,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 6,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 1,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 7,
+              "col": 0
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 0,
+            "col": 3
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    }
+  ],
+  "threePlayers": [
+    {
+      "gameId": "fixture-3",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 8,
+            "col": 4
+          },
+          "wallsRemaining": 7,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Player 1",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 7,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "AI",
+          "isAI": false
+        },
+        {
+          "id": 3,
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "wallsRemaining": 7,
+          "goal": "right",
+          "name": "Player 3",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 8,
+          "col": 4
+        },
+        "wallsRemaining": 7,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Player 1",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 7,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "AI",
+        "isAI": false
+      },
+      "walls": [],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": []
+    },
+    {
+      "gameId": "fixture-3",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 7,
+            "col": 4
+          },
+          "wallsRemaining": 7,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Player 1",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 7,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "AI",
+          "isAI": false
+        },
+        {
+          "id": 3,
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "wallsRemaining": 7,
+          "goal": "right",
+          "name": "Player 3",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 7,
+          "col": 4
+        },
+        "wallsRemaining": 7,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Player 1",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 7,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "AI",
+        "isAI": false
+      },
+      "walls": [],
+      "currentPlayerId": 2,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-3",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 7,
+            "col": 4
+          },
+          "wallsRemaining": 7,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Player 1",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 6,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "AI",
+          "isAI": false
+        },
+        {
+          "id": 3,
+          "position": {
+            "row": 4,
+            "col": 0
+          },
+          "wallsRemaining": 7,
+          "goal": "right",
+          "name": "Player 3",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 7,
+          "col": 4
+        },
+        "wallsRemaining": 7,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Player 1",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 6,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "AI",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 4,
+            "col": 3
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 3,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 3
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        }
+      ]
+    },
+    {
+      "gameId": "fixture-3",
+      "players": [
+        {
+          "id": 1,
+          "position": {
+            "row": 7,
+            "col": 4
+          },
+          "wallsRemaining": 7,
+          "goal": "top",
+          "goalRow": 0,
+          "name": "Player 1",
+          "isAI": false
+        },
+        {
+          "id": 2,
+          "position": {
+            "row": 0,
+            "col": 4
+          },
+          "wallsRemaining": 6,
+          "goal": "bottom",
+          "goalRow": 8,
+          "name": "AI",
+          "isAI": false
+        },
+        {
+          "id": 3,
+          "position": {
+            "row": 4,
+            "col": 1
+          },
+          "wallsRemaining": 7,
+          "goal": "right",
+          "name": "Player 3",
+          "isAI": false
+        }
+      ],
+      "player1": {
+        "id": 1,
+        "position": {
+          "row": 7,
+          "col": 4
+        },
+        "wallsRemaining": 7,
+        "goal": "top",
+        "goalRow": 0,
+        "name": "Player 1",
+        "isAI": false
+      },
+      "player2": {
+        "id": 2,
+        "position": {
+          "row": 0,
+          "col": 4
+        },
+        "wallsRemaining": 6,
+        "goal": "bottom",
+        "goalRow": 8,
+        "name": "AI",
+        "isAI": false
+      },
+      "walls": [
+        {
+          "position": {
+            "row": 4,
+            "col": 3
+          },
+          "orientation": 0
+        }
+      ],
+      "currentPlayerId": 1,
+      "status": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "moveHistory": [
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 7,
+            "col": 4
+          },
+          "wall": null,
+          "playerId": 1
+        },
+        {
+          "type": 1,
+          "newPosition": null,
+          "wall": {
+            "position": {
+              "row": 4,
+              "col": 3
+            },
+            "orientation": 0
+          },
+          "playerId": 2
+        },
+        {
+          "type": 0,
+          "newPosition": {
+            "row": 4,
+            "col": 1
+          },
+          "wall": null,
+          "playerId": 3
+        }
+      ]
+    }
+  ]
+}

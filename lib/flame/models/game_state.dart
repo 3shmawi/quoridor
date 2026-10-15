@@ -116,6 +116,19 @@ class GameState {
     updatedAt = DateTime.now();
   }
 
+  /// Plays [move] for the player to move, without checking it or passing
+  /// the turn on.
+  void apply(GameMove move) {
+    switch (move.type) {
+      case MoveType.pawnMove:
+        movePawn(move.newPosition!);
+      case MoveType.wallPlace:
+        addWall(move.wall!);
+      case MoveType.pass:
+        updatedAt = DateTime.now();
+    }
+  }
+
   void checkWinCondition() {
     for (final player in players) {
       if (player.hasReachedGoal) {
@@ -295,6 +308,9 @@ class GameStateFactory {
     String player2Name = 'AI',
     bool player2IsAI = true,
     int playerCount = 2,
+
+    /// Whether seats three and four are the computer too.
+    bool othersAreAI = false,
   }) {
     gameId ??= 'game_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -309,7 +325,12 @@ class GameStateFactory {
           playerCount: playerCount,
         ),
         for (var seat = 3; seat <= playerCount; seat++)
-          PlayerFactory.seat(seat, playerCount: playerCount),
+          PlayerFactory.seat(
+            seat,
+            playerCount: playerCount,
+            isAI: othersAreAI,
+            name: othersAreAI ? 'AI' : null,
+          ),
       ],
     );
   }

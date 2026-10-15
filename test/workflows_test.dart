@@ -52,4 +52,38 @@ void main() {
       expect(versions, {r'${{'}, reason: file.path);
     }
   });
+
+  group('the rules deploy', () {
+    final ci = File('.github/workflows/ci.yml').readAsStringSync();
+    final job = ci.substring(ci.indexOf('\n  deploy-rules:'));
+
+    test('runs only for main, and only after both suites pass', () {
+      expect(
+        job,
+        contains(
+          "if: github.event_name == 'push' && github.ref == 'refs/heads/main'",
+        ),
+      );
+      expect(job, contains('needs: [check, rules]'));
+    });
+
+    test('deploys with the firebase-tools the rules were tested with', () {
+      final tested = RegExp(
+        r'firebase-tools@(\S+) emulators:exec',
+      ).firstMatch(ci)!.group(1);
+      expect(job, contains('firebase-tools@$tested deploy'));
+      expect(job, contains('--only firestore:rules\n'));
+    });
+
+    test('reads a secret that setup_secrets.sh sets', () {
+      final script = File('tool/setup_secrets.sh').readAsStringSync();
+      final names = RegExp(
+        r'\$\{\{\s*secrets\.(\w+)',
+      ).allMatches(job).map((m) => m.group(1)!).toSet();
+      expect(names, isNotEmpty);
+      for (final name in names) {
+        expect(script, contains('set_file  $name'), reason: name);
+      }
+    });
+  });
 }

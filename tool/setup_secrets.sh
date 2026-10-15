@@ -7,8 +7,10 @@
 # Values shared by all your apps live in ~/.app-secrets/shared.env (made as a
 # template on the first run). Values that belong to one app -- its Android
 # upload keystore and passwords -- live in ~/.app-secrets/apps/<repo>/ and are
-# generated the first time, with a random password. Set APP_SECRETS_DIR to
-# keep the folder elsewhere.
+# generated the first time, with a random password. This app's Firebase
+# service account key, which only you can create, goes in that folder too, as
+# firebase-service-account.json. Set APP_SECRETS_DIR to keep the folder
+# elsewhere.
 #
 # Needs: gh (logged in), keytool (any JDK), openssl. Secret values are piped
 # to gh on stdin, never passed as arguments or printed.
@@ -129,3 +131,4 @@ set_value IOS_CERTIFICATE_PASSWORD         "${IOS_CERTIFICATE_PASSWORD:-}"
 set_file  MACOS_DEVELOPER_ID_P12_BASE64    "${MACOS_DEVELOPER_ID_P12_PATH:-}" base64
 set_value MACOS_DEVELOPER_ID_P12_PASSWORD  "${MACOS_DEVELOPER_ID_P12_PASSWORD:-}"
 set_value RELEASE_TOKEN                    "${RELEASE_TOKEN:-}"
+set_file  FIREBASE_SERVICE_ACCOUNT_JSON    "$APP_DIR/firebase-service-account.json"
