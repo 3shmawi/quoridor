@@ -608,9 +608,19 @@ extension WallRejectionText on AppStrings {
   }
 
   /// What [controller] has to tell the player, in their language.
+  ///
+  /// When online play is unavailable altogether, the reason goes along with
+  /// it: it is a code rather than a sentence, but it is the only thing that
+  /// tells a Firebase setting switched off apart from a dropped connection.
   String? onlineNotice(OnlineGameController controller) {
     final failure = controller.failure;
-    return failure == null ? controller.message : onlineFailure(failure);
+    if (failure == null) return controller.message;
+    final text = onlineFailure(failure);
+    final detail = controller.failureDetail;
+    if (failure == OnlineFailure.unavailable && detail != null) {
+      return '$text ($detail)';
+    }
+    return text;
   }
 
   /// The player-facing reason an online action did not go through.

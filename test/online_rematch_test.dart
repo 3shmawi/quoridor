@@ -201,4 +201,21 @@ void main() {
     expect(OnlineGameCodec.decodeRematch(null), isNull);
     expect(OnlineGameCodec.decodeRematch({'gameId': 'g2'}), isNull);
   });
+
+  test('when online play is unavailable, the reason is still shown', () async {
+    // The reason is what tells a broken Firebase setup apart from a dropped
+    // connection; translating the message once lost it.
+    service.signInError = 'operation-not-allowed';
+    expect(await controller.joinGame('ABCDEF'), isFalse);
+    expect(controller.failure, OnlineFailure.unavailable);
+
+    for (final strings in const [
+      AppStrings(Locale('en')),
+      AppStrings(Locale('ar')),
+    ]) {
+      final notice = strings.onlineNotice(controller)!;
+      expect(notice, startsWith(strings.onlineUnavailable));
+      expect(notice, contains('operation-not-allowed'));
+    }
+  });
 }
