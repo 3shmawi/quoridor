@@ -89,8 +89,14 @@ class OnlineGameController extends ChangeNotifier {
   OnlineFailure? get failure => _failure;
   OnlineFailure? _failure;
 
+  /// The technical reason behind [failure], when the backend gave one -- a
+  /// sign-in error code such as `operation-not-allowed`.
+  String? get failureDetail => _failureDetail;
+  String? _failureDetail;
+
   void _fail(OnlineResult<Object?> result) {
     _failure = result.failure;
+    _failureDetail = result.detail;
     _message = result.message;
   }
 
@@ -231,6 +237,7 @@ class OnlineGameController extends ChangeNotifier {
     _serverGame = result.value!.game;
     _message = null;
     _failure = null;
+    _failureDetail = null;
     _startWatching();
     _refreshConnection();
     // A rematch replaces the board on screen, which no move will announce.
@@ -354,6 +361,7 @@ class OnlineGameController extends ChangeNotifier {
 
       _message = null;
       _failure = null;
+      _failureDetail = null;
       return true;
     } finally {
       _submitting = false;
@@ -450,6 +458,7 @@ class OnlineGameController extends ChangeNotifier {
     if (_message == null) return;
     _message = null;
     _failure = null;
+    _failureDetail = null;
     notifyListeners();
   }
 

@@ -29,8 +29,16 @@ class FakeOnlineGameService implements OnlineGameService {
     return OnlineResult.success(nextCreated);
   }
 
+  /// When set, joining fails as it does when sign-in did: unavailable, with
+  /// this as the reason.
+  String? signInError;
+
   @override
   Future<OnlineResult<OnlineSession>> joinByCode(String rawCode) async {
+    final error = signInError;
+    if (error != null) {
+      return OnlineResult.failed(OnlineFailure.unavailable, error);
+    }
     final session = byCode[rawCode];
     return session == null
         ? const OnlineResult.failed(OnlineFailure.gameNotFound)
