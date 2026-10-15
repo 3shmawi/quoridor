@@ -1,0 +1,77 @@
+import 'dart:async';
+
+import 'package:quoridor/flame/constants.dart';
+import 'package:quoridor/flame/models/online_session.dart';
+import 'package:quoridor/flame/services/online/online_game_service.dart';
+
+/// Stands in for Firestore: games are whatever the test seeds, and the
+/// first rematch link offered on a game is the one that stands.
+class FakeOnlineGameService implements OnlineGameService {
+  final sessions = <String, OnlineSession>{};
+  final byCode = <String, OnlineSession>{};
+  final links = <String, RematchLink>{};
+  final abandoned = <String>[];
+  final created = <OnlineSession>[];
+  OnlineSession? nextCreated;
+  final _streams = <String, StreamController<OnlineGame>>{};
+
+  void push(OnlineGame game) => _streams[game.gameId]?.add(game);
+
+  @override
+  Future<OnlineResult<OnlineSession>> resume(String gameId) async =>
+      OnlineResult.success(sessions[gameId]);
+
+  @override
+  Future<OnlineResult<OnlineSession>> createPrivateGame({
+    int playerCount = 2,
+  }) async {
+    created.add(nextCreated!);
+    return OnlineResult.success(nextCreated);
+  }
+
+  @override
+  Future<OnlineResult<OnlineSession>> joinByCode(String rawCode) async {
+    final session = byCode[rawCode];
+    return session == null
+        ? const OnlineResult.failed(OnlineFailure.gameNotFound)
+        : OnlineResult.success(session);
+  }
+
+  @override
+  Future<OnlineResult<RematchLink>> offerRematch(
+    String gameId,
+    RematchLink link,
+  ) async => OnlineResult.success(links.putIfAbsent(gameId, () => link));
+
+  @override
+  Future<void> abandon(String gameId) async => abandoned.add(gameId);
+
+  @override
+  Stream<OnlineGame> watchGame(String gameId) =>
+      (_streams[gameId] ??= StreamController<OnlineGame>.broadcast()).stream;
+
+  /// Moves submitted, in order. Each waits on [submitResults] until the test
+  /// completes it, so a test can act while a move is still on its way.
+  final submitted = <GameMove>[];
+  final submitResults = <Completer<OnlineResult<OnlineGame>>>[];
+
+  @override
+  Future<OnlineResult<OnlineGame>> submitMove(
+    OnlineSession session,
+    GameMove move,
+  ) {
+    submitted.add(move);
+    final result = Completer<OnlineResult<OnlineGame>>();
+    submitResults.add(result);
+    return result.future;
+  }
+
+  @override
+  Future<void> heartbeat(String gameId, int seat) async {}
+
+  @override
+  Future<void> markAway(String gameId, int seat) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}

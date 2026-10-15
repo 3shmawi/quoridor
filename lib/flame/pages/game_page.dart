@@ -1073,24 +1073,36 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-          // Floats over the strip rather than taking a place in the column:
+          // Floats over the page rather than taking a place in the column:
           // in the column it shrank and moved the board while it showed, so
-          // a tap in that moment landed on the wrong square. Taps go through
-          // it to whatever is underneath.
+          // a tap in that moment landed on the wrong square. It drops in at
+          // the top, where it is read first and covers neither the players
+          // under the board nor the board itself on most screens, and taps go
+          // through it to whatever is underneath.
           if (_showMessage)
             Positioned(
               left: 20,
               right: 20,
-              bottom: 20,
+              top: 8,
               child: IgnorePointer(
                 child: AnimatedBuilder(
                   animation: _messageController,
                   builder: (context, child) {
+                    final shown = Curves.easeOut.transform(
+                      _messageController.value,
+                    );
                     return Opacity(
-                      opacity: _messageController.value,
-                      child: _buildMessageToast(),
+                      opacity: shown,
+                      child: Transform.translate(
+                        offset: Offset(0, -16 * (1 - shown)),
+                        child: child,
+                      ),
                     );
                   },
+                  child: KeyedSubtree(
+                    key: const Key('toast'),
+                    child: _buildMessageToast(),
+                  ),
                 ),
               ),
             ),
