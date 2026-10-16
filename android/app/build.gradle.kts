@@ -21,7 +21,7 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.MoRe_H.quoridor"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -40,7 +40,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // 24: Google Play automatic protection refuses anything lower.
         minSdk = 24
-        targetSdk = 35
+        // Google Play refuses updates targeting less than 36 from 31 August 2026.
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

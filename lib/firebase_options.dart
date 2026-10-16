@@ -60,11 +60,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyByIDYkwQaFGIN_qJTYlcOzzMvwPKrZ5cM',
-    appId: '1:829516799814:ios:5f3bb5449481d145e88f47',
+    appId: '1:829516799814:ios:972db203142ad26ce88f47',
     messagingSenderId: '829516799814',
     projectId: 'quoridor-290f6',
     storageBucket: 'quoridor-290f6.firebasestorage.app',
-    iosBundleId: 'com.MoReH.quoridor',
+    iosBundleId: 'com.moreh.quoridor',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

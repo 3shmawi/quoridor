@@ -2,7 +2,7 @@
 # comes from the environment that job sets from GitHub Secrets.
 default_platform(:ios)
 
-APP_ID = "com.MoReH.quoridor"
+APP_ID = "com.moreh.quoridor"
 
 platform :ios do
   lane :beta do

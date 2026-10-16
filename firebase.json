@@ -11,7 +11,7 @@
       "ios": {
         "default": {
           "projectId": "quoridor-290f6",
-          "appId": "1:829516799814:ios:5f3bb5449481d145e88f47",
+          "appId": "1:829516799814:ios:972db203142ad26ce88f47",
           "uploadDebugSymbols": false,
           "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
@@ -29,7 +29,7 @@
           "projectId": "quoridor-290f6",
           "configurations": {
             "android": "1:829516799814:android:34b8ce29b4e71c12e88f47",
-            "ios": "1:829516799814:ios:5f3bb5449481d145e88f47",
+            "ios": "1:829516799814:ios:972db203142ad26ce88f47",
             "macos": "1:829516799814:ios:5f3bb5449481d145e88f47",
             "web": "1:829516799814:web:f8a5c9f661ff0f80e88f47",
             "windows": "1:829516799814:web:8b6ce39c28540e27e88f47"
