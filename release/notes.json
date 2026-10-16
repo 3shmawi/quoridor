@@ -1,0 +1,4 @@
+{
+  "en": "- Undo your last move, and see every move of the game in a list.\n- Pick up where you left off: an unfinished game is kept when you close the app.\n- Play against 2 or 3 computers at once.\n- Hard is now clearly harder than Medium.\n- Online: ask for a rematch when a game ends.\n- Online moves no longer vanish and reappear while they are sent, and messages now appear at the top.\n- Many fixes, including your chosen difficulty being kept after a restart, and Arabic text throughout.",
+  "ar": "- تقدر تتراجع عن آخر نقلة، وتشوف كل نقلات اللعبة في قائمة.\n- كمّل من مكان ما وقفت: اللعبة اللي ما خلصتش بتتحفظ لما تقفل التطبيق.\n- العب ضد 2 أو 3 كمبيوتر مرة واحدة.\n- المستوى الصعب بقى أصعب فعلًا من المتوسط.\n- أونلاين: اطلب ماتش تاني لما اللعبة تخلص.\n- النقلات أونلاين مابقتش بتختفي وترجع وهي بتتبعت، والرسايل بقت بتظهر فوق.\n- إصلاحات كتير، منها إن المستوى اللي بتختاره بيفضل محفوظ، والعربي بقى في كل حتة."
+}
