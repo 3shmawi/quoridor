@@ -57,6 +57,45 @@ jobs:
             test/**/failures/
           if-no-files-found: ignore
 
+  # Android is otherwise only built on release day, which is where a target
+  # SDK below Google Play's floor was found: the bundle uploaded, then Play
+  # refused it.
+  android:
+    name: Android build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Without the signing secrets a release build falls back to the debug
+      # key, which is enough to prove it builds.
+      - name: Build APK
+        run: flutter build apk --release --target-platform android-arm64
+
+      # Google Play refuses an upload whose target SDK is under its yearly
+      # floor (API 36 from 31 August 2026).
+      - name: Check the target SDK
+        run: |
+          AAPT2="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2"
+          TARGET="$("$AAPT2" dump badging build/app/outputs/flutter-apk/app-release.apk | sed -n "s/^targetSdkVersion:'\([0-9]*\)'.*/\1/p")"
+          echo "targetSdkVersion: $TARGET"
+          if [ -z "$TARGET" ] || [ "$TARGET" -lt 36 ]; then
+            echo "::error::targetSdkVersion is ${TARGET:-unknown}; Google Play needs 36 or higher."
+            exit 1
+          fi
+
   rules:
     name: Firestore Security Rules
     runs-on: ubuntu-latest
