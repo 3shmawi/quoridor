@@ -63,6 +63,12 @@ PLAY_SERVICE_ACCOUNT_JSON_PATH=~/.app-secrets/play-service-account.json
 # release. One token can cover all your repos.
 RELEASE_TOKEN=
 
+# itch.io API key (itch.io -> Settings -> API keys), for pushing releases
+BUTLER_API_KEY=
+
+# Cloudflare API token with only "Cloudflare Pages: Edit", for the web deploy
+CLOUDFLARE_API_TOKEN=
+
 # Who new Android keystores are issued to
 KEYSTORE_DNAME="CN=Your Name, O=Your Company, C=EG"
 TEMPLATE
@@ -131,4 +137,6 @@ set_value IOS_CERTIFICATE_PASSWORD         "${IOS_CERTIFICATE_PASSWORD:-}"
 set_file  MACOS_DEVELOPER_ID_P12_BASE64    "${MACOS_DEVELOPER_ID_P12_PATH:-}" base64
 set_value MACOS_DEVELOPER_ID_P12_PASSWORD  "${MACOS_DEVELOPER_ID_P12_PASSWORD:-}"
 set_value RELEASE_TOKEN                    "${RELEASE_TOKEN:-}"
+set_value BUTLER_API_KEY                   "${BUTLER_API_KEY:-}"
+set_value CLOUDFLARE_API_TOKEN             "${CLOUDFLARE_API_TOKEN:-}"
 set_file  FIREBASE_SERVICE_ACCOUNT_JSON    "$APP_DIR/firebase-service-account.json"

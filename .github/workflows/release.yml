@@ -19,6 +19,8 @@ env:
   # workflow to it.
   FLUTTER_VERSION: 3.32.0
   ANDROID_PACKAGE: com.MoRe_H.quoridor
+  # The itch.io page builds are pushed to, as user/game.
+  ITCH_TARGET: 3shmawiii/quoridor
 
 jobs:
   version:
@@ -31,6 +33,7 @@ jobs:
       play: ${{ steps.secrets.outputs.play }}
       macos_signing: ${{ steps.secrets.outputs.macos_signing }}
       testflight: ${{ steps.secrets.outputs.testflight }}
+      itch: ${{ steps.secrets.outputs.itch }}
     steps:
       - uses: actions/checkout@v5
 
@@ -58,15 +61,18 @@ jobs:
           ASC: ${{ secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8_BASE64 != '' }}
           MACOS: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 != '' && secrets.MACOS_DEVELOPER_ID_P12_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' }}
           IOS: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 != '' && secrets.IOS_CERTIFICATE_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' }}
+          ITCH: ${{ secrets.BUTLER_API_KEY != '' }}
         run: |
           echo "android_signing=$ANDROID" >> "$GITHUB_OUTPUT"
           echo "play=$([ "$ANDROID" = true ] && [ "$PLAY" = true ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "macos_signing=$([ "$MACOS" = true ] && [ "$ASC" = true ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "testflight=$([ "$IOS" = true ] && [ "$ASC" = true ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "itch=$ITCH" >> "$GITHUB_OUTPUT"
           [ "$ANDROID" = true ] || echo "::warning::No Android signing secrets: the APK is signed with the debug key and no app bundle is built."
           [ "$PLAY" = true ] && [ "$ANDROID" = true ] || echo "::notice::Google Play upload skipped (needs PLAY_SERVICE_ACCOUNT_JSON and the Android signing secrets)."
           [ "$MACOS" = true ] && [ "$ASC" = true ] || echo "::notice::macOS build is not signed or notarized (needs MACOS_DEVELOPER_ID_* and ASC_* secrets)."
           [ "$IOS" = true ] && [ "$ASC" = true ] || echo "::notice::TestFlight skipped (needs IOS_CERTIFICATE_*, APPLE_TEAM_ID and ASC_* secrets)."
+          [ "$ITCH" = true ] || echo "::notice::itch.io upload skipped (needs BUTLER_API_KEY)."
 
   checks:
     name: Analyze and test
@@ -214,6 +220,48 @@ jobs:
           name: windows
           path: quoridor-*-windows-x64.zip
 
+  # The browser build, as a zip that plays from any folder: itch.io serves
+  # it from a path of its own, so the page's base is made relative rather
+  # than the /quoridor/ GitHub Pages uses. No service worker, so a player
+  # never keeps a cached old version after an update is pushed.
+  web:
+    name: Web (zip)
+    needs: [version, checks]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      BUILD: ${{ needs.version.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Whole history, so latest.json notes can fall back to commits.
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build
+        run: |
+          flutter build web --release \
+            --no-web-resources-cdn \
+            --pwa-strategy=none \
+            --base-href / \
+            --build-name=$VERSION --build-number=$BUILD \
+            --dart-define=APP_VERSION=$VERSION \
+            --dart-define=BUILD_NUMBER=$BUILD \
+            --dart-define=APP_COMMIT=${{ github.sha }}
+          sed -i 's|<base href="/">|<base href="./">|' build/web/index.html
+          grep -q '<base href="./">' build/web/index.html
+          python3 tool/write_latest_json.py build/web/latest.json
+          cd build/web
+          zip -r "$GITHUB_WORKSPACE/quoridor-$VERSION-web.zip" .
+      - uses: actions/upload-artifact@v6
+        with:
+          name: web
+          path: quoridor-*-web.zip
+
   macos:
     name: macOS
     needs: [version, checks]
@@ -281,7 +329,7 @@ jobs:
 
   github-release:
     name: GitHub Release
-    needs: [version, android, linux, windows, macos]
+    needs: [version, android, linux, windows, macos, web]
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.version.outputs.version }}
@@ -312,6 +360,47 @@ jobs:
           name: Quoridor ${{ env.VERSION }}
           body_path: ${{ runner.temp }}/notes.md
           files: dist/*
+
+  # Every build that finished goes to itch.io, one channel per platform, so
+  # one platform failing -- a notarization, say -- does not hold the others
+  # back. The channel names are what itch.io tags platforms by.
+  itch:
+    name: itch.io
+    needs: [version, android, linux, windows, macos, web]
+    if: ${{ !cancelled() && needs.version.outputs.itch == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Install butler
+        run: |
+          curl -sSfL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler
+          chmod +x butler/butler
+          butler/butler -V
+
+      - name: Push to itch.io
+        run: |
+          failed=0
+          push() { # file channel
+            if [ ! -f "$1" ]; then
+              echo "::warning::$1 was not built, so the $2 channel keeps its last version."
+              return
+            fi
+            butler/butler push "$1" "$ITCH_TARGET:$2" --userversion "$VERSION" || failed=1
+          }
+          push "dist/quoridor-$VERSION-web.zip" html5
+          push "dist/quoridor-$VERSION-windows-x64.zip" windows
+          push "dist/quoridor-$VERSION-linux-x64.zip" linux
+          push "dist/quoridor-$VERSION-macos.zip" mac
+          push "dist/quoridor-$VERSION-android.apk" android
+          exit $failed
 
   google-play:
     name: Google Play (internal)
