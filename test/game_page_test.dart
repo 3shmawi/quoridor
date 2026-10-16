@@ -89,6 +89,16 @@ void main() {
   IconButton button(WidgetTester tester, String key) =>
       tester.widget<IconButton>(find.byKey(Key(key)));
 
+  testWidgets('the menu credits Mohager', (tester) async {
+    await openPage(tester);
+    await tester.tap(find.byIcon(Icons.menu));
+    await settle(tester, frames: 5);
+
+    expect(find.text('@copyWrite Mohager', findRichText: true), findsOneWidget);
+    expect(find.textContaining('ASHMAWY'), findsNothing);
+    await finish(tester);
+  });
+
   testWidgets('undo is greyed out until there is a move to take back', (
     tester,
   ) async {

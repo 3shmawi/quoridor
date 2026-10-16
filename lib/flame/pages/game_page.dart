@@ -1010,23 +1010,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     ),
                     TextSpan(text: " "),
                     TextSpan(
-                      text: "MO",
-                      style: TextStyle(color: Colors.cyan),
-                    ),
-                    TextSpan(
-                      text: "RE",
-                      style: TextStyle(color: Theme.of(context).dividerColor),
-                    ),
-                    TextSpan(
-                      text: " H",
+                      text: "Mohager",
                       style: TextStyle(color: Colors.cyan),
                     ),
                   ],
                 ),
-              ),
-              Text(
-                "ASHMAWY",
-                style: TextStyle(color: Theme.of(context).dividerColor),
               ),
               const SizedBox(height: 8),
             ],
