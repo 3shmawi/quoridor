@@ -86,4 +86,33 @@ void main() {
       }
     });
   });
+
+  test('every secret a workflow reads is one setup_secrets.sh sets', () {
+    // A secret named in a workflow but missing from the script is one that
+    // never gets set, and its job is skipped (or fails) without anyone
+    // noticing why.
+    final script = File('tool/setup_secrets.sh').readAsStringSync();
+    final read = <String>{
+      for (final file in workflows)
+        for (final m in RegExp(
+          r'secrets\.([A-Z0-9_]+)',
+        ).allMatches(file.readAsStringSync()))
+          m.group(1)!,
+    };
+    expect(read, contains('BUTLER_API_KEY'));
+    expect(read, contains('CLOUDFLARE_API_TOKEN'));
+    for (final name in read) {
+      expect(
+        script,
+        matches(RegExp('set_(value|file)\\s+$name\\s')),
+        reason: name,
+      );
+    }
+  });
+
+  test('the itch.io build loads from any folder', () {
+    final release = File('.github/workflows/release.yml').readAsStringSync();
+    expect(release, contains('<base href="./">'));
+    expect(release, contains('--pwa-strategy=none'));
+  });
 }

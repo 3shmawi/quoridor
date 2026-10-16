@@ -280,7 +280,10 @@ Everything is in GitHub Actions:
 - **CI** (`ci.yml`) — format, analyze, test and a web build on every push and
   pull request, plus the Security Rules tests.
 - **Pages** (`pages.yml`) — every push to `main` is tested, then deployed to
-  the web with a `latest.json` the app reads to spot a newer build.
+  the web with a `latest.json` the app reads to spot a newer build: on GitHub
+  Pages, and on Cloudflare Pages (project `quoridor`) when the
+  `CLOUDFLARE_API_TOKEN` secret is set, a token with only
+  **Cloudflare Pages: Edit**.
 - **Rules deploy** (part of `ci.yml`) — every push to `main` that passes the
   tests puts `firestore.rules` live, using `FIREBASE_SERVICE_ACCOUNT_JSON`.
 - **Bump version** (`bump.yml`) — run it from the Actions tab and pick patch,
@@ -288,7 +291,12 @@ Everything is in GitHub Actions:
 - **Release** (`release.yml`) — on that tag: builds Android, Linux, Windows
   and macOS and publishes them with `latest.json` as a GitHub Release.
   Signing, Google Play (internal track) and TestFlight run only when their
-  secrets are set; otherwise those steps are skipped with a note.
+  secrets are set; otherwise those steps are skipped with a note. With
+  `BUTLER_API_KEY` set, every build that finished is also pushed to
+  [itch.io](https://3shmawiii.itch.io/quoridor) with butler, one channel per
+  platform (`html5`, `windows`, `linux`, `mac`, `android`). The web zip
+  plays from any folder, as itch.io needs; mark the `html5` upload as
+  "played in the browser" once on the itch.io dashboard.
 
 Secrets are pushed from your own machine with `tool/setup_secrets.sh`. It
 reads the values all your apps share from `~/.app-secrets/shared.env`

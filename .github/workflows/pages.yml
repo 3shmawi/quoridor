@@ -1,4 +1,4 @@
-name: Deploy web to GitHub Pages
+name: Deploy web to GitHub Pages and Cloudflare Pages
 
 on:
   push:
@@ -85,6 +85,73 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: build/web
+
+  # The same site again on Cloudflare Pages, at its root rather than under
+  # /quoridor/, so it is its own build. Skipped with a warning when the
+  # CLOUDFLARE_API_TOKEN secret (Cloudflare Pages: Edit) is not set.
+  cloudflare:
+    name: Deploy to Cloudflare Pages
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      # Not a secret: it names the account, it does not grant access to it.
+      CLOUDFLARE_ACCOUNT_ID: 59e2f1308a0af66321e49dc4cb473736
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      PROJECT: quoridor
+    steps:
+      - name: Say why nothing was deployed
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::warning::CLOUDFLARE_API_TOKEN is not set, so the web build was not deployed to Cloudflare Pages."
+
+      - uses: actions/checkout@v5
+        if: env.HAS_TOKEN == 'true'
+        with:
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@v2
+        if: env.HAS_TOKEN == 'true'
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-node@v5
+        if: env.HAS_TOKEN == 'true'
+        with:
+          node-version: 24
+
+      - name: Build web
+        if: env.HAS_TOKEN == 'true'
+        run: |
+          flutter pub get
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          flutter build web \
+            --release \
+            --no-web-resources-cdn \
+            --base-href / \
+            --build-name=$VERSION \
+            --build-number=${{ github.run_number }} \
+            --dart-define=APP_VERSION=$VERSION \
+            --dart-define=BUILD_NUMBER=${{ github.run_number }} \
+            --dart-define=APP_COMMIT=${{ github.sha }}
+          python3 tool/write_latest_json.py build/web/latest.json
+
+      # The first deploy creates the project; after that it already exists.
+      - name: Create the Pages project if it is missing
+        if: env.HAS_TOKEN == 'true'
+        run: |
+          if ! out=$(npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=main 2>&1); then
+            echo "$out" | grep -qi "already exists" || { echo "$out"; exit 1; }
+          fi
+
+      - name: Deploy
+        if: env.HAS_TOKEN == 'true'
+        run: >
+          npx --yes wrangler@4 pages deploy build/web
+          --project-name="$PROJECT"
+          --branch=main
+          --commit-hash="$GITHUB_SHA"
 
   deploy:
     name: Deploy
