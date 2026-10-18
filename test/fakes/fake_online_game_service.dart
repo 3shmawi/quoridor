@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:quoridor/flame/constants.dart';
+import 'package:quoridor/flame/models/online_chat.dart';
 import 'package:quoridor/flame/models/online_session.dart';
 import 'package:quoridor/flame/services/online/online_game_service.dart';
 
@@ -73,6 +74,27 @@ class FakeOnlineGameService implements OnlineGameService {
     submitResults.add(result);
     return result.future;
   }
+
+  /// Messages sent, in order, and whether sending them works.
+  final chatSent = <ChatMessage>[];
+  bool chatFails = false;
+  final _chatStreams = <String, StreamController<List<ChatMessage>>>{};
+
+  /// Delivers [messages] as the game's latest chat, as Firestore would.
+  void pushChat(String gameId, List<ChatMessage> messages) =>
+      _chatStreams[gameId]?.add(messages);
+
+  @override
+  Future<bool> sendChat(String gameId, ChatMessage message) async {
+    if (chatFails) return false;
+    chatSent.add(message);
+    return true;
+  }
+
+  @override
+  Stream<List<ChatMessage>> watchChat(String gameId) =>
+      (_chatStreams[gameId] ??= StreamController<List<ChatMessage>>.broadcast())
+          .stream;
 
   @override
   Future<void> heartbeat(String gameId, int seat) async {}

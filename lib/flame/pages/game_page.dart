@@ -13,6 +13,8 @@ import '../../flame/services/settings_service.dart';
 import '../../flame/services/online/online_game_controller.dart';
 import '../../flame/services/turn_clock.dart';
 import '../services/update/update_service.dart';
+import '../models/online_chat.dart';
+import '../widgets/online_chat.dart';
 import 'online_lobby_page.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/models/move_notation.dart';
@@ -23,7 +25,12 @@ import '../../flame/services/saved_game_service.dart';
 import '../../theme.dart';
 
 class GamePage extends StatefulWidget {
-  const GamePage({super.key});
+  const GamePage({super.key, this.openLobby});
+
+  /// Opens the online lobby and returns the game it started, if any. Tests
+  /// put their own here; the app uses [OnlineLobbyPage].
+  @visibleForTesting
+  final Future<OnlineGameController?> Function(BuildContext context)? openLobby;
 
   @override
   State<GamePage> createState() => _GamePageState();
@@ -53,6 +60,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   OnlineGameController? _online;
 
   bool get _isOnline => _online != null;
+
+  /// Plays the sound for each message the others send.
+  StreamSubscription<ChatMessage>? _chatSound;
 
   @override
   void initState() {
@@ -202,9 +212,12 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   Future<void> _startOnlineGame() async {
     closeMenu();
 
-    final controller = await Navigator.of(context).push<OnlineGameController>(
-      MaterialPageRoute(builder: (_) => const OnlineLobbyPage()),
-    );
+    final openLobby =
+        widget.openLobby ??
+        (context) => Navigator.of(context).push<OnlineGameController>(
+          MaterialPageRoute(builder: (_) => const OnlineLobbyPage()),
+        );
+    final controller = await openLobby(context);
 
     if (controller == null || !mounted) {
       controller?.dispose();
@@ -222,6 +235,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     controller.onRemoteUpdate = _game.updateGameState;
     controller.onGameOver = _handleOnlineGameOver;
     controller.addListener(_handleOnlineChanged);
+    _chatSound = controller.chatArrivals.listen(_handleChatArrived);
 
     final board = controller.game?.board;
     if (board != null) _game.updateGameState(board);
@@ -266,6 +280,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _online = null;
     controller.removeListener(_handleOnlineChanged);
+    _chatSound?.cancel();
+    _chatSound = null;
     unawaited(controller.leave(abandon: abandon));
     controller.dispose();
 
@@ -273,6 +289,29 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _game.turnGate = null;
     _game.viewTurns = 0;
     _game.onSubmitMove = null;
+  }
+
+  void _handleChatArrived(ChatMessage message) {
+    if (message.seat == _online?.localPlayerId) return;
+    AudioService.instance.play(Sfx.chat);
+    HapticFeedback.selectionClick();
+  }
+
+  /// What the chat calls a seat: "You", or the name the player chose.
+  String _chatName(int seat) {
+    if (seat == _online?.localPlayerId) return context.l10n.you;
+    return _online?.game?.players[seat]?.displayName ?? context.l10n.opponent;
+  }
+
+  void _openChat() {
+    final online = _online;
+    if (online == null) return;
+    showChatSheet(
+      context,
+      controller: online,
+      nameOf: _chatName,
+      colorOf: _seatColor,
+    );
   }
 
   Future<void> _leaveOnlineGame() async {
@@ -638,6 +677,18 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   shrinkWrap: true,
                   children: [
+                    _buildModeCard(
+                      key: const Key('mode_online'),
+                      icon: Icons.public,
+                      title: context.l10n.playOnline,
+                      subtitle: context.l10n.playOnlineSubtitle,
+                      featured: true,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _startOnlineGame();
+                      },
+                    ),
+                    const SizedBox(height: 16),
                     if (_canContinue) ...[
                       _buildModeCard(
                         icon: Icons.play_arrow_rounded,
@@ -680,16 +731,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                       title: context.l10n.playVsAIs,
                       subtitle: context.l10n.playVsAIsSubtitle,
                       onTap: _startGameAgainstSeveralAIs,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildModeCard(
-                      icon: Icons.public,
-                      title: context.l10n.playOnline,
-                      subtitle: context.l10n.playOnlineSubtitle,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _startOnlineGame();
-                      },
                     ),
                     const SizedBox(height: 16),
                     _buildModeCard(
@@ -764,74 +805,124 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
   }
 
+  /// One choice in the mode sheet. The [featured] one is filled in the
+  /// app's colour so it is the first thing the eye lands on.
   Widget _buildModeCard({
+    Key? key,
     required IconData icon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    bool featured = false,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+    final foreground = featured ? Colors.white : scheme.onSurface;
+
     return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
+      key: key,
+      elevation: featured ? 4 : 0,
+      shadowColor: scheme.primary.withValues(alpha: 0.5),
+      clipBehavior: Clip.antiAlias,
+      color: featured ? null : scheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-        ),
+        side: featured
+            ? BorderSide.none
+            : BorderSide(color: scheme.outline.withValues(alpha: 0.2)),
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+      child: Ink(
+        decoration: featured
+            ? const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: AlignmentDirectional.topStart,
+                  end: AlignmentDirectional.bottomEnd,
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                 ),
-                child: Icon(
-                  icon,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 28,
+              )
+            : null,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: featured
+                        ? Colors.white.withValues(alpha: 0.2)
+                        : scheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: featured ? Colors.white : scheme.primary,
+                    size: 28,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: foreground,
+                            ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.7),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: foreground.withValues(alpha: 0.75),
+                        ),
                       ),
-                    ),
-                  ],
+                      if (featured) ...[
+                        const SizedBox(height: 8),
+                        // A peek at the reactions waiting in an online game.
+                        Row(
+                          children: [
+                            for (final item in const [
+                              QuickChat.laugh,
+                              QuickChat.thinking,
+                              QuickChat.angry,
+                              QuickChat.scared,
+                            ])
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  end: 2,
+                                ),
+                                child: ChatGlyph(item, size: 16),
+                              ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                context.l10n.chat,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
-            ],
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: foreground.withValues(alpha: 0.5),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1031,23 +1122,39 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                 Expanded(
                   // A tap anywhere off the game area -- the status strip, the
                   // padding, the banner -- puts down whatever was lined up.
-                  child: TapRegion(
-                    onTapOutside: (_) => _game.clearInteraction(),
-                    // Online, the board dims while it is someone else's turn:
-                    // it can be watched but not touched until the turn
-                    // comes back.
-                    child: AnimatedOpacity(
-                      opacity: _isOnline && !_game.canActNow ? 0.75 : 1,
-                      duration: const Duration(milliseconds: 200),
-                      // Each online player sees the board from their own side,
-                      // with their pawn starting at the bottom.
-                      child: RotatedBox(
-                        quarterTurns: _game.viewTurns,
-                        child: GameWidget<QuoridorGame>.controlled(
-                          gameFactory: () => _game,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: TapRegion(
+                          onTapOutside: (_) => _game.clearInteraction(),
+                          // Online, the board dims while it is someone else's turn:
+                          // it can be watched but not touched until the turn
+                          // comes back.
+                          child: AnimatedOpacity(
+                            opacity: _isOnline && !_game.canActNow ? 0.75 : 1,
+                            duration: const Duration(milliseconds: 200),
+                            // Each online player sees the board from their own side,
+                            // with their pawn starting at the bottom.
+                            child: RotatedBox(
+                              quarterTurns: _game.viewTurns,
+                              child: GameWidget<QuoridorGame>.controlled(
+                                gameFactory: () => _game,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      // Messages pop up in the board's corners.
+                      if (_online case final online?)
+                        Positioned.fill(
+                          child: ChatBubbleLayer(
+                            arrivals: online.chatArrivals,
+                            localSeat: online.localPlayerId,
+                            nameOf: _chatName,
+                            colorOf: _seatColor,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 if (_isOnline) _buildOnlineBanner(),
@@ -1576,7 +1683,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               ),
             ),
           ),
-          if (action != null) action,
+          ?action,
+          if (online.game != null && online.localPlayerId != null) ...[
+            const SizedBox(width: 8),
+            ChatButton(
+              unread: online.unreadChat,
+              onPressed: _openChat,
+              arrivals: online.chatArrivals,
+              localSeat: online.localPlayerId,
+            ),
+          ],
         ],
       ),
     );

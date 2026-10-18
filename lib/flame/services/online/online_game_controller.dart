@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
 import '../../constants.dart';
 import '../../models/game_state.dart';
+import '../../models/online_chat.dart';
 import '../../models/online_session.dart';
 import '../game_service.dart';
 import '../identity_service.dart';
@@ -37,10 +39,16 @@ enum OnlineConnectionState {
 /// arrive from the opponent, and exposes a single listenable state for the
 /// screens to render.
 class OnlineGameController extends ChangeNotifier {
-  OnlineGameController({OnlineGameService? service})
-    : _service = service ?? OnlineGameService.instance;
+  OnlineGameController({OnlineGameService? service, DateTime Function()? now})
+    : _service = service ?? OnlineGameService.instance,
+      _now = now ?? DateTime.now;
 
   final OnlineGameService _service;
+  final DateTime Function() _now;
+
+  /// The shortest gap between two messages from this device, so a reaction
+  /// stays a reaction rather than a flood of them.
+  static const Duration chatCooldown = Duration(milliseconds: 1200);
 
   /// How often this device reports that it is still here.
   static const Duration heartbeatInterval = Duration(seconds: 10);
@@ -67,6 +75,7 @@ class OnlineGameController extends ChangeNotifier {
   OnlineGame? _serverGame;
 
   StreamSubscription<OnlineGame>? _subscription;
+  StreamSubscription<List<ChatMessage>>? _chatSubscription;
   Timer? _heartbeat;
   Timer? _presenceTicker;
 
@@ -197,6 +206,130 @@ class OnlineGameController extends ChangeNotifier {
   Future<bool> _joinRematch(RematchLink link) async =>
       _adopt(await _service.joinByCode(link.roomCode));
 
+  // --- Chat ----------------------------------------------------------------
+
+  final List<ChatMessage> _chat = [];
+  final StreamController<ChatMessage> _chatArrivals =
+      StreamController<ChatMessage>.broadcast();
+  final Random _random = Random();
+  int _unreadChat = 0;
+  DateTime? _lastChatSent;
+
+  /// False until the first list of messages has come in. That one is the
+  /// conversation so far, not anything new, so it neither pops up nor
+  /// counts as unread.
+  bool _chatPrimed = false;
+
+  /// This game's messages, oldest first.
+  List<ChatMessage> get chat => List.unmodifiable(_chat);
+
+  /// Messages from the others since the chat was last looked at.
+  int get unreadChat => _unreadChat;
+
+  /// Every message as it should pop up on screen: the others' when they
+  /// arrive, and this device's own the moment it is sent.
+  Stream<ChatMessage> get chatArrivals => _chatArrivals.stream;
+
+  /// Whether a message can go out right now.
+  bool get canChat {
+    final session = _session;
+    if (_disposed || session == null || !session.isParticipant) return false;
+    final last = _lastChatSent;
+    return last == null || _now().difference(last) >= chatCooldown;
+  }
+
+  /// Sends [item] to the table. It shows here at once and goes out in the
+  /// background; false when it was not sent at all.
+  Future<bool> sendChat(QuickChat item) async {
+    final session = _session;
+    final seat = session?.localPlayerId;
+    if (session == null || seat == null || !canChat) return false;
+
+    final sentAt = _now();
+    _lastChatSent = sentAt;
+    final message = ChatMessage(
+      id:
+          '$seat-${sentAt.microsecondsSinceEpoch}-'
+          '${_random.nextInt(0x7fffffff).toRadixString(36)}',
+      seat: seat,
+      item: item,
+      sentAt: sentAt,
+    );
+    _mergeChat([message]);
+    _chatArrivals.add(message);
+    notifyListeners();
+
+    final sent = await _service.sendChat(session.game.gameId, message);
+    if (!sent && !_disposed) {
+      // Taking it back off the list says it did not go, without a toast
+      // in the middle of the board for something this small.
+      _chat.removeWhere((m) => m.id == message.id);
+      notifyListeners();
+    }
+    return sent;
+  }
+
+  /// The chat has been read.
+  void markChatRead() {
+    if (_unreadChat == 0) return;
+    _unreadChat = 0;
+    notifyListeners();
+  }
+
+  void _onChatChanged(List<ChatMessage> messages) {
+    if (_disposed) return;
+    final known = {for (final m in _chat) m.id};
+    final fresh = [
+      for (final m in messages)
+        if (!known.contains(m.id)) m,
+    ];
+    _mergeChat(messages);
+
+    if (_chatPrimed) {
+      final seat = _session?.localPlayerId;
+      for (final message in fresh) {
+        if (message.seat == seat) continue;
+        _unreadChat++;
+        _chatArrivals.add(message);
+      }
+    }
+    _chatPrimed = true;
+    notifyListeners();
+  }
+
+  /// Adds [messages] to the list, taking the server's copy of any already
+  /// there, and keeps it in order and to its length.
+  void _mergeChat(List<ChatMessage> messages) {
+    final byId = {for (final m in _chat) m.id: m};
+    for (final m in messages) {
+      // A message the server has not dated yet keeps the time it was first
+      // seen here, so it stays where it was in the list.
+      byId[m.id] = m.sentAt != null
+          ? m
+          : ChatMessage(
+              id: m.id,
+              seat: m.seat,
+              item: m.item,
+              sentAt: byId[m.id]?.sentAt ?? _now(),
+            );
+    }
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    final merged = byId.values.toList()
+      ..sort((a, b) => (a.sentAt ?? epoch).compareTo(b.sentAt ?? epoch));
+    final overflow = merged.length - OnlineGameService.chatHistory;
+    _chat
+      ..clear()
+      ..addAll(overflow > 0 ? merged.skip(overflow) : merged);
+  }
+
+  void _resetChat() {
+    _chatSubscription?.cancel();
+    _chatSubscription = null;
+    _chat.clear();
+    _unreadChat = 0;
+    _chatPrimed = false;
+  }
+
   /// The player whose turn it is, as the server names them.
   OnlinePlayer? get playerToMove {
     final game = _session?.game;
@@ -254,6 +387,18 @@ class OnlineGameController extends ChangeNotifier {
     _subscription = _service
         .watchGame(gameId)
         .listen(_onGameChanged, onError: _onStreamError);
+
+    // A rematch is a new game with a conversation of its own.
+    _resetChat();
+    _chatSubscription = _service
+        .watchChat(gameId)
+        .listen(
+          _onChatChanged,
+          // Chat going quiet must not end the game; the game's own stream
+          // reports a lost connection.
+          onError: (Object error) =>
+              debugPrint('OnlineGameController: chat error: $error'),
+        );
 
     // Report in immediately, then keep reporting.
     unawaited(_service.heartbeat(gameId, seat));
@@ -465,6 +610,8 @@ class OnlineGameController extends ChangeNotifier {
   void _teardown() {
     _subscription?.cancel();
     _subscription = null;
+    _chatSubscription?.cancel();
+    _chatSubscription = null;
     _heartbeat?.cancel();
     _heartbeat = null;
     _presenceTicker?.cancel();
@@ -475,6 +622,7 @@ class OnlineGameController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _teardown();
+    _chatArrivals.close();
     super.dispose();
   }
 }

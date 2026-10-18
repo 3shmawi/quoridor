@@ -12,7 +12,10 @@ enum Sfx {
   wall2('wall_2.wav'),
   wall3('wall_3.wav'),
   wall4('wall_4.wav'),
-  win('win.wav', voices: 1);
+  win('win.wav', voices: 1),
+
+  /// A chat message from another player popping up.
+  chat('chat.wav', voices: 1);
 
   const Sfx(this.file, {this.voices = 2});
 

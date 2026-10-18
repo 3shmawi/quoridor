@@ -1,5 +1,6 @@
 import '../../constants.dart';
 import '../../models/game_state.dart';
+import '../../models/online_chat.dart';
 import '../../models/online_session.dart';
 
 /// Translates between the game's own types and the documents stored for an
@@ -171,6 +172,33 @@ class OnlineGameCodec {
       outcomeReason: _decodeReason(outcome?['reason'] as String?),
       updatedAt: _decodeTime(data['updatedAt']),
       rematch: decodeRematch(data['rematch']),
+    );
+  }
+
+  /// The fields of one chat message. `uid` is there for the Security Rules,
+  /// which check the sender sits in [ChatMessage.seat].
+  static Map<String, dynamic> encodeChat({
+    required ChatMessage message,
+    required String uid,
+    required Object sentAt,
+  }) => {
+    'seat': message.seat,
+    'uid': uid,
+    'code': message.item.name,
+    'sentAt': sentAt,
+  };
+
+  /// Decodes a chat document, or null for one this build cannot show: an
+  /// entry added by a newer version, or a malformed write.
+  static ChatMessage? decodeChat(String id, Map<String, dynamic> data) {
+    final seat = data['seat'];
+    final item = QuickChat.tryParse(data['code']);
+    if (seat is! int || item == null) return null;
+    return ChatMessage(
+      id: id,
+      seat: seat,
+      item: item,
+      sentAt: _decodeTime(data['sentAt']),
     );
   }
 

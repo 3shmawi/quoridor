@@ -11,7 +11,8 @@ rules_version = '2';
 // own pawn or wall supply, that a step covers at most two squares, that a
 // wall costs one and lands on the board, that walls and history only ever
 // grow, that the turn passes to the next seat, that only a pawn on its goal
-// edge can end the game, and that recorded moves are never altered.
+// edge can end the game, and that recorded moves are never altered. Chat
+// between the players is limited to the game's fixed set of reactions.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -313,6 +314,54 @@ service cloud.firestore {
                       && game().currentPlayerId
                          == seatOf(game(), request.auth.uid)
                       && int(moveId) == game().moveCount;
+        allow update, delete: if false;
+      }
+
+      match /chat/{messageId} {
+        function chatGame() {
+          return get(/databases/$(database)/documents/games/$(gameId)).data;
+        }
+
+        // The quick reactions QuickChat lists, in the app's order. There is
+        // no free text: a message can only name one of these.
+        function isQuickChat(code) {
+          return code in [
+              'laugh',
+              'cool',
+              'thinking',
+              'angry',
+              'scared',
+              'crying',
+              'love',
+              'sleepy',
+              'mindBlown',
+              'party',
+              'smirk',
+              'hello',
+              'goodLuck',
+              'niceMove',
+              'oops',
+              'hurryUp',
+              'notThatWall',
+              'wellPlayed',
+              'goodGame',
+              'thanks'
+          ];
+        }
+
+        // Reactions the players send each other. Only the game's players may
+        // read or send them; a message comes from the sender's own seat, as
+        // themselves, names one of the fixed set, and is dated by the server.
+        // Like a move, a message once sent stays as it was sent.
+        allow read: if isPlayer(chatGame());
+        allow create: if isPlayer(chatGame())
+                      && request.resource.data.keys()
+                         .hasOnly(['seat', 'uid', 'code', 'sentAt'])
+                      && request.resource.data.uid == request.auth.uid
+                      && request.resource.data.seat
+                         == seatOf(chatGame(), request.auth.uid)
+                      && isQuickChat(request.resource.data.code)
+                      && request.resource.data.sentAt == request.time;
         allow update, delete: if false;
       }
     }

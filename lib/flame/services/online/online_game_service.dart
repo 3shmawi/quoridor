@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../constants.dart';
 import '../../models/game_state.dart';
+import '../../models/online_chat.dart';
 import '../../models/online_session.dart';
 import '../firebase_service.dart';
 import '../game_service.dart';
@@ -95,6 +96,10 @@ class OnlineGameService {
 
   static const String gamesCollection = 'games';
   static const String movesCollection = 'moves';
+  static const String chatCollection = 'chat';
+
+  /// How much of a game's chat is kept on screen.
+  static const int chatHistory = 50;
 
   /// How many codes to try before giving up on finding an unused one.
   static const int _codeAttempts = 5;
@@ -397,6 +402,55 @@ class OnlineGameService {
       debugPrint('OnlineGameService: submitMove failed: $error');
       return OnlineResult.failed(OnlineFailure.backendError, '$error');
     }
+  }
+
+  /// Sends [message] to everyone in [gameId].
+  ///
+  /// The id is the sender's own, so the copy it shows straight away and the
+  /// one the server sends back are known to be the same message.
+  Future<bool> sendChat(String gameId, ChatMessage message) async {
+    final games = _games;
+    final identity = IdentityService.instance.current;
+    if (games == null || identity == null) return false;
+    try {
+      await games
+          .doc(gameId)
+          .collection(chatCollection)
+          .doc(message.id)
+          .set(
+            OnlineGameCodec.encodeChat(
+              message: message,
+              uid: identity.uid,
+              sentAt: FieldValue.serverTimestamp(),
+            ),
+          );
+      return true;
+    } catch (error) {
+      debugPrint('OnlineGameService: sendChat failed: $error');
+      return false;
+    }
+  }
+
+  /// The latest [chatHistory] messages in [gameId], oldest first, every time
+  /// one arrives.
+  Stream<List<ChatMessage>> watchChat(String gameId) {
+    final games = _games;
+    if (games == null) return const Stream<List<ChatMessage>>.empty();
+
+    return games
+        .doc(gameId)
+        .collection(chatCollection)
+        .orderBy('sentAt', descending: true)
+        .limit(chatHistory)
+        .snapshots()
+        .map(
+          (snapshot) => [
+            for (final doc in snapshot.docs.reversed)
+              // A message still on its way has no server time yet; the
+              // controller dates it itself.
+              ?OnlineGameCodec.decodeChat(doc.id, doc.data()),
+          ],
+        );
   }
 
   /// Offers [link] as the rematch of the finished game [gameId].

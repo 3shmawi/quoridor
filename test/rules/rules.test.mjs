@@ -10,6 +10,11 @@ import {
 import {
   doc,
   getDoc,
+  getDocs,
+  collection,
+  query,
+  orderBy,
+  limit,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -850,5 +855,88 @@ describe('reading and deleting', () => {
   it('refuses deleting a game', async () => {
     await seed('games/read-4', activeGame());
     await assertFails(deleteDoc(doc(db(ALICE), 'games/read-4')));
+  });
+});
+
+describe('chat', () => {
+  /** A message as the client writes it. */
+  const message = (seat, uid, code = 'laugh') => ({
+    seat,
+    uid,
+    code,
+    sentAt: serverTimestamp(),
+  });
+
+  it('lets a player send a reaction from their own seat', async () => {
+    await seed('games/chat-1', activeGame());
+    await assertSucceeds(
+      setDoc(doc(db(BOB), 'games/chat-1/chat/m1'), message(2, BOB, 'scared')),
+    );
+  });
+
+  it('lets the players read the chat, newest first', async () => {
+    await seed('games/chat-2', activeGame());
+    await seed('games/chat-2/chat/m1', { seat: 1, uid: ALICE, code: 'hello', sentAt: 0 });
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db(BOB), 'games/chat-2/chat'),
+          orderBy('sentAt', 'desc'),
+          limit(50),
+        ),
+      ),
+    );
+  });
+
+  it('keeps the chat from anyone outside the game', async () => {
+    await seed('games/chat-3', activeGame());
+    await assertFails(getDocs(collection(db(MALLORY), 'games/chat-3/chat')));
+    await assertFails(
+      setDoc(doc(db(MALLORY), 'games/chat-3/chat/m1'), message(1, MALLORY)),
+    );
+  });
+
+  it('refuses speaking for somebody else’s seat', async () => {
+    await seed('games/chat-4', activeGame());
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-4/chat/m1'), message(2, ALICE)),
+    );
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-4/chat/m2'), message(1, BOB)),
+    );
+  });
+
+  it('refuses anything but the fixed reactions', async () => {
+    await seed('games/chat-5', activeGame());
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-5/chat/m1'), message(1, ALICE, 'you are bad')),
+    );
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-5/chat/m2'), {
+        ...message(1, ALICE),
+        text: 'free text smuggled alongside',
+      }),
+    );
+  });
+
+  it('refuses a message dated by the sender', async () => {
+    await seed('games/chat-6', activeGame());
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-6/chat/m1'), { ...message(1, ALICE), sentAt: 0 }),
+    );
+  });
+
+  it('lets the players chat after the game is over', async () => {
+    await seed('games/chat-7', { ...activeGame(), status: 'finished' });
+    await assertSucceeds(
+      setDoc(doc(db(ALICE), 'games/chat-7/chat/m1'), message(1, ALICE, 'goodGame')),
+    );
+  });
+
+  it('never lets a sent message be changed or taken back', async () => {
+    await seed('games/chat-8', activeGame());
+    await seed('games/chat-8/chat/m1', { seat: 1, uid: ALICE, code: 'laugh', sentAt: 0 });
+    await assertFails(updateDoc(doc(db(ALICE), 'games/chat-8/chat/m1'), { code: 'love' }));
+    await assertFails(deleteDoc(doc(db(ALICE), 'games/chat-8/chat/m1')));
   });
 });
