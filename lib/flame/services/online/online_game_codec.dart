@@ -184,7 +184,8 @@ class OnlineGameCodec {
   }) => {
     'seat': message.seat,
     'uid': uid,
-    'code': message.item.name,
+    'code': message.item?.name ?? ChatMessage.textCode,
+    if (message.text case final text?) 'text': text,
     'sentAt': sentAt,
   };
 
@@ -192,14 +193,20 @@ class OnlineGameCodec {
   /// entry added by a newer version, or a malformed write.
   static ChatMessage? decodeChat(String id, Map<String, dynamic> data) {
     final seat = data['seat'];
+    if (seat is! int) return null;
+    final sentAt = _decodeTime(data['sentAt']);
+
+    if (data['code'] == ChatMessage.textCode) {
+      final text = data['text'];
+      if (text is! String) return null;
+      final tidy = ChatMessage.tidy(text);
+      if (tidy.isEmpty) return null;
+      return ChatMessage(id: id, seat: seat, text: tidy, sentAt: sentAt);
+    }
+
     final item = QuickChat.tryParse(data['code']);
-    if (seat is! int || item == null) return null;
-    return ChatMessage(
-      id: id,
-      seat: seat,
-      item: item,
-      sentAt: _decodeTime(data['sentAt']),
-    );
+    if (item == null) return null;
+    return ChatMessage(id: id, seat: seat, item: item, sentAt: sentAt);
   }
 
   static OnlineOutcomeReason? _decodeReason(String? value) {

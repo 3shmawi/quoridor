@@ -114,6 +114,10 @@ class AppStrings {
   String get chatJustNow => _get('chatJustNow');
   String chatMinutesAgo(int n) => _fill('chatMinutesAgo', '$n');
   String chatUnread(int n) => _fill('chatUnread', '$n');
+  String get chatWriteHint => _get('chatWriteHint');
+  String get chatSend => _get('chatSend');
+  String get chatMute => _get('chatMute');
+  String get chatUnmute => _get('chatUnmute');
 
   /// What [item] says: the words of a line, or what a face means.
   String chatLabel(QuickChat item) => _get('chat_${item.name}');
@@ -317,6 +321,10 @@ class AppStrings {
     'chatJustNow': 'now',
     'chatMinutesAgo': '%s min',
     'chatUnread': 'Chat, %s new',
+    'chatWriteHint': 'Write a message…',
+    'chatSend': 'Send',
+    'chatMute': 'Mute the chat',
+    'chatUnmute': 'Unmute the chat',
     'chat_laugh': 'Ha ha!',
     'chat_cool': 'Too cool',
     'chat_thinking': 'Hmm…',
@@ -332,6 +340,8 @@ class AppStrings {
     'chat_goodLuck': 'Good luck!',
     'chat_niceMove': 'Nice move!',
     'chat_oops': 'Oops!',
+    'chat_didntMeanIt': "Didn't mean it, I swear!",
+    'chat_misplayed': 'Misplayed that one',
     'chat_hurryUp': 'Hurry up!',
     'chat_notThatWall': 'Not that wall!',
     'chat_wellPlayed': 'Well played',
@@ -527,6 +537,10 @@ class AppStrings {
     'chatJustNow': 'دلوقتي',
     'chatMinutesAgo': '%s د',
     'chatUnread': 'دردشة، %s جديد',
+    'chatWriteHint': 'اكتب رسالة…',
+    'chatSend': 'ابعت',
+    'chatMute': 'اكتم الدردشة',
+    'chatUnmute': 'رجّع صوت الدردشة',
     'chat_laugh': 'هههههه!',
     'chat_cool': 'روقان',
     'chat_thinking': 'امممم…',
@@ -542,6 +556,8 @@ class AppStrings {
     'chat_goodLuck': 'بالتوفيق!',
     'chat_niceMove': 'حركة حلوة!',
     'chat_oops': 'أوبس!',
+    'chat_didntMeanIt': 'مقصدش دي وربنا!',
+    'chat_misplayed': 'اتلعبت غلط',
     'chat_hurryUp': 'يلا بسرعة!',
     'chat_notThatWall': 'مش الحيطة دي!',
     'chat_wellPlayed': 'لعبت حلو',
