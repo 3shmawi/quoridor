@@ -10,6 +10,8 @@ import '../../models/online_session.dart';
 import '../game_service.dart';
 import '../turn_clock.dart';
 import '../identity_service.dart';
+import '../settings_service.dart';
+import 'chat_filter.dart';
 import 'online_game_service.dart';
 
 /// How this device is faring in an online game.
@@ -40,12 +42,21 @@ enum OnlineConnectionState {
 /// arrive from the opponent, and exposes a single listenable state for the
 /// screens to render.
 class OnlineGameController extends ChangeNotifier {
-  OnlineGameController({OnlineGameService? service, DateTime Function()? now})
-    : _service = service ?? OnlineGameService.instance,
-      _now = now ?? DateTime.now;
+  OnlineGameController({
+    OnlineGameService? service,
+    DateTime Function()? now,
+    ValueNotifier<Set<String>>? blocked,
+  }) : _service = service ?? OnlineGameService.instance,
+       _now = now ?? DateTime.now,
+       _blocked = blocked ?? SettingsService.instance.blockedPlayers {
+    _blocked.addListener(notifyListeners);
+  }
 
   final OnlineGameService _service;
   final DateTime Function() _now;
+
+  /// The players this device has blocked, by account id, kept across games.
+  final ValueNotifier<Set<String>> _blocked;
 
   /// The shortest gap between two messages from this device, so a reaction
   /// stays a reaction rather than a flood of them.
@@ -368,8 +379,11 @@ class OnlineGameController extends ChangeNotifier {
   /// counts as unread.
   bool _chatPrimed = false;
 
-  /// This game's messages, oldest first.
-  List<ChatMessage> get chat => List.unmodifiable(_chat);
+  /// This game's messages, oldest first, leaving out blocked players'.
+  List<ChatMessage> get chat => List.unmodifiable([
+    for (final m in _chat)
+      if (!isSeatBlocked(m.seat)) m,
+  ]);
 
   /// Messages from the others since the chat was last looked at.
   int get unreadChat => _unreadChat;
@@ -394,7 +408,7 @@ class OnlineGameController extends ChangeNotifier {
   /// [ChatMessage.maxText] characters; false when there was nothing to send
   /// or it was not sent.
   Future<bool> sendText(String raw) {
-    final text = ChatMessage.tidy(raw);
+    final text = ChatFilter.clean(ChatMessage.tidy(raw));
     if (text.isEmpty) return Future.value(false);
     return _send(text: text);
   }
@@ -441,6 +455,76 @@ class OnlineGameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The account behind [seat] in this game, if anyone sits there.
+  String? _uidOf(int seat) => _session?.game.players[seat]?.uid;
+
+  /// Whether [seat] is someone this device has blocked. Their messages are
+  /// left out of the chat altogether: no bubble, no sound, no unread count.
+  bool isSeatBlocked(int seat) {
+    if (seat == localPlayerId) return false;
+    final uid = _uidOf(seat);
+    return uid != null && _blocked.value.contains(uid);
+  }
+
+  /// The other seats in this game that are blocked, in seat order.
+  List<int> get blockedSeats {
+    final game = _session?.game;
+    if (game == null) return const [];
+    return [
+      for (final seat in game.players.keys.toList()..sort())
+        if (isSeatBlocked(seat)) seat,
+    ];
+  }
+
+  /// Blocks whoever sits in [seat], in this game and every later one.
+  void blockSeat(int seat) {
+    final uid = _uidOf(seat);
+    if (uid == null || seat == localPlayerId) return;
+    _blocked.value = {..._blocked.value, uid};
+  }
+
+  /// Lets [seat]'s messages through again.
+  void unblockSeat(int seat) {
+    final uid = _uidOf(seat);
+    if (uid == null) return;
+    _blocked.value = {..._blocked.value}..remove(uid);
+  }
+
+  final Set<String> _reported = {};
+
+  /// Whether [message] has been reported from this device.
+  bool isReported(ChatMessage message) => _reported.contains(message.id);
+
+  /// Whether [message] is one this player could report: someone else's,
+  /// and not reported already.
+  bool canReport(ChatMessage message) =>
+      message.seat != localPlayerId &&
+      _uidOf(message.seat) != null &&
+      !isReported(message);
+
+  /// Reports [message] for review, and blocks its sender too when [block]
+  /// is true. False when the report did not go out.
+  Future<bool> reportMessage(ChatMessage message, {bool block = false}) async {
+    final session = _session;
+    final seat = session?.localPlayerId;
+    final uid = _uidOf(message.seat);
+    if (session == null || seat == null || uid == null) return false;
+    if (!canReport(message)) return isReported(message);
+    // Blocking needs no server, so it holds even if the report fails.
+    if (block) blockSeat(message.seat);
+    final sent = await _service.reportChat(
+      gameId: session.game.gameId,
+      message: message,
+      reporterSeat: seat,
+      reportedUid: uid,
+    );
+    if (sent && !_disposed) {
+      _reported.add(message.id);
+      notifyListeners();
+    }
+    return sent;
+  }
+
   /// The chat has been read.
   void markChatRead() {
     if (_unreadChat == 0) return;
@@ -460,7 +544,7 @@ class OnlineGameController extends ChangeNotifier {
     if (_chatPrimed && !_chatMuted) {
       final seat = _session?.localPlayerId;
       for (final message in fresh) {
-        if (message.seat == seat) continue;
+        if (message.seat == seat || isSeatBlocked(message.seat)) continue;
         _unreadChat++;
         _chatArrivals.add(message);
       }
@@ -846,6 +930,7 @@ class OnlineGameController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _blocked.removeListener(notifyListeners);
     _teardown();
     _chatArrivals.close();
     super.dispose();

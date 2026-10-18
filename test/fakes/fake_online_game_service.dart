@@ -141,6 +141,22 @@ class FakeOnlineGameService implements OnlineGameService {
     return true;
   }
 
+  /// Messages reported, with who sent them, and whether reporting works.
+  final reported = <({String gameId, ChatMessage message, String reportedUid})>[];
+  bool reportFails = false;
+
+  @override
+  Future<bool> reportChat({
+    required String gameId,
+    required ChatMessage message,
+    required int reporterSeat,
+    required String reportedUid,
+  }) async {
+    if (reportFails) return false;
+    reported.add((gameId: gameId, message: message, reportedUid: reportedUid));
+    return true;
+  }
+
   @override
   Stream<List<ChatMessage>> watchChat(String gameId) =>
       (_chatStreams[gameId] ??= StreamController<List<ChatMessage>>.broadcast())

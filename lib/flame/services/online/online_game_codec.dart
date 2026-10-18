@@ -230,6 +230,27 @@ class OnlineGameCodec {
     'sentAt': sentAt,
   };
 
+  /// A report of [message] in [gameId]: who reported it, who sent it, and
+  /// what it said, copied as it was sent.
+  static Map<String, dynamic> encodeReport({
+    required String gameId,
+    required ChatMessage message,
+    required String reporterUid,
+    required int reporterSeat,
+    required String reportedUid,
+    required Object reportedAt,
+  }) => {
+    'gameId': gameId,
+    'messageId': message.id,
+    'reporterUid': reporterUid,
+    'reporterSeat': reporterSeat,
+    'reportedUid': reportedUid,
+    'reportedSeat': message.seat,
+    'code': message.item?.name ?? ChatMessage.textCode,
+    if (message.text case final text?) 'text': text,
+    'reportedAt': reportedAt,
+  };
+
   /// Decodes a chat document, or null for one this build cannot show: an
   /// entry added by a newer version, or a malformed write.
   static ChatMessage? decodeChat(String id, Map<String, dynamic> data) {

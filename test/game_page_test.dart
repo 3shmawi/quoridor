@@ -104,6 +104,16 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('the menu links to the privacy policy', (tester) async {
+    await openPage(tester);
+    await tester.tap(find.byIcon(Icons.menu));
+    await settle(tester, frames: 5);
+
+    expect(find.byKey(const Key('privacyPolicy')), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
+    await finish(tester);
+  });
+
   testWidgets('undo is greyed out until there is a move to take back', (
     tester,
   ) async {

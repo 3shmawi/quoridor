@@ -98,6 +98,7 @@ class OnlineGameService {
   static const String gamesCollection = 'games';
   static const String movesCollection = 'moves';
   static const String chatCollection = 'chat';
+  static const String reportsCollection = 'reports';
 
   /// How much of a game's chat is kept on screen.
   static const int chatHistory = 50;
@@ -437,6 +438,40 @@ class OnlineGameService {
       return true;
     } catch (error) {
       debugPrint('OnlineGameService: sendChat failed: $error');
+      return false;
+    }
+  }
+
+  /// Reports [message], sent by [reportedUid], for the developer to review.
+  ///
+  /// The report copies what the message said, and the Security Rules check
+  /// the copy against the message itself, so a report can't put words in
+  /// anyone's mouth. Reports are written once and read only from the
+  /// Firebase console.
+  Future<bool> reportChat({
+    required String gameId,
+    required ChatMessage message,
+    required int reporterSeat,
+    required String reportedUid,
+  }) async {
+    final identity = IdentityService.instance.current;
+    if (!FirebaseService.isReady || identity == null) return false;
+    try {
+      await FirebaseFirestore.instance
+          .collection(reportsCollection)
+          .add(
+            OnlineGameCodec.encodeReport(
+              gameId: gameId,
+              message: message,
+              reporterUid: identity.uid,
+              reporterSeat: reporterSeat,
+              reportedUid: reportedUid,
+              reportedAt: FieldValue.serverTimestamp(),
+            ),
+          );
+      return true;
+    } catch (error) {
+      debugPrint('OnlineGameService: reportChat failed: $error');
       return false;
     }
   }

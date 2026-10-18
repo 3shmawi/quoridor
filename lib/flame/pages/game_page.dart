@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:confetti/confetti.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'dart:math' show pi;
 import 'dart:ui' show ImageFilter;
@@ -14,6 +15,7 @@ import '../../flame/services/settings_service.dart';
 import '../../flame/services/online/online_game_controller.dart';
 import '../../flame/services/turn_clock.dart';
 import '../services/update/update_service.dart';
+import '../services/legal.dart';
 import '../models/online_chat.dart';
 import '../models/online_session.dart';
 import '../widgets/online_chat.dart';
@@ -1288,6 +1290,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     },
                   ),
                 ),
+              ),
+              TextButton.icon(
+                key: const Key('privacyPolicy'),
+                onPressed: () => launchUrl(
+                  Legal.privacyPolicy,
+                  mode: LaunchMode.externalApplication,
+                ),
+                icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+                label: Text(context.l10n.privacyPolicy),
               ),
               Text.rich(
                 textDirection: TextDirection.ltr,

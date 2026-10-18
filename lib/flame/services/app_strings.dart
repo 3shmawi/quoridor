@@ -148,6 +148,18 @@ class AppStrings {
   String get chatSend => _get('chatSend');
   String get chatMute => _get('chatMute');
   String get chatUnmute => _get('chatUnmute');
+  String get chatTapToReport => _get('chatTapToReport');
+  String get chatReport => _get('chatReport');
+  String chatBlock(String name) => _fill('chatBlock', name);
+  String get chatReportTitle => _get('chatReportTitle');
+  String get chatReportBody => _get('chatReportBody');
+  String chatAlsoBlock(String name) => _fill('chatAlsoBlock', name);
+  String get chatReportSend => _get('chatReportSend');
+  String get chatReported => _get('chatReported');
+  String get chatReportFailed => _get('chatReportFailed');
+  String chatBlocked(String name) => _fill('chatBlocked', name);
+  String get chatUnblock => _get('chatUnblock');
+  String get privacyPolicy => _get('privacyPolicy');
 
   /// What [item] says: the words of a line, or what a face means.
   String chatLabel(QuickChat item) => _get('chat_${item.name}');
@@ -378,6 +390,19 @@ class AppStrings {
     'chatSend': 'Send',
     'chatMute': 'Mute the chat',
     'chatUnmute': 'Unmute the chat',
+    'chatTapToReport': 'Tap a message to report it or block its sender',
+    'chatReport': 'Report message',
+    'chatBlock': 'Block %s',
+    'chatReportTitle': 'Report this message?',
+    'chatReportBody':
+        'We will review it. The report includes the message and who sent it.',
+    'chatAlsoBlock': 'Also block %s',
+    'chatReportSend': 'Report',
+    'chatReported': 'Reported',
+    'chatReportFailed': "Couldn't send the report. Try again.",
+    'chatBlocked': 'You blocked %s',
+    'chatUnblock': 'Unblock',
+    'privacyPolicy': 'Privacy policy',
     'chat_laugh': 'Ha ha!',
     'chat_cool': 'Too cool',
     'chat_thinking': 'Hmm…',
@@ -618,6 +643,18 @@ class AppStrings {
     'chatSend': 'ابعت',
     'chatMute': 'اكتم الدردشة',
     'chatUnmute': 'رجّع صوت الدردشة',
+    'chatTapToReport': 'دوس على أي رسالة عشان تبلّغ عنها أو تحظر صاحبها',
+    'chatReport': 'بلّغ عن الرسالة',
+    'chatBlock': 'احظر %s',
+    'chatReportTitle': 'تبلّغ عن الرسالة دي؟',
+    'chatReportBody': 'هنراجعها. البلاغ فيه الرسالة واللي بعتها.',
+    'chatAlsoBlock': 'واحظر %s كمان',
+    'chatReportSend': 'بلّغ',
+    'chatReported': 'اتبلّغ عنها',
+    'chatReportFailed': 'معرفناش نبعت البلاغ. جرّب تاني.',
+    'chatBlocked': 'إنت حاظر %s',
+    'chatUnblock': 'إلغاء الحظر',
+    'privacyPolicy': 'سياسة الخصوصية',
     'chat_laugh': 'هههههه!',
     'chat_cool': 'روقان',
     'chat_thinking': 'امممم…',

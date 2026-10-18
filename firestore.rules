@@ -505,5 +505,49 @@ service cloud.firestore {
         allow update, delete: if false;
       }
     }
+
+    // Chat messages a player reported, for the developer to review in the
+    // Firebase console. A report is written once and never read back by the
+    // app. It has to name a real message in a game the reporter plays in,
+    // sent by someone else, and copy what that message said exactly, so a
+    // report can't put words in anyone's mouth.
+    match /reports/{reportId} {
+      function report() {
+        return request.resource.data;
+      }
+
+      function reportedGame() {
+        return get(/databases/$(database)/documents/games/$(report().gameId)).data;
+      }
+
+      function reportedMessage() {
+        return get(/databases/$(database)/documents/games/$(report().gameId)/chat/$(report().messageId)).data;
+      }
+
+      function holdsSeat(game, seat, uid) {
+        return game.players.keys().hasAny([string(seat)])
+          && game.players[string(seat)].uid == uid;
+      }
+
+      allow create: if request.auth != null
+                    && report().keys().hasOnly(['gameId', 'messageId',
+                         'reporterUid', 'reporterSeat', 'reportedUid',
+                         'reportedSeat', 'code', 'text', 'reportedAt'])
+                    && report().gameId is string
+                    && report().messageId is string
+                    && report().reporterSeat is int
+                    && report().reportedSeat is int
+                    && report().reporterUid == request.auth.uid
+                    && report().reportedUid != request.auth.uid
+                    && report().reportedAt == request.time
+                    && holdsSeat(reportedGame(), report().reporterSeat,
+                         request.auth.uid)
+                    && reportedMessage().uid == report().reportedUid
+                    && reportedMessage().seat == report().reportedSeat
+                    && reportedMessage().code == report().code
+                    && reportedMessage().get('text', null)
+                       == report().get('text', null);
+      allow read, update, delete: if false;
+    }
   }
 }

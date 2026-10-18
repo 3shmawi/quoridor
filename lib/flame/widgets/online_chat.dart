@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../models/online_chat.dart';
 import '../services/app_strings.dart';
+import '../services/online/chat_filter.dart';
 import '../services/online/online_game_controller.dart';
 
 /// Names and colours a seat the way the rest of the screen does.
@@ -14,8 +15,12 @@ typedef SeatColor = Color Function(int seat);
 
 /// What [message] says: the words typed, or the reaction's words in the
 /// reader's language.
-String chatWords(BuildContext context, ChatMessage message) =>
-    message.text ?? context.l10n.chatLabel(message.item!);
+String chatWords(BuildContext context, ChatMessage message) => switch (message
+    .text) {
+  // Masked again here, for lines from builds that sent them unfiltered.
+  final text? => ChatFilter.clean(text),
+  null => context.l10n.chatLabel(message.item!),
+};
 
 // --- The face -------------------------------------------------------------
 
@@ -800,6 +805,157 @@ class _ChatSheetState extends State<ChatSheet> {
     await widget.controller.sendText(text);
   }
 
+  /// Why the last report did not go, shown under the conversation.
+  String? _notice;
+
+  /// What can be done about someone else's [message]: report it, or block
+  /// whoever sent it.
+  Future<void> _messageActions(ChatMessage message) async {
+    final controller = widget.controller;
+    final name = widget.nameOf(message.seat);
+    HapticFeedback.selectionClick();
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              key: const Key('chatReport'),
+              leading: const Icon(Icons.flag_outlined),
+              title: Text(context.l10n.chatReport),
+              enabled: controller.canReport(message),
+              onTap: () => Navigator.of(context).pop('report'),
+            ),
+            ListTile(
+              key: const Key('chatBlock'),
+              leading: Icon(
+                Icons.block_rounded,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(context.l10n.chatBlock(name)),
+              onTap: () => Navigator.of(context).pop('block'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'report':
+        await _report(message, name);
+      case 'block':
+        controller.blockSeat(message.seat);
+    }
+  }
+
+  /// Asks before reporting [message], offering to block [name] as well.
+  Future<void> _report(ChatMessage message, String name) async {
+    var block = true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(context.l10n.chatReportTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(context.l10n.chatReportBody),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                key: const Key('chatAlsoBlock'),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: block,
+                onChanged: (value) =>
+                    setDialogState(() => block = value ?? false),
+                title: Text(context.l10n.chatAlsoBlock(name)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(context.l10n.cancel),
+            ),
+            FilledButton(
+              key: const Key('confirmReport'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(context.l10n.chatReportSend),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _notice = null);
+    final sent = await widget.controller.reportMessage(message, block: block);
+    if (!mounted || sent) return;
+    setState(() => _notice = context.l10n.chatReportFailed);
+  }
+
+  /// One line per blocked player, each with a way back.
+  Widget _blockedNotes(OnlineGameController controller) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        for (final seat in controller.blockedSeats)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+            padding: const EdgeInsetsDirectional.only(start: 12, end: 4),
+            decoration: BoxDecoration(
+              color: scheme.error.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.block_rounded, size: 16, color: scheme.error),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    context.l10n.chatBlocked(widget.nameOf(seat)),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                TextButton(
+                  key: Key('chatUnblock_$seat'),
+                  onPressed: () => controller.unblockSeat(seat),
+                  child: Text(context.l10n.chatUnblock),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Under the conversation: how to report, or why a report failed.
+  Widget _hint(OnlineGameController controller) {
+    final notice = _notice;
+    final others = controller.chat.any(
+      (m) => m.seat != controller.localPlayerId,
+    );
+    if (notice == null && !others) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 2),
+      child: Text(
+        notice ?? context.l10n.chatTapToReport,
+        key: const Key('chatHint'),
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 11,
+          color: notice != null
+              ? scheme.error
+              : scheme.onSurface.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
+
   Future<void> _send(QuickChat item) async {
     if (!widget.controller.canChat) {
       HapticFeedback.heavyImpact();
@@ -877,6 +1033,7 @@ class _ChatSheetState extends State<ChatSheet> {
               ],
             ),
           ),
+          _blockedNotes(controller),
           // While typing, the conversation takes the room the faces had.
           if (typing)
             Flexible(child: _history(controller))
@@ -885,6 +1042,7 @@ class _ChatSheetState extends State<ChatSheet> {
               height: math.min(200, media.size.height * 0.24),
               child: _history(controller),
             ),
+          _hint(controller),
           _composer(),
           Divider(height: 1, color: scheme.outline.withValues(alpha: 0.2)),
           if (!typing)
@@ -1039,6 +1197,10 @@ class _ChatSheetState extends State<ChatSheet> {
           name: widget.nameOf(message.seat),
           color: widget.colorOf(message.seat),
           slideIn: !_seen.contains(message.id),
+          reported: controller.isReported(message),
+          onActions: message.seat == localSeat
+              ? null
+              : () => _messageActions(message),
         );
       },
     );
@@ -1195,9 +1357,17 @@ class _HistoryRow extends StatelessWidget {
     required this.name,
     required this.color,
     required this.slideIn,
+    this.reported = false,
+    this.onActions,
   });
 
   final ChatMessage message;
+
+  /// Whether this device has reported the message.
+  final bool reported;
+
+  /// Opens what can be done about someone else's message; null for one's own.
+  final VoidCallback? onActions;
   final bool startsRun;
   final bool isMine;
   final String name;
@@ -1306,7 +1476,38 @@ class _HistoryRow extends StatelessWidget {
                       ),
                     ),
                   ),
-                bubble,
+                if (onActions case final onActions?)
+                  GestureDetector(
+                    key: Key('chatMessage_${message.id}'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onActions,
+                    onLongPress: onActions,
+                    child: bubble,
+                  )
+                else
+                  bubble,
+                if (reported)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.flag_rounded,
+                          size: 11,
+                          color: scheme.error.withValues(alpha: 0.8),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          context.l10n.chatReported,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: scheme.error.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
