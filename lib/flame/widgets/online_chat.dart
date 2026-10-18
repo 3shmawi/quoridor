@@ -15,12 +15,12 @@ typedef SeatColor = Color Function(int seat);
 
 /// What [message] says: the words typed, or the reaction's words in the
 /// reader's language.
-String chatWords(BuildContext context, ChatMessage message) => switch (message
-    .text) {
-  // Masked again here, for lines from builds that sent them unfiltered.
-  final text? => ChatFilter.clean(text),
-  null => context.l10n.chatLabel(message.item!),
-};
+String chatWords(BuildContext context, ChatMessage message) =>
+    switch (message.text) {
+      // Masked again here, for lines from builds that sent them unfiltered.
+      final text? => ChatFilter.clean(text),
+      null => context.l10n.chatLabel(message.item!),
+    };
 
 // --- The face -------------------------------------------------------------
 

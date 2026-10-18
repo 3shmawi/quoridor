@@ -34,7 +34,11 @@ OnlineGame liveGame(String id) => OnlineGame(
       displayName: 'Alice',
       lastSeen: DateTime.now(),
     ),
-    2: OnlinePlayer(uid: 'uid-bob', displayName: 'Bob', lastSeen: DateTime.now()),
+    2: OnlinePlayer(
+      uid: 'uid-bob',
+      displayName: 'Bob',
+      lastSeen: DateTime.now(),
+    ),
   },
   currentPlayerId: 1,
   moveCount: 0,
@@ -193,16 +197,19 @@ void main() {
       expect(controller.isSeatBlocked(2), isTrue);
     });
 
-    test('a report that fails is not marked, but the block still holds', () async {
-      final message = said(2, 'b1', 'you are bad');
-      service.pushChat('g', [message]);
-      await flush();
-      service.reportFails = true;
+    test(
+      'a report that fails is not marked, but the block still holds',
+      () async {
+        final message = said(2, 'b1', 'you are bad');
+        service.pushChat('g', [message]);
+        await flush();
+        service.reportFails = true;
 
-      expect(await controller.reportMessage(message, block: true), isFalse);
-      expect(controller.isReported(message), isFalse);
-      expect(controller.isSeatBlocked(2), isTrue);
-    });
+        expect(await controller.reportMessage(message, block: true), isFalse);
+        expect(controller.isReported(message), isFalse);
+        expect(controller.isSeatBlocked(2), isTrue);
+      },
+    );
 
     test('a player cannot report their own message', () async {
       await controller.sendText('hello');

@@ -142,7 +142,8 @@ class FakeOnlineGameService implements OnlineGameService {
   }
 
   /// Messages reported, with who sent them, and whether reporting works.
-  final reported = <({String gameId, ChatMessage message, String reportedUid})>[];
+  final reported =
+      <({String gameId, ChatMessage message, String reportedUid})>[];
   bool reportFails = false;
 
   @override
