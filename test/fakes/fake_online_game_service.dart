@@ -62,13 +62,35 @@ class FakeOnlineGameService implements OnlineGameService {
   Future<void> abandon(String gameId) async => abandoned.add(gameId);
 
   /// Games ended other than on the board, as (game, winner, reason).
-  final endings = <(String, int, OnlineOutcomeReason)>[];
+  final endings = <(String, int?, OnlineOutcomeReason)>[];
+
+  /// Draws offered, as (game, seat, move count), and games whose offer was
+  /// declined.
+  final drawOffers = <(String, int, int)>[];
+  final drawsDeclined = <String>[];
+
+  @override
+  Future<OnlineResult<void>> offerDraw(
+    String gameId, {
+    required int seat,
+    required int atMove,
+  }) async {
+    drawOffers.add((gameId, seat, atMove));
+    return const OnlineResult.success(null);
+  }
+
+  @override
+  Future<OnlineResult<void>> declineDraw(String gameId) async {
+    drawsDeclined.add(gameId);
+    return const OnlineResult.success(null);
+  }
+
   bool endingFails = false;
 
   @override
   Future<OnlineResult<void>> endGame(
     String gameId, {
-    required int winner,
+    required int? winner,
     required OnlineOutcomeReason reason,
   }) async {
     if (endingFails) {

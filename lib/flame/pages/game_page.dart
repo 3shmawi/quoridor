@@ -270,6 +270,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _game.onSubmitMove = controller.submitMove;
     controller.onRemoteUpdate = _game.updateGameState;
     controller.onGameOver = _handleOnlineGameOver;
+    controller.onDrawOffered = () {
+      HapticFeedback.mediumImpact();
+      AudioService.instance.play(Sfx.chat);
+    };
+    controller.onDrawDeclined = () {
+      if (mounted) {
+        _showGameMessage(context.l10n.drawDeclined(_opponentName));
+      }
+    };
     controller.addListener(_handleOnlineChanged);
     _chatSound = controller.chatArrivals.listen(_handleChatArrived);
 
@@ -305,26 +314,124 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     setState(() {});
   }
 
-  void _handleOnlineGameOver(bool didWin) {
+  /// The other player of a two-player online game, by name.
+  String get _opponentName =>
+      _online?.session?.opponent?.displayName ?? context.l10n.opponent;
+
+  void _handleOnlineGameOver(bool? didWin) {
     if (!mounted) return;
-    if (didWin) _showConfetti(offerReplay: false);
+    if (didWin == true) _showConfetti(offerReplay: false);
+    final reason = _online?.game?.outcomeReason;
+    final l10n = context.l10n;
+    _showGameMessage(switch ((didWin, reason)) {
+      (null, _) => l10n.drawAgreed,
+      (true, OnlineOutcomeReason.resign) => l10n.opponentResignedYouWin(
+        _opponentName,
+      ),
+      (true, OnlineOutcomeReason.timeout) => l10n.opponentLeftYouWin(
+        _opponentName,
+      ),
+      (true, _) => l10n.youWin,
+      (false, OnlineOutcomeReason.resign) => l10n.youResigned,
+      (false, _) => l10n.opponentWins,
+    });
+  }
+
+  // --- Resigning and draws ---------------------------------------------------
+
+  Future<void> _resign() async {
     final online = _online;
-    final reason = online?.game?.outcomeReason;
-    // Won because the other player left, rather than on the board.
-    final left =
-        didWin &&
-        (reason == OnlineOutcomeReason.resign ||
-            reason == OnlineOutcomeReason.timeout);
+    if (online == null || !online.canResign) return;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.flag_rounded),
+        title: Text(context.l10n.resignTitle),
+        content: Text(context.l10n.resignGivesWin(_opponentName)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.keepPlaying),
+          ),
+          FilledButton(
+            key: const Key('confirmResign'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.resign),
+          ),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+    if (!await online.resign() && mounted) {
+      _showGameMessage(context.l10n.backendError);
+    }
+  }
+
+  Future<void> _offerDraw() async {
+    final online = _online;
+    if (online == null) return;
+    final offered = await online.offerDraw();
+    if (!mounted) return;
     _showGameMessage(
-      left
-          ? context.l10n.opponentLeftYouWin(
-              online
-                      ?.game
-                      ?.players[3 - (online.localPlayerId ?? 1)]
-                      ?.displayName ??
-                  context.l10n.opponent,
-            )
-          : (didWin ? context.l10n.youWin : context.l10n.opponentWins),
+      offered
+          ? context.l10n.drawOfferedTo(_opponentName)
+          : context.l10n.backendError,
+    );
+  }
+
+  Future<void> _answerDraw({required bool accept}) async {
+    final online = _online;
+    if (online == null) return;
+    final done = accept
+        ? await online.acceptDraw()
+        : await online.declineDraw();
+    if (!done && mounted) _showGameMessage(context.l10n.backendError);
+  }
+
+  /// The flag in the top bar of a two-player online game: offer a draw, or
+  /// resign.
+  Widget _buildGameActions(OnlineGameController online) {
+    final canOffer = online.canOfferDraw && online.drawOfferToAnswer == null;
+    return PopupMenuButton<void Function()>(
+      key: const Key('gameActions'),
+      tooltip: context.l10n.gameActions,
+      icon: const Icon(Icons.flag_outlined),
+      onSelected: (action) => action(),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          key: const Key('offerDraw'),
+          value: _offerDraw,
+          enabled: canOffer,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.handshake_outlined),
+            title: Text(context.l10n.offerDraw),
+            subtitle: canOffer
+                ? null
+                : Text(
+                    online.drawOffered
+                        ? context.l10n.drawPending
+                        : context.l10n.drawOncePerMove,
+                  ),
+          ),
+        ),
+        PopupMenuItem(
+          key: const Key('resign'),
+          value: _resign,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.flag_rounded,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            title: Text(context.l10n.resign),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1409,6 +1516,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             icon: const Icon(Icons.undo_rounded),
           ),
 
+        if (_online case final online? when online.canResign)
+          _buildGameActions(online),
+
         if (_game.isInitialized && !_awaitingStart)
           IconButton(
             key: const Key('moveHistory'),
@@ -1852,10 +1962,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     final scheme = Theme.of(context).colorScheme;
 
-    late final Color color;
-    late final IconData icon;
-    late final String text;
+    late Color color;
+    late IconData icon;
+    late String text;
     Widget? action;
+
+    /// An action too wide to share the line with the text, shown under it.
+    Widget? actionBelow;
 
     switch (online.connection) {
       case OnlineConnectionState.connecting:
@@ -1940,6 +2053,36 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             : context.l10n.nameThinking(
                 online.playerToMove?.displayName ?? context.l10n.opponent,
               );
+        if (online.drawOffered) text = '$text · ${context.l10n.drawPending}';
+    }
+
+    // A draw offered to this device takes over the strip until it is
+    // answered, or lapses with the next move.
+    if (online.drawOfferToAnswer != null) {
+      color = scheme.primary;
+      icon = Icons.handshake_rounded;
+      text = context.l10n.opponentOffersDraw(_opponentName);
+      action = null;
+      actionBelow = Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton(
+            key: const Key('declineDraw'),
+            onPressed: () => _answerDraw(accept: false),
+            child: Text(context.l10n.declineDraw),
+          ),
+          const SizedBox(width: 4),
+          FilledButton(
+            key: const Key('acceptDraw'),
+            onPressed: () => _answerDraw(accept: true),
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+            ),
+            child: Text(context.l10n.acceptDraw),
+          ),
+        ],
+      );
     }
 
     return Container(
@@ -1949,30 +2092,36 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13,
-                color: color,
-                fontWeight: FontWeight.w600,
+          Row(
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
+              ?action,
+              if (online.game != null && online.localPlayerId != null) ...[
+                const SizedBox(width: 8),
+                ChatButton(
+                  unread: online.unreadChat,
+                  onPressed: _openChat,
+                  arrivals: online.chatArrivals,
+                  localSeat: online.localPlayerId,
+                ),
+              ],
+            ],
           ),
-          ?action,
-          if (online.game != null && online.localPlayerId != null) ...[
-            const SizedBox(width: 8),
-            ChatButton(
-              unread: online.unreadChat,
-              onPressed: _openChat,
-              arrivals: online.chatArrivals,
-              localSeat: online.localPlayerId,
-            ),
-          ],
+          if (actionBelow != null) ...[const SizedBox(height: 6), actionBelow],
         ],
       ),
     );

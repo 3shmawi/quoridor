@@ -644,7 +644,7 @@ class OnlineGameService {
   /// The Security Rules decide which of those this caller may write.
   Future<OnlineResult<void>> endGame(
     String gameId, {
-    required int winner,
+    required int? winner,
     required OnlineOutcomeReason reason,
   }) async {
     final games = _games;
@@ -664,6 +664,46 @@ class OnlineGameService {
       return const OnlineResult.success(null);
     } catch (error) {
       debugPrint('OnlineGameService: endGame failed: $error');
+      return OnlineResult.failed(OnlineFailure.backendError, '$error');
+    }
+  }
+
+  /// Offers the other player of [gameId] a draw from [seat], standing until
+  /// the move after [atMove].
+  Future<OnlineResult<void>> offerDraw(
+    String gameId, {
+    required int seat,
+    required int atMove,
+  }) => _update(
+    gameId,
+    OnlineGameCodec.encodeDrawOffer(
+      seat: seat,
+      atMove: atMove,
+      timestamp: FieldValue.serverTimestamp(),
+    ),
+    'offerDraw',
+  );
+
+  /// Turns down the draw offered in [gameId].
+  Future<OnlineResult<void>> declineDraw(String gameId) => _update(gameId, {
+    'drawOffer.declined': true,
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, 'declineDraw');
+
+  Future<OnlineResult<void>> _update(
+    String gameId,
+    Map<String, dynamic> fields,
+    String what,
+  ) async {
+    final games = _games;
+    if (games == null) {
+      return const OnlineResult.failed(OnlineFailure.unavailable);
+    }
+    try {
+      await games.doc(gameId).update(fields);
+      return const OnlineResult.success(null);
+    } catch (error) {
+      debugPrint('OnlineGameService: $what failed: $error');
       return OnlineResult.failed(OnlineFailure.backendError, '$error');
     }
   }

@@ -292,6 +292,13 @@ service cloud.firestore {
         return me == 1 ? 2 : 1;
       }
 
+      // The reason an ending write gives, or '' for any other write. Each
+      // kind of write below looks at what it touches first, so the others
+      // rule themselves out cheaply: rules have a budget per request.
+      function endingReason() {
+        return incoming().get('outcome', {}).get('reason', '');
+      }
+
       // A two-player game under way ending off the board: only the status,
       // the outcome and the time change.
       function isEnding(winner, reason) {
@@ -308,18 +315,81 @@ service cloud.firestore {
 
       // Resigning hands the game to the other player.
       function isValidResign() {
-        return isEnding(otherSeat(seatOf(existing(), request.auth.uid)),
-                        'resign');
+        return endingReason() == 'resign'
+          && isEnding(otherSeat(seatOf(existing(), request.auth.uid)),
+                      'resign');
       }
 
       // A player may take the win from one who has not reported in for over
       // a minute, by the server's clock rather than their own.
       function isValidClaim() {
-        let me = seatOf(existing(), request.auth.uid);
-        let them = existing().players[string(otherSeat(me))];
+        return endingReason() == 'timeout'
+          && isClaimBy(seatOf(existing(), request.auth.uid));
+      }
+
+      function isClaimBy(me) {
         return isEnding(me, 'timeout')
-          && them.lastSeen is timestamp
-          && request.time > them.lastSeen + duration.value(60, 's');
+          && existing().players[string(otherSeat(me))].lastSeen is timestamp
+          && request.time
+             > existing().players[string(otherSeat(me))].lastSeen
+               + duration.value(60, 's');
+      }
+
+      // A two-player game under way, played by the caller, with only
+      // [fields] changing.
+      function isTwoPlayerTurnFree(fields) {
+        return isPlayer(existing())
+          && existing().status == 'active'
+          && playerCountOf(existing()) == 2
+          && incoming().diff(existing()).affectedKeys().hasOnly(fields);
+      }
+
+      // Whether this write touches the draw offer and nothing but it.
+      function touchesOnlyDrawOffer() {
+        return incoming().keys().hasAny(['drawOffer'])
+          && incoming().diff(existing()).affectedKeys()
+             .hasOnly(['drawOffer', 'updatedAt']);
+      }
+
+      // The draw offer still waiting for an answer: made at this very move
+      // and not turned down. An offer lapses with the next move.
+      function hasOpenDrawOffer() {
+        return existing().keys().hasAny(['drawOffer'])
+          && existing().drawOffer.atMove == existing().moveCount
+          && !existing().drawOffer.get('declined', false);
+      }
+
+      // Offering a draw: as yourself, at the current move, and at most once
+      // per move, so offers cannot be used to pester.
+      function isValidDrawOffer() {
+        return touchesOnlyDrawOffer()
+          && incoming().drawOffer.keys().hasOnly(['by', 'atMove'])
+          && incoming().drawOffer.atMove == existing().moveCount
+          && (!existing().keys().hasAny(['drawOffer'])
+            || existing().drawOffer.atMove != existing().moveCount)
+          && isTwoPlayerTurnFree(['drawOffer', 'updatedAt'])
+          && incoming().drawOffer.by == seatOf(existing(), request.auth.uid);
+      }
+
+      // Turning down the other player's open offer, and nothing else.
+      function isValidDrawDecline() {
+        return touchesOnlyDrawOffer()
+          && incoming().drawOffer.get('declined', false) == true
+          && hasOpenDrawOffer()
+          && incoming().drawOffer.diff(existing().drawOffer).affectedKeys()
+             .hasOnly(['declined'])
+          && isTwoPlayerTurnFree(['drawOffer', 'updatedAt'])
+          && existing().drawOffer.by != seatOf(existing(), request.auth.uid);
+      }
+
+      // Agreeing the other player's open offer ends the game with no winner.
+      function isValidDrawAccept() {
+        return endingReason() == 'draw'
+          && hasOpenDrawOffer()
+          && incoming().status == 'finished'
+          && incoming().outcome.keys().hasOnly(['reason'])
+          && isTwoPlayerTurnFree(['status', 'outcome', 'updatedAt'])
+          && existing().drawOffer.by != seatOf(existing(), request.auth.uid);
       }
 
       // Any player may abandon a game they are in.
@@ -346,6 +416,9 @@ service cloud.firestore {
                     || isValidAbandon()
                     || isValidResign()
                     || isValidClaim()
+                    || isValidDrawOffer()
+                    || isValidDrawDecline()
+                    || isValidDrawAccept()
                     || isValidRematchLink();
 
       // Games are never deleted by clients; cleanup is a scheduled job.
