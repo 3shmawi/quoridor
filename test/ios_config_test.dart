@@ -52,4 +52,41 @@ void main() {
       isTrue,
     );
   });
+
+  test('the app targets iOS 15.0 or later everywhere', () {
+    // App Store Connect warns (90068) that from April 2027 it refuses apps
+    // targeting less. Every place the minimum is set has to agree.
+    double at(String text, RegExp pattern) =>
+        double.parse(pattern.firstMatch(text)!.group(1)!);
+
+    final podfile = File('ios/Podfile').readAsStringSync();
+    expect(
+      at(podfile, RegExp(r"^platform :ios, '([\d.]+)'", multiLine: true)),
+      greaterThanOrEqualTo(15.0),
+    );
+    expect(
+      podfile,
+      contains("config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'"),
+    );
+
+    final project = File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
+    final targets = RegExp(
+      r'IPHONEOS_DEPLOYMENT_TARGET = ([\d.]+);',
+    ).allMatches(project).map((m) => double.parse(m.group(1)!)).toList();
+    expect(targets, isNotEmpty);
+    expect(targets, everyElement(greaterThanOrEqualTo(15.0)));
+
+    final framework = File(
+      'ios/Flutter/AppFrameworkInfo.plist',
+    ).readAsStringSync();
+    expect(
+      at(
+        framework,
+        RegExp(r'<key>MinimumOSVersion</key>\s*<string>([\d.]+)</string>'),
+      ),
+      greaterThanOrEqualTo(15.0),
+    );
+  });
 }
