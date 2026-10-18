@@ -267,6 +267,97 @@ void main() {
     expect(find.text('Continue game', skipOffstage: false), findsNothing);
     await finish(tester);
   });
+
+  /// Closes the mode sheet by tapping the board above it.
+  Future<void> dismissSheet(WidgetTester tester) async {
+    await tester.tapAt(const Offset(180, 90));
+    await settle(tester, frames: 5);
+  }
+
+  testWidgets('closing the sheet leaves a way back to it', (tester) async {
+    final game = await openPage(tester, mode: null);
+    await dismissSheet(tester);
+
+    expect(find.text('Choose Game Mode'), findsNothing);
+    expect(find.text('Ready to play?'), findsOneWidget);
+    // Nothing runs behind it: no clock, no undo, no move list.
+    expect(find.byKey(const Key('undo')), findsNothing);
+    expect(find.byKey(const Key('moveHistory')), findsNothing);
+    expect(game.gameState.moveHistory, isEmpty);
+
+    await tester.tap(find.byKey(const Key('startGame')));
+    await settle(tester, frames: 5);
+    expect(find.text('Choose Game Mode'), findsOneWidget);
+
+    await tester.tap(find.text('Play vs AI'));
+    await settle(tester);
+    expect(find.text('Ready to play?'), findsNothing);
+    await finish(tester);
+  });
+
+  testWidgets('closing the sheet over an unfinished game carries on with it', (
+    tester,
+  ) async {
+    final saved = GameService.executeMove(
+      GameStateFactory.createNewGame(gameId: 'saved', player2IsAI: false),
+      const GameMove.pawnMove(Position(7, 4), 1),
+    );
+    SharedPreferences.setMockInitialValues({
+      'savedGame.local': jsonEncode(saved.toJson()),
+    });
+    final game = await openPage(tester, mode: null);
+    await dismissSheet(tester);
+
+    expect(find.text('Ready to play?'), findsNothing);
+    expect(game.gameState.gameId, 'saved');
+    expect(find.byKey(const Key('undo')), findsOneWidget);
+    await finish(tester);
+  });
+
+  testWidgets('New Game in the menu opens the mode sheet, and the menu keeps '
+      'only what is needed', (tester) async {
+    await openPage(tester);
+    await tester.tap(find.byIcon(Icons.menu));
+    await settle(tester, frames: 5);
+
+    expect(find.text('Save Game'), findsNothing);
+    expect(find.text('Toggle Player Mode'), findsNothing);
+
+    await tester.tap(find.text('New Game'));
+    await settle(tester, frames: 6);
+    expect(find.text('Choose Game Mode'), findsOneWidget);
+    expect(find.text('Play Online'), findsOneWidget);
+    // A game is under way, so it can be gone back to.
+    expect(find.text('Continue game'), findsNothing);
+    await finish(tester);
+  });
+
+  testWidgets('the title says what is being played, and changes it', (
+    tester,
+  ) async {
+    await openPage(tester, mode: 'Play vs AI');
+    expect(find.text('vs AI · Medium'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('modeLabel')));
+    await settle(tester, frames: 6);
+    expect(find.text('Choose Game Mode'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Two Players'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Two Players'));
+    await settle(tester);
+    expect(find.text('2 players · this device'), findsOneWidget);
+    await finish(tester);
+  });
+
+  testWidgets('the mode is named in Arabic too', (tester) async {
+    await openPage(tester, mode: 'ضد الكمبيوتر', locale: const Locale('ar'));
+    expect(find.textContaining('ضد الكمبيوتر ·'), findsOneWidget);
+    await finish(tester);
+  });
 }
 
 QuoridorGame _gameOf(WidgetTester tester) => tester
