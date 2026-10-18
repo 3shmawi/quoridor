@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../models/online_chat.dart';
 import 'game_service.dart';
 import 'online/online_game_controller.dart';
 import 'online/online_game_service.dart';
@@ -104,6 +105,18 @@ class AppStrings {
   String get youWin => _get('youWin');
   String get opponentWins => _get('opponentWins');
   String get opponentMovedFirst => _get('opponentMovedFirst');
+
+  // --- Chat --------------------------------------------------------------
+  String get chat => _get('chat');
+  String get chatFaces => _get('chatFaces');
+  String get chatLines => _get('chatLines');
+  String get chatEmpty => _get('chatEmpty');
+  String get chatJustNow => _get('chatJustNow');
+  String chatMinutesAgo(int n) => _fill('chatMinutesAgo', '$n');
+  String chatUnread(int n) => _fill('chatUnread', '$n');
+
+  /// What [item] says: the words of a line, or what a face means.
+  String chatLabel(QuickChat item) => _get('chat_${item.name}');
 
   // --- Online failures ---------------------------------------------------
   String get onlineUnavailable => _get('onlineUnavailable');
@@ -297,6 +310,34 @@ class AppStrings {
     'opponentWins': 'Your opponent wins',
     'opponentMovedFirst': 'Your opponent moved first',
 
+    'chat': 'Chat',
+    'chatFaces': 'Faces',
+    'chatLines': 'Quick lines',
+    'chatEmpty': 'Nothing yet. Send a face to break the ice!',
+    'chatJustNow': 'now',
+    'chatMinutesAgo': '%s min',
+    'chatUnread': 'Chat, %s new',
+    'chat_laugh': 'Ha ha!',
+    'chat_cool': 'Too cool',
+    'chat_thinking': 'Hmm…',
+    'chat_angry': 'Grr!',
+    'chat_scared': 'Eek!',
+    'chat_crying': 'Noooo',
+    'chat_love': 'Love it',
+    'chat_sleepy': 'Zzz…',
+    'chat_mindBlown': 'Mind blown',
+    'chat_party': 'Woo-hoo!',
+    'chat_smirk': 'Heh',
+    'chat_hello': 'Hi!',
+    'chat_goodLuck': 'Good luck!',
+    'chat_niceMove': 'Nice move!',
+    'chat_oops': 'Oops!',
+    'chat_hurryUp': 'Hurry up!',
+    'chat_notThatWall': 'Not that wall!',
+    'chat_wellPlayed': 'Well played',
+    'chat_goodGame': 'Good game!',
+    'chat_thanks': 'Thanks!',
+
     'onlineUnavailable': 'Online play is unavailable right now',
     'gameNotFound': 'No game found with that code',
     'gameFull': 'That game is already full',
@@ -478,6 +519,34 @@ class AppStrings {
     'youWin': 'كسبت!',
     'opponentWins': 'خصمك كسب',
     'opponentMovedFirst': 'خصمك لعب قبلك',
+
+    'chat': 'دردشة',
+    'chatFaces': 'وشوش',
+    'chatLines': 'جمل سريعة',
+    'chatEmpty': 'لسه مفيش حاجة. ابعت وش يكسر الجليد!',
+    'chatJustNow': 'دلوقتي',
+    'chatMinutesAgo': '%s د',
+    'chatUnread': 'دردشة، %s جديد',
+    'chat_laugh': 'هههههه!',
+    'chat_cool': 'روقان',
+    'chat_thinking': 'امممم…',
+    'chat_angry': 'اتعصبت!',
+    'chat_scared': 'يا خبر!',
+    'chat_crying': 'لأااااا',
+    'chat_love': 'حبيتها',
+    'chat_sleepy': 'نمت…',
+    'chat_mindBlown': 'دماغي ضربت',
+    'chat_party': 'هييييه!',
+    'chat_smirk': 'ماشي ماشي',
+    'chat_hello': 'أهلاً!',
+    'chat_goodLuck': 'بالتوفيق!',
+    'chat_niceMove': 'حركة حلوة!',
+    'chat_oops': 'أوبس!',
+    'chat_hurryUp': 'يلا بسرعة!',
+    'chat_notThatWall': 'مش الحيطة دي!',
+    'chat_wellPlayed': 'لعبت حلو',
+    'chat_goodGame': 'ماتش حلو!',
+    'chat_thanks': 'شكراً!',
 
     'onlineUnavailable': 'اللعب الأونلاين مش متاح دلوقتي',
     'gameNotFound': 'مفيش لعبة بالكود ده',

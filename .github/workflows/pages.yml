@@ -98,7 +98,11 @@ jobs:
       # Not a secret: it names the account, it does not grant access to it.
       CLOUDFLARE_ACCOUNT_ID: 59e2f1308a0af66321e49dc4cb473736
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      PROJECT: quoridor
+      # The site is served at <project>.pages.dev. Cloudflare adds a random
+      # suffix (quoridor-5q7) when the name is taken by another account, so
+      # the name can be changed with the CLOUDFLARE_PAGES_PROJECT repository
+      # variable; the next deploy creates the new project.
+      PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'quoridor' }}
     steps:
       - name: Say why nothing was deployed
         if: env.HAS_TOKEN != 'true'

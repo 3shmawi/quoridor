@@ -283,7 +283,12 @@ Everything is in GitHub Actions:
   the web with a `latest.json` the app reads to spot a newer build: on GitHub
   Pages, and on Cloudflare Pages (project `quoridor`) when the
   `CLOUDFLARE_API_TOKEN` secret is set, a token with only
-  **Cloudflare Pages: Edit**.
+  **Cloudflare Pages: Edit**. The site lives at `<project>.pages.dev`;
+  `quoridor` was already taken, so Cloudflare serves it as
+  `quoridor-5q7.pages.dev`. For a cleaner address, add a custom domain to
+  the project in the Cloudflare dashboard (Workers & Pages → quoridor →
+  Custom domains), or set the repository variable
+  `CLOUDFLARE_PAGES_PROJECT` to a free name and the next deploy creates it.
 - **Rules deploy** (part of `ci.yml`) — every push to `main` that passes the
   tests puts `firestore.rules` live, using `FIREBASE_SERVICE_ACCOUNT_JSON`.
 - **Bump version** (`bump.yml`) — run it from the Actions tab and pick patch,

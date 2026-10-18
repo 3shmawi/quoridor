@@ -66,3 +66,17 @@ for k, f in enumerate(notes):
     for i, v in enumerate(b):
         if start+i < total: mix[start+i] += v*(0.8 if k < 3 else 1.0)
 write('win.wav', mix)
+
+def bloop(f0, f1, dur):
+    # A bubble popping up: a quick upward sweep that rounds off.
+    n = int(SR*dur); ph = 0; r = []
+    for i in range(n):
+        t = i/SR; k = min(1.0, t/(dur*0.6))
+        f = f0 + (f1-f0)*(1-(1-k)**2)
+        ph += 2*math.pi*f/SR
+        r.append((math.sin(ph) + 0.25*math.sin(2*ph))*math.exp(-t*18))
+    return r
+
+# A chat message arriving: two bubbles, the second higher.
+chat = bloop(420, 880, 0.11) + [0.0]*int(SR*0.02) + bloop(620, 1180, 0.13)
+write('chat.wav', chat)
