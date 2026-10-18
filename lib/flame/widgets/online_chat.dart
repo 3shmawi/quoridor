@@ -12,6 +12,11 @@ import '../services/online/online_game_controller.dart';
 typedef SeatName = String Function(int seat);
 typedef SeatColor = Color Function(int seat);
 
+/// What [message] says: the words typed, or the reaction's words in the
+/// reader's language.
+String chatWords(BuildContext context, ChatMessage message) =>
+    message.text ?? context.l10n.chatLabel(message.item!);
+
 // --- The face -------------------------------------------------------------
 
 /// A reaction's emoji, moving the way its [QuickChat.motion] says.
@@ -205,6 +210,10 @@ class ChatBubbleLayer extends StatefulWidget {
   /// How long a face stays up. Lines stay a little longer, to be read.
   static const Duration faceLife = Duration(milliseconds: 3200);
   static const Duration lineLife = Duration(milliseconds: 4000);
+  static const Duration textLife = Duration(milliseconds: 5500);
+
+  static Duration lifeOf(ChatMessage message) =>
+      message.isText ? textLife : (message.item!.isLine ? lineLife : faceLife);
 
   /// The most bubbles one corner holds; the oldest leaves for a newer one.
   static const int perCorner = 3;
@@ -341,10 +350,7 @@ class _ChatBubbleState extends State<ChatBubble> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _enter.forward();
-    final life = widget.message.item.isLine
-        ? ChatBubbleLayer.lineLife
-        : ChatBubbleLayer.faceLife;
-    _life = Timer(life, _leave);
+    _life = Timer(ChatBubbleLayer.lifeOf(widget.message), _leave);
   }
 
   Future<void> _leave() async {
@@ -365,7 +371,7 @@ class _ChatBubbleState extends State<ChatBubble> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final item = widget.message.item;
-    final label = context.l10n.chatLabel(item);
+    final label = chatWords(context, widget.message);
     final corner = widget.fromTop
         ? AlignmentDirectional.topEnd
         : AlignmentDirectional.bottomEnd;
@@ -374,28 +380,43 @@ class _ChatBubbleState extends State<ChatBubble> with TickerProviderStateMixin {
         ? Color.alphaBlend(widget.color.withValues(alpha: 0.22), scheme.surface)
         : scheme.surface;
 
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ChatGlyph(item, size: item.isLine ? 26 : 38),
-        if (item.isLine) ...[
-          const SizedBox(width: 6),
-          Flexible(
+    final content = item == null
+        ? Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             child: Text(
               label,
-              maxLines: 2,
+              maxLines: 4,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
                 color: scheme.onSurface,
               ),
             ),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ],
-    );
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ChatGlyph(item, size: item.isLine ? 26 : 38),
+              if (item.isLine) ...[
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+            ],
+          );
 
     final bubble = Container(
       constraints: const BoxConstraints(maxWidth: 230),
@@ -739,6 +760,8 @@ class _ChatSheetState extends State<ChatSheet> {
   /// slide in.
   late final Set<String> _seen = {for (final m in widget.controller.chat) m.id};
 
+  final TextEditingController _draft = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -759,7 +782,22 @@ class _ChatSheetState extends State<ChatSheet> {
   @override
   void dispose() {
     widget.controller.removeListener(_changed);
+    _draft.dispose();
     super.dispose();
+  }
+
+  /// Sends what was typed. The sheet stays open, since typing is a
+  /// conversation rather than a quick reaction.
+  Future<void> _sendDraft() async {
+    final text = ChatMessage.tidy(_draft.text);
+    if (text.isEmpty) return;
+    if (!widget.controller.canChat) {
+      HapticFeedback.heavyImpact();
+      return;
+    }
+    HapticFeedback.lightImpact();
+    _draft.clear();
+    await widget.controller.sendText(text);
   }
 
   Future<void> _send(QuickChat item) async {
@@ -777,6 +815,7 @@ class _ChatSheetState extends State<ChatSheet> {
     final scheme = Theme.of(context).colorScheme;
     final media = MediaQuery.of(context);
     final controller = widget.controller;
+    final typing = media.viewInsets.bottom > 0;
 
     return Container(
       constraints: BoxConstraints(maxHeight: media.size.height * 0.8),
@@ -791,7 +830,10 @@ class _ChatSheetState extends State<ChatSheet> {
           ),
         ],
       ),
-      padding: EdgeInsets.only(bottom: media.padding.bottom + 12),
+      // Above the keyboard while typing.
+      padding: EdgeInsets.only(
+        bottom: math.max(media.padding.bottom, media.viewInsets.bottom) + 12,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -816,27 +858,116 @@ class _ChatSheetState extends State<ChatSheet> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const Spacer(),
+                IconButton(
+                  key: const Key('chatMute'),
+                  tooltip: controller.chatMuted
+                      ? context.l10n.chatUnmute
+                      : context.l10n.chatMute,
+                  onPressed: () => controller.chatMuted = !controller.chatMuted,
+                  icon: Icon(
+                    controller.chatMuted
+                        ? Icons.notifications_off_rounded
+                        : Icons.notifications_active_outlined,
+                    color: controller.chatMuted
+                        ? scheme.error
+                        : scheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
               ],
             ),
           ),
-          SizedBox(
-            height: math.min(200, media.size.height * 0.24),
-            child: _history(controller),
-          ),
+          // While typing, the conversation takes the room the faces had.
+          if (typing)
+            Flexible(child: _history(controller))
+          else
+            SizedBox(
+              height: math.min(200, media.size.height * 0.24),
+              child: _history(controller),
+            ),
+          _composer(),
           Divider(height: 1, color: scheme.outline.withValues(alpha: 0.2)),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sectionTitle(context.l10n.chatFaces),
-                  _faces(),
-                  const SizedBox(height: 14),
-                  _sectionTitle(context.l10n.chatLines),
-                  _lines(),
-                ],
+          if (!typing)
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionTitle(context.l10n.chatFaces),
+                    _faces(),
+                    const SizedBox(height: 14),
+                    _sectionTitle(context.l10n.chatLines),
+                    _lines(),
+                  ],
+                ),
               ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// The box to type in, and its send button.
+  Widget _composer() {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 12, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              key: const Key('chatText'),
+              controller: _draft,
+              maxLength: ChatMessage.maxText,
+              maxLengthEnforcement: MaxLengthEnforcement.enforced,
+              textInputAction: TextInputAction.send,
+              textCapitalization: TextCapitalization.sentences,
+              onSubmitted: (_) => _sendDraft(),
+              onChanged: (_) => setState(() {}),
+              // The count shows only near the end, where it matters.
+              buildCounter:
+                  (
+                    context, {
+                    required currentLength,
+                    required isFocused,
+                    required maxLength,
+                  }) => currentLength < (maxLength ?? 0) - 15
+                  ? null
+                  : Text(
+                      '$currentLength/$maxLength',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+              decoration: InputDecoration(
+                hintText: context.l10n.chatWriteHint,
+                isDense: true,
+                filled: true,
+                fillColor: scheme.onSurface.withValues(alpha: 0.06),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          AnimatedScale(
+            scale: _draft.text.trim().isEmpty ? 0.85 : 1,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutBack,
+            child: IconButton.filled(
+              key: const Key('chatSend'),
+              tooltip: context.l10n.chatSend,
+              onPressed: _draft.text.trim().isEmpty ? null : _sendDraft,
+              // Material flips this arrow for right-to-left by itself.
+              icon: const Icon(Icons.send_rounded),
             ),
           ),
         ],
@@ -973,11 +1104,15 @@ class _ChatSheetState extends State<ChatSheet> {
                         style: const TextStyle(fontSize: 16),
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        context.l10n.chatLabel(lines[i]),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onSurface,
+                      Flexible(
+                        child: Text(
+                          context.l10n.chatLabel(lines[i]),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                          ),
                         ),
                       ),
                     ],
@@ -1072,7 +1207,11 @@ class _HistoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final label = context.l10n.chatLabel(message.item);
+    final item = message.item;
+    final label = chatWords(context, message);
+    // Typed words and quick lines read as speech; a face's caption is just
+    // what it means, so it is quieter.
+    final spoken = item == null || item.isLine;
 
     final bubble = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1090,22 +1229,18 @@ class _HistoryRow extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message.item.emoji, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 6),
+          if (item != null) ...[
+            Text(item.emoji, style: const TextStyle(fontSize: 20)),
+            const SizedBox(width: 6),
+          ],
           Flexible(
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 13,
-                fontWeight: message.item.isLine
-                    ? FontWeight.w600
-                    : FontWeight.w400,
-                fontStyle: message.item.isLine
-                    ? FontStyle.normal
-                    : FontStyle.italic,
-                color: scheme.onSurface.withValues(
-                  alpha: message.item.isLine ? 1 : 0.7,
-                ),
+                fontSize: item == null ? 14 : 13,
+                fontWeight: spoken ? FontWeight.w600 : FontWeight.w400,
+                fontStyle: spoken ? FontStyle.normal : FontStyle.italic,
+                color: scheme.onSurface.withValues(alpha: spoken ? 1 : 0.7),
               ),
             ),
           ),

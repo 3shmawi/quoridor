@@ -325,4 +325,182 @@ void main() {
       expect(tester.binding.hasScheduledFrame, isFalse);
     });
   });
+
+  group('typed messages', () {
+    test('are tidied to one short line', () {
+      expect(ChatMessage.tidy('  hi \n\n  there  '), 'hi there');
+      expect(ChatMessage.tidy('   '), isEmpty);
+      final long = ChatMessage.tidy('a' * 200);
+      expect(long.length, ChatMessage.maxText);
+      // An emoji is one character, not cut in half.
+      final emoji = ChatMessage.tidy('😅' * 100);
+      expect(emoji.runes.length, ChatMessage.maxText);
+      expect(emoji, '😅' * ChatMessage.maxText);
+    });
+
+    test('survive the round trip, as words rather than a reaction', () {
+      final message = ChatMessage(
+        id: 't1',
+        seat: 1,
+        text: 'مقصدش دي وربنا',
+        sentAt: DateTime(2026, 1, 1, 12),
+      );
+      final data = OnlineGameCodec.encodeChat(
+        message: message,
+        uid: 'uid-alice',
+        sentAt: message.sentAt!.millisecondsSinceEpoch,
+      );
+      expect(data['code'], 'text');
+      expect(data['text'], 'مقصدش دي وربنا');
+      expect(OnlineGameCodec.decodeChat('t1', data), message);
+
+      // A reaction carries no words.
+      expect(
+        OnlineGameCodec.encodeChat(
+          message: from(1, 'r1', QuickChat.laugh),
+          uid: 'u',
+          sentAt: 0,
+        ).containsKey('text'),
+        isFalse,
+      );
+    });
+
+    test('with nothing in them are skipped', () {
+      expect(
+        OnlineGameCodec.decodeChat('t', {'seat': 1, 'code': 'text'}),
+        isNull,
+      );
+      expect(
+        OnlineGameCodec.decodeChat('t', {
+          'seat': 1,
+          'code': 'text',
+          'text': '   ',
+        }),
+        isNull,
+      );
+    });
+
+    test('the two new quick lines say what was asked', () {
+      const arabic = AppStrings(Locale('ar'));
+      expect(arabic.chatLabel(QuickChat.didntMeanIt), 'مقصدش دي وربنا!');
+      expect(arabic.chatLabel(QuickChat.misplayed), 'اتلعبت غلط');
+      expect(QuickChat.lines, contains(QuickChat.didntMeanIt));
+      expect(QuickChat.lines, contains(QuickChat.misplayed));
+    });
+  });
+
+  group('typing and muting', () {
+    late FakeOnlineGameService service;
+    late OnlineGameController controller;
+    late DateTime now;
+    final arrivals = <ChatMessage>[];
+    StreamSubscription<ChatMessage>? listening;
+
+    setUp(() async {
+      service = FakeOnlineGameService();
+      now = DateTime(2026, 1, 1, 12);
+      controller = OnlineGameController(service: service, now: () => now);
+      arrivals.clear();
+      listening = controller.chatArrivals.listen(arrivals.add);
+      service.sessions['g'] = OnlineSession(
+        game: liveGame('g'),
+        localPlayerId: 1,
+      );
+      expect(await controller.resumeGame('g'), isTrue);
+      service.pushChat('g', []);
+      await Future<void>.delayed(Duration.zero);
+    });
+
+    tearDown(() async {
+      await listening?.cancel();
+      controller.dispose();
+    });
+
+    Future<void> flush() => Future<void>.delayed(Duration.zero);
+
+    test('typed words go out tidied, and show at once', () async {
+      expect(await controller.sendText('  اتلعبت   غلط\n'), isTrue);
+      await flush();
+      expect(service.chatSent.single.text, 'اتلعبت غلط');
+      expect(service.chatSent.single.item, isNull);
+      expect(controller.chat.single.text, 'اتلعبت غلط');
+      expect(arrivals.single.text, 'اتلعبت غلط');
+    });
+
+    test('nothing typed sends nothing', () async {
+      expect(await controller.sendText('   '), isFalse);
+      expect(service.chatSent, isEmpty);
+      expect(controller.chat, isEmpty);
+    });
+
+    test('typing shares the cooldown with reactions', () async {
+      expect(await controller.sendChat(QuickChat.laugh), isTrue);
+      expect(await controller.sendText('too soon'), isFalse);
+      now = now.add(OnlineGameController.chatCooldown);
+      expect(await controller.sendText('now'), isTrue);
+    });
+
+    test('muted, the others are still listed but stay quiet', () async {
+      service.pushChat('g', [from(2, 'b1', QuickChat.laugh)]);
+      await flush();
+      expect(controller.unreadChat, 1);
+
+      controller.chatMuted = true;
+      expect(controller.unreadChat, 0);
+      arrivals.clear();
+
+      service.pushChat('g', [
+        from(2, 'b1', QuickChat.laugh),
+        ChatMessage(id: 'b2', seat: 2, text: 'hello?', sentAt: now),
+      ]);
+      await flush();
+      expect(controller.chat.map((m) => m.id), ['b1', 'b2']);
+      expect(arrivals, isEmpty);
+      expect(controller.unreadChat, 0);
+
+      // This device's own messages still pop up.
+      await controller.sendChat(QuickChat.cool);
+      expect(arrivals.single.item, QuickChat.cool);
+
+      controller.chatMuted = false;
+      service.pushChat('g', [
+        ...controller.chat,
+        from(2, 'b3', QuickChat.angry, at: now.add(const Duration(minutes: 1))),
+      ]);
+      await flush();
+      expect(arrivals.last.id, 'b3');
+      expect(controller.unreadChat, 1);
+    });
+  });
+
+  testWidgets('typed words pop up in a bubble and stay a little longer', (
+    tester,
+  ) async {
+    final arrivals = StreamController<ChatMessage>.broadcast();
+    addTearDown(arrivals.close);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatBubbleLayer(
+            arrivals: arrivals.stream,
+            localSeat: 1,
+            nameOf: (_) => 'Bob',
+            colorOf: (_) => Colors.teal,
+          ),
+        ),
+      ),
+    );
+    arrivals.add(
+      ChatMessage(id: 't', seat: 2, text: 'not the wall again', sentAt: null),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.text('not the wall again'), findsOneWidget);
+
+    await tester.pump(ChatBubbleLayer.lineLife);
+    expect(find.text('not the wall again'), findsOneWidget);
+    await tester.pump(ChatBubbleLayer.textLife);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('not the wall again'), findsNothing);
+  });
 }

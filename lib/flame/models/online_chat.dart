@@ -32,10 +32,10 @@ enum ChatMotion {
 
 /// Everything a player can send in an online game.
 ///
-/// There is no free text on purpose: a fixed set needs no moderation, reads
-/// in either language, and keeps a game about the game. Each entry is stored
-/// by its [name], and `firestore.rules` accepts only these names, so adding
-/// one means adding it there too (a test holds the two lists together).
+/// These are the one-tap reactions; players can also type their own words
+/// (see [ChatMessage.text]). Each entry is stored by its [name], and
+/// `firestore.rules` accepts only these names, so adding one means adding it
+/// there too (a test holds the two lists together).
 enum QuickChat {
   // Faces: the emoji alone.
   laugh('😂', ChatMotion.bounce),
@@ -55,6 +55,8 @@ enum QuickChat {
   goodLuck('🍀', ChatMotion.spin, isLine: true),
   niceMove('👏', ChatMotion.pulse, isLine: true),
   oops('🙈', ChatMotion.tremble, isLine: true),
+  didntMeanIt('😅', ChatMotion.sway, isLine: true),
+  misplayed('🤦', ChatMotion.nod, isLine: true),
   hurryUp('⏰', ChatMotion.shake, isLine: true),
   notThatWall('🧱', ChatMotion.nod, isLine: true),
   wellPlayed('🤝', ChatMotion.bounce, isLine: true),
@@ -85,9 +87,16 @@ enum QuickChat {
   }
 }
 
-/// One reaction sent in an online game.
+/// One message sent in an online game: a quick reaction, or words the
+/// player typed.
 @immutable
 class ChatMessage {
+  /// The longest message a player can type, in characters.
+  static const int maxText = 80;
+
+  /// What a typed message is stored as, in place of a reaction's name.
+  static const String textCode = 'text';
+
   /// The document id, chosen by the sender so its own copy and the server's
   /// echo are recognised as the same message.
   final String id;
@@ -95,7 +104,13 @@ class ChatMessage {
   /// The seat that sent it.
   final int seat;
 
-  final QuickChat item;
+  /// The reaction sent, or null for a typed message.
+  final QuickChat? item;
+
+  /// The words typed, or null for a reaction.
+  final String? text;
+
+  bool get isText => text != null;
 
   /// When the server took it, or the sender's clock until it has.
   final DateTime? sentAt;
@@ -103,9 +118,23 @@ class ChatMessage {
   const ChatMessage({
     required this.id,
     required this.seat,
-    required this.item,
+    this.item,
+    this.text,
     this.sentAt,
-  });
+  }) : assert((item == null) != (text == null), 'a reaction or words');
+
+  /// The same message, dated [sentAt].
+  ChatMessage dated(DateTime? sentAt) =>
+      ChatMessage(id: id, seat: seat, item: item, text: text, sentAt: sentAt);
+
+  /// [raw] as it is sent: on one line, without spare spaces, and no longer
+  /// than [maxText] characters. Empty when there is nothing to send.
+  static String tidy(String raw) {
+    final line = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final characters = line.runes.toList();
+    if (characters.length <= maxText) return line;
+    return String.fromCharCodes(characters.take(maxText)).trim();
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -113,11 +142,13 @@ class ChatMessage {
       other.id == id &&
       other.seat == seat &&
       other.item == item &&
+      other.text == text &&
       other.sentAt == sentAt;
 
   @override
-  int get hashCode => Object.hash(id, seat, item, sentAt);
+  int get hashCode => Object.hash(id, seat, item, text, sentAt);
 
   @override
-  String toString() => 'ChatMessage($id, seat $seat, ${item.name})';
+  String toString() =>
+      'ChatMessage($id, seat $seat, ${item?.name ?? '"$text"'})';
 }

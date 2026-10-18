@@ -207,4 +207,62 @@ void main() {
     expect(find.byType(ChatBubbleLayer), findsNothing);
     await finish(tester);
   });
+
+  testWidgets('typed words are sent from the chat, which stays open', (
+    tester,
+  ) async {
+    await goOnline(tester);
+    await tester.tap(find.byKey(const Key('chatButton')));
+    await settle(tester, frames: 6);
+
+    // Nothing to send yet.
+    expect(
+      tester.widget<IconButton>(find.byKey(const Key('chatSend'))).onPressed,
+      isNull,
+    );
+    await tester.enterText(find.byKey(const Key('chatText')), 'مقصدش دي وربنا');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('chatSend')));
+    await settle(tester, frames: 6);
+
+    expect(service.chatSent.single.text, 'مقصدش دي وربنا');
+    expect(find.byType(ChatSheet), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('chatHistory')),
+        matching: find.text('مقصدش دي وربنا'),
+      ),
+      findsOneWidget,
+    );
+    // The box is empty again, ready for the next one.
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('chatText')))
+          .controller!
+          .text,
+      isEmpty,
+    );
+    await finish(tester);
+  });
+
+  testWidgets('a muted chat stays quiet', (tester) async {
+    await goOnline(tester);
+    await tester.tap(find.byKey(const Key('chatButton')));
+    await settle(tester, frames: 6);
+    await tester.tap(find.byKey(const Key('chatMute')));
+    await settle(tester, frames: 2);
+    // Close the sheet.
+    await tester.tapAt(const Offset(200, 40));
+    await settle(tester, frames: 6);
+
+    service.pushChat('g', [
+      ChatMessage(id: 'b1', seat: 2, text: 'hello?', sentAt: DateTime.now()),
+    ]);
+    await settle(tester, frames: 7);
+
+    expect(find.byType(ChatBubble), findsNothing);
+    expect(audio.played, isNot(contains(Sfx.chat)));
+    expect(tester.widget<ChatButton>(find.byType(ChatButton)).unread, 0);
+    await finish(tester);
+  });
 }

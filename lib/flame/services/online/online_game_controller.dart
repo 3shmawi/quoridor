@@ -240,7 +240,18 @@ class OnlineGameController extends ChangeNotifier {
 
   /// Sends [item] to the table. It shows here at once and goes out in the
   /// background; false when it was not sent at all.
-  Future<bool> sendChat(QuickChat item) async {
+  Future<bool> sendChat(QuickChat item) => _send(item: item);
+
+  /// Sends words the player typed, tidied to one line of at most
+  /// [ChatMessage.maxText] characters; false when there was nothing to send
+  /// or it was not sent.
+  Future<bool> sendText(String raw) {
+    final text = ChatMessage.tidy(raw);
+    if (text.isEmpty) return Future.value(false);
+    return _send(text: text);
+  }
+
+  Future<bool> _send({QuickChat? item, String? text}) async {
     final session = _session;
     final seat = session?.localPlayerId;
     if (session == null || seat == null || !canChat) return false;
@@ -253,6 +264,7 @@ class OnlineGameController extends ChangeNotifier {
           '${_random.nextInt(0x7fffffff).toRadixString(36)}',
       seat: seat,
       item: item,
+      text: text,
       sentAt: sentAt,
     );
     _mergeChat([message]);
@@ -267,6 +279,18 @@ class OnlineGameController extends ChangeNotifier {
       notifyListeners();
     }
     return sent;
+  }
+
+  /// Whether the others' messages are kept quiet: still listed, but with no
+  /// bubble, no sound and no unread count.
+  bool get chatMuted => _chatMuted;
+  bool _chatMuted = false;
+
+  set chatMuted(bool value) {
+    if (_chatMuted == value) return;
+    _chatMuted = value;
+    if (value) _unreadChat = 0;
+    notifyListeners();
   }
 
   /// The chat has been read.
@@ -285,7 +309,7 @@ class OnlineGameController extends ChangeNotifier {
     ];
     _mergeChat(messages);
 
-    if (_chatPrimed) {
+    if (_chatPrimed && !_chatMuted) {
       final seat = _session?.localPlayerId;
       for (final message in fresh) {
         if (message.seat == seat) continue;
@@ -304,14 +328,7 @@ class OnlineGameController extends ChangeNotifier {
     for (final m in messages) {
       // A message the server has not dated yet keeps the time it was first
       // seen here, so it stays where it was in the list.
-      byId[m.id] = m.sentAt != null
-          ? m
-          : ChatMessage(
-              id: m.id,
-              seat: m.seat,
-              item: m.item,
-              sentAt: byId[m.id]?.sentAt ?? _now(),
-            );
+      byId[m.id] = m.sentAt != null ? m : m.dated(byId[m.id]?.sentAt ?? _now());
     }
     final epoch = DateTime.fromMillisecondsSinceEpoch(0);
     final merged = byId.values.toList()

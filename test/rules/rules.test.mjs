@@ -906,7 +906,7 @@ describe('chat', () => {
     );
   });
 
-  it('refuses anything but the fixed reactions', async () => {
+  it('refuses a reaction that is not one of the fixed set', async () => {
     await seed('games/chat-5', activeGame());
     await assertFails(
       setDoc(doc(db(ALICE), 'games/chat-5/chat/m1'), message(1, ALICE, 'you are bad')),
@@ -938,5 +938,61 @@ describe('chat', () => {
     await seed('games/chat-8/chat/m1', { seat: 1, uid: ALICE, code: 'laugh', sentAt: 0 });
     await assertFails(updateDoc(doc(db(ALICE), 'games/chat-8/chat/m1'), { code: 'love' }));
     await assertFails(deleteDoc(doc(db(ALICE), 'games/chat-8/chat/m1')));
+  });
+
+  /** A typed message as the client writes it. */
+  const typed = (seat, uid, text) => ({
+    seat,
+    uid,
+    code: 'text',
+    text,
+    sentAt: serverTimestamp(),
+  });
+
+  it('lets a player type a short message, in any language', async () => {
+    await seed('games/chat-9', activeGame());
+    await assertSucceeds(
+      setDoc(doc(db(ALICE), 'games/chat-9/chat/m1'), typed(1, ALICE, 'مقصدش دي وربنا 😅')),
+    );
+    // The app's limit of eighty characters fits, whatever they are.
+    await assertSucceeds(
+      setDoc(doc(db(ALICE), 'games/chat-9/chat/m2'), typed(1, ALICE, 'ب'.repeat(80))),
+    );
+    await assertSucceeds(
+      setDoc(doc(db(ALICE), 'games/chat-9/chat/m3'), typed(1, ALICE, '😅'.repeat(80))),
+    );
+  });
+
+  it('refuses a typed message that is empty or too long', async () => {
+    await seed('games/chat-10', activeGame());
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-10/chat/m1'), typed(1, ALICE, '')),
+    );
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-10/chat/m2'), typed(1, ALICE, 'a'.repeat(161))),
+    );
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-10/chat/m3'), typed(1, ALICE, 42)),
+    );
+  });
+
+  it('refuses words smuggled onto a quick reaction', async () => {
+    await seed('games/chat-11', activeGame());
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-11/chat/m1'), {
+        ...message(1, ALICE, 'laugh'),
+        text: 'extra',
+      }),
+    );
+  });
+
+  it('refuses typing as somebody else, or from outside the game', async () => {
+    await seed('games/chat-12', activeGame());
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/chat-12/chat/m1'), typed(2, ALICE, 'hi')),
+    );
+    await assertFails(
+      setDoc(doc(db(MALLORY), 'games/chat-12/chat/m2'), typed(1, MALLORY, 'hi')),
+    );
   });
 });
