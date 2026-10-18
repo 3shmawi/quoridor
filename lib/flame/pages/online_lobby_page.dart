@@ -7,6 +7,8 @@ import '../services/identity_service.dart';
 import '../services/online/online_game_controller.dart';
 import '../services/online/online_game_service.dart';
 import '../services/online/room_code.dart';
+import '../services/settings_service.dart';
+import '../services/turn_clock.dart';
 
 /// Where a player starts or rejoins an online game.
 ///
@@ -27,6 +29,10 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
 
   /// Seats in the game this device would create.
   int _playerCount = 2;
+
+  /// The time every player gets for a turn in the game this device would
+  /// create. Starts from this player's own setting.
+  TurnLimit _turnLimit = SettingsService.instance.turnLimit.value;
   String? _error;
   List<OnlineGame> _resumable = const [];
 
@@ -257,10 +263,60 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
                         setState(() => _playerCount = selection.first),
             ),
             const SizedBox(height: 16),
+            Text(
+              context.l10n.timePerTurn,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface.withValues(alpha: 0.8),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<TurnLimit>(
+                key: const Key('lobbyTurnLimit'),
+                segments: [
+                  for (final limit in TurnLimit.values)
+                    ButtonSegment(
+                      value: limit,
+                      label: Text(
+                        limit == TurnLimit.off
+                            ? '∞'
+                            : context.l10n.secondsShort(limit.seconds),
+                      ),
+                      tooltip: limit == TurnLimit.off
+                          ? context.l10n.turnTimerOff
+                          : context.l10n.turnTimerSeconds(limit.seconds),
+                    ),
+                ],
+                selected: {_turnLimit},
+                showSelectedIcon: false,
+                onSelectionChanged: _busy
+                    ? null
+                    : (selection) =>
+                          setState(() => _turnLimit = selection.first),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _turnLimit == TurnLimit.off
+                  ? context.l10n.turnTimerOffSubtitle
+                  : context.l10n.timePerTurnHint,
+              style: TextStyle(
+                fontSize: 12,
+                color: scheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _busy
                   ? null
-                  : () => _run((c) => c.createGame(playerCount: _playerCount)),
+                  : () => _run(
+                      (c) => c.createGame(
+                        playerCount: _playerCount,
+                        turnLimit: _turnLimit,
+                      ),
+                    ),
               icon: const Icon(Icons.play_arrow_rounded),
               label: Text(context.l10n.createGame),
               style: FilledButton.styleFrom(
@@ -396,7 +452,11 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
           ),
         ),
         subtitle: Text(
-          context.l10n.codeAndMoves(game.roomCode, game.moveCount),
+          [
+            context.l10n.codeAndMoves(game.roomCode, game.moveCount),
+            if (game.turnLimit != TurnLimit.off)
+              context.l10n.secondsShort(game.turnLimit.seconds),
+          ].join(' · '),
           style: TextStyle(
             fontSize: 12,
             color: scheme.onSurface.withValues(alpha: 0.7),

@@ -7,6 +7,7 @@ import '../../models/online_chat.dart';
 import '../../models/online_session.dart';
 import '../firebase_service.dart';
 import '../game_service.dart';
+import '../turn_clock.dart';
 import '../identity_service.dart';
 import 'online_game_codec.dart';
 import 'room_code.dart';
@@ -110,9 +111,11 @@ class OnlineGameService {
       : null;
 
   /// Creates a game for [playerCount] people with a room code and seats the
-  /// creator as player 1.
+  /// creator as player 1. [turnLimit] is the time every player gets for a
+  /// turn.
   Future<OnlineResult<OnlineSession>> createPrivateGame({
     int playerCount = 2,
+    TurnLimit turnLimit = TurnLimit.off,
   }) async {
     assert(playerCount >= 2 && playerCount <= 4);
     // Sign in first: it waits for Firebase to finish starting, and reading
@@ -157,6 +160,7 @@ class OnlineGameService {
           creator: creator,
           board: board,
           timestamp: FieldValue.serverTimestamp(),
+          turnLimit: turnLimit,
         ),
       );
 

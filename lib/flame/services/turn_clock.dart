@@ -31,6 +31,15 @@ enum TurnLimit {
 
   /// The number shown in the settings list, in seconds.
   int get seconds => duration?.inSeconds ?? 0;
+
+  /// The limit stored as [seconds], or [off] for anything this build does
+  /// not offer.
+  static TurnLimit fromSeconds(Object? seconds) {
+    for (final limit in values) {
+      if (limit.seconds == seconds) return limit;
+    }
+    return off;
+  }
 }
 
 /// Counts down the turn in front of the player.

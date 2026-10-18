@@ -996,3 +996,55 @@ describe('chat', () => {
     );
   });
 });
+
+describe('the host\u2019s turn limit', () => {
+  it('lets the host pick one of the limits the app offers', async () => {
+    for (const seconds of [0, 15, 30, 60]) {
+      await assertSucceeds(
+        setDoc(doc(db(ALICE), `games/limit-ok-${seconds}`), {
+          ...waitingGame(),
+          turnSeconds: seconds,
+        }),
+      );
+    }
+  });
+
+  it('refuses a limit the app does not offer', async () => {
+    await assertFails(
+      setDoc(doc(db(ALICE), 'games/limit-bad'), { ...waitingGame(), turnSeconds: 1 }),
+    );
+  });
+
+  it('refuses a joiner changing it', async () => {
+    await seed('games/limit-join', { ...waitingGame(), turnSeconds: 15 });
+    await assertFails(
+      updateDoc(doc(db(BOB), 'games/limit-join'), {
+        'players.2': player(BOB, 'Bob'),
+        status: 'active',
+        turnSeconds: 60,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(BOB), 'games/limit-join'), {
+        'players.2': player(BOB, 'Bob'),
+        status: 'active',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('refuses changing it along with a move', async () => {
+    await seed('games/limit-move', { ...activeGame(), turnSeconds: 15 });
+    const next = play(board(), step(7, 4));
+    await assertFails(
+      updateDoc(doc(db(ALICE), 'games/limit-move'), {
+        ...moveWrite(next, 1),
+        turnSeconds: 0,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(ALICE), 'games/limit-move'), moveWrite(next, 1)),
+    );
+  });
+});
