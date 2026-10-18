@@ -22,6 +22,7 @@ class SettingsService {
   static const String _languageKey = 'settings.language';
   static const String _difficultyKey = 'settings.difficulty';
   static const String _turnLimitKey = 'settings.turnLimit';
+  static const String _blockedKey = 'settings.blockedPlayers';
 
   /// Languages the game is translated into.
   static const List<Locale> supportedLocales = [Locale('en'), Locale('ar')];
@@ -41,6 +42,14 @@ class SettingsService {
   /// without their asking. It is one tap away in the settings drawer.
   final ValueNotifier<TurnLimit> turnLimit = ValueNotifier<TurnLimit>(
     TurnLimit.off,
+  );
+
+  /// The online players this player has blocked, by their account id.
+  ///
+  /// Kept across games and restarts: someone blocked for what they wrote
+  /// should stay blocked next time they turn up, not only for one game.
+  final ValueNotifier<Set<String>> blockedPlayers = ValueNotifier<Set<String>>(
+    const {},
   );
 
   SharedPreferences? _prefs;
@@ -63,6 +72,7 @@ class SettingsService {
       locale.value = _localeFor(prefs.getString(_languageKey));
       difficulty.value = _difficultyFor(prefs.getString(_difficultyKey));
       turnLimit.value = _turnLimitFor(prefs.getString(_turnLimitKey));
+      blockedPlayers.value = {...?prefs.getStringList(_blockedKey)};
     } catch (error) {
       debugPrint('SettingsService: using defaults, load failed: $error');
     } finally {
@@ -84,6 +94,9 @@ class SettingsService {
     locale.addListener(() => _write(_languageKey, locale.value.languageCode));
     difficulty.addListener(() => _write(_difficultyKey, difficulty.value.name));
     turnLimit.addListener(() => _write(_turnLimitKey, turnLimit.value.name));
+    blockedPlayers.addListener(
+      () => _write(_blockedKey, blockedPlayers.value.toList()..sort()),
+    );
   }
 
   /// Switches between the languages the game supports.
@@ -100,6 +113,8 @@ class SettingsService {
     try {
       if (value is bool) {
         prefs.setBool(key, value);
+      } else if (value is List<String>) {
+        prefs.setStringList(key, value);
       } else {
         prefs.setString(key, '$value');
       }

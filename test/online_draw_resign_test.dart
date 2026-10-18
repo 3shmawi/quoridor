@@ -10,6 +10,7 @@ import 'package:quoridor/flame/services/audio_service.dart';
 import 'package:quoridor/flame/services/online/online_game_codec.dart';
 import 'package:quoridor/flame/services/online/online_game_controller.dart';
 import 'package:quoridor/flame/services/settings_service.dart';
+import 'package:quoridor/flame/services/turn_clock.dart';
 import 'package:quoridor/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -54,6 +55,7 @@ OnlineGame table({
       playerCount: playerCount,
     ),
     drawOffer: drawOffer,
+    turnLimit: TurnLimit.thirtySeconds,
     winnerPlayerId: winner,
     outcomeReason: reason,
   );
@@ -89,6 +91,17 @@ void main() {
         timestamp: 0,
       );
       expect(data['outcome'], {'reason': 'draw'});
+    });
+
+    test('an accepted offer is not open once the game is over', () {
+      expect(
+        table(
+          drawOffer: const DrawOffer(by: 1, atMove: 4),
+          status: OnlineGameStatus.finished,
+          reason: OnlineOutcomeReason.draw,
+        ).openDrawOffer,
+        isNull,
+      );
     });
 
     test('an offer stands only until the next move, or a no', () {
@@ -315,19 +328,27 @@ void main() {
       service.push(table(drawOffer: const DrawOffer(by: 2, atMove: 4)));
       await settle(tester, frames: 3);
       expect(find.text('Bob offers a draw'), findsOneWidget);
+      expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('acceptDraw')));
       await settle(tester, frames: 3);
       expect(service.endings.single, ('g', null, OnlineOutcomeReason.draw));
 
+      // The finished game still carries the offer that was accepted.
       service.push(
         table(
           status: OnlineGameStatus.finished,
           reason: OnlineOutcomeReason.draw,
+          drawOffer: const DrawOffer(by: 2, atMove: 4),
         ),
       );
       await settle(tester, frames: 3);
       expect(find.text("It's a draw 🤝"), findsOneWidget);
+      // The offer is answered: it no longer asks, and nobody's clock runs.
+      expect(find.text('Bob offers a draw'), findsNothing);
+      expect(find.byKey(const Key('acceptDraw')), findsNothing);
+      expect(find.text('Game over'), findsOneWidget);
+      expect(find.byIcon(Icons.timer_outlined), findsNothing);
       await finish(tester);
     });
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quoridor/flame/constants.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quoridor/flame/models/game_state.dart';
@@ -152,8 +153,18 @@ void main() {
 
   group('the game screen', () {
     late FakeOnlineGameService service;
+    late DateTime clockNow;
+
+    /// Moves the page's clock and the test's time on together.
+    Future<void> runClock(WidgetTester tester, Duration by) async {
+      for (var i = 0; i < by.inMilliseconds ~/ 200; i++) {
+        clockNow = clockNow.add(const Duration(milliseconds: 200));
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+    }
 
     setUp(() {
+      clockNow = DateTime.now();
       SharedPreferences.setMockInitialValues({});
       AIService.search = AIService.searchInline;
       AudioService.instance.debugOut = _SilentAudio();
@@ -186,6 +197,7 @@ void main() {
             GlobalCupertinoLocalizations.delegate,
           ],
           home: GamePage(
+            now: () => clockNow,
             openLobby: (_, _) async {
               final controller = OnlineGameController(service: service);
               await controller.resumeGame('g');
@@ -213,8 +225,34 @@ void main() {
       expect(find.text('Online · 15 s a turn'), findsOneWidget);
       expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
       expect(find.text('15'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 5));
+      await runClock(tester, const Duration(seconds: 5));
       expect(find.text('10'), findsWidgets);
+      await finish(tester);
+    });
+
+    testWidgets('when time runs out online, the turn passes on', (
+      tester,
+    ) async {
+      await goOnline(tester);
+      await runClock(tester, const Duration(seconds: 16));
+
+      // A pass, sent as a turn that ran out, and no move played for us.
+      expect(service.submitted, [const GameMove.pass(1)]);
+      expect(service.timedOutMoves, [const GameMove.pass(1)]);
+      expect(find.text("Time's up: your turn passed"), findsOneWidget);
+      await finish(tester);
+    });
+
+    testWidgets('the other player\'s clock running out sends nothing here', (
+      tester,
+    ) async {
+      service.sessions['g'] = OnlineSession(
+        game: game('g', turnLimit: TurnLimit.fifteenSeconds),
+        localPlayerId: 2,
+      );
+      await goOnline(tester);
+      await runClock(tester, const Duration(seconds: 16));
+      expect(service.submitted, isEmpty);
       await finish(tester);
     });
 

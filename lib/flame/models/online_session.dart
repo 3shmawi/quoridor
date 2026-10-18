@@ -176,10 +176,14 @@ class OnlineGame {
   });
 
   /// The draw offer still waiting for an answer: made at this very move,
-  /// and not turned down.
+  /// not turned down, in a game still being played. Accepting it ends the
+  /// game but leaves the offer stored, so a finished game must not count it.
   DrawOffer? get openDrawOffer {
     final offer = drawOffer;
-    if (offer == null || offer.declined || offer.atMove != moveCount) {
+    if (offer == null ||
+        offer.declined ||
+        offer.atMove != moveCount ||
+        status != OnlineGameStatus.active) {
       return null;
     }
     return offer;

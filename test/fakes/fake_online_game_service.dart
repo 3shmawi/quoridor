@@ -107,13 +107,18 @@ class FakeOnlineGameService implements OnlineGameService {
   /// Moves submitted, in order. Each waits on [submitResults] until the test
   /// completes it, so a test can act while a move is still on its way.
   final submitted = <GameMove>[];
+
+  /// Moves sent as passes for a turn that ran out.
+  final timedOutMoves = <GameMove>[];
   final submitResults = <Completer<OnlineResult<OnlineGame>>>[];
 
   @override
   Future<OnlineResult<OnlineGame>> submitMove(
     OnlineSession session,
-    GameMove move,
-  ) {
+    GameMove move, {
+    bool timedOut = false,
+  }) {
+    if (timedOut) timedOutMoves.add(move);
     submitted.add(move);
     final result = Completer<OnlineResult<OnlineGame>>();
     submitResults.add(result);
@@ -133,6 +138,23 @@ class FakeOnlineGameService implements OnlineGameService {
   Future<bool> sendChat(String gameId, ChatMessage message) async {
     if (chatFails) return false;
     chatSent.add(message);
+    return true;
+  }
+
+  /// Messages reported, with who sent them, and whether reporting works.
+  final reported =
+      <({String gameId, ChatMessage message, String reportedUid})>[];
+  bool reportFails = false;
+
+  @override
+  Future<bool> reportChat({
+    required String gameId,
+    required ChatMessage message,
+    required int reporterSeat,
+    required String reportedUid,
+  }) async {
+    if (reportFails) return false;
+    reported.add((gameId: gameId, message: message, reportedUid: reportedUid));
     return true;
   }
 

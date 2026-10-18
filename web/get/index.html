@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Get Quoridor</title>
+  <meta name="description" content="Get Quoridor on Google Play or the App Store, or play in your browser.">
+  <!-- Relative paths: the site is served from /quoridor/ on GitHub Pages
+       and from the root on Cloudflare Pages. -->
+  <link rel="icon" href="../icons/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <script>
+    // Where each phone gets the app. Kept in step with the Android
+    // applicationId and the App Store listing (test/get_page_test.dart).
+    var PLAY = 'https://play.google.com/store/apps/details?id=com.MoRe_H.quoridor';
+    var APP_STORE = 'https://apps.apple.com/app/id6752514464';
+
+    // Phones go straight to their store, to install or update. iPads that
+    // say they are Macs still have a touch screen, which a Mac does not.
+    (function () {
+      var ua = navigator.userAgent || '';
+      var ios = /iPhone|iPad|iPod/.test(ua) ||
+        (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+      var android = /Android/.test(ua);
+      if (ios) location.replace(APP_STORE);
+      else if (android) location.replace(PLAY);
+    })();
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Arabic", sans-serif;
+      color: #fff; background: radial-gradient(circle at 20% 10%, #4338ca 0, transparent 45%),
+        radial-gradient(circle at 90% 90%, #7c3aed 0, transparent 40%), #0b1020;
+      padding: 24px;
+    }
+    .card { width: 100%; max-width: 420px; text-align: center; padding: 36px 28px; border-radius: 28px;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+    img.logo { width: 112px; height: 112px; border-radius: 26px; box-shadow: 0 16px 50px rgba(220,38,38,.35); }
+    h1 { margin: 18px 0 6px; font-size: 30px; }
+    p { margin: 0 0 24px; color: #c7d2fe; line-height: 1.5; }
+    a.btn { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 12px 0; padding: 15px 18px;
+      border-radius: 16px; font-size: 17px; font-weight: 700; color: #fff; text-decoration: none;
+      background: #111827; border: 1px solid rgba(255,255,255,.18); }
+    a.btn.web { background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; }
+    a.btn:hover { filter: brightness(1.15); }
+    .lang { margin-top: 18px; font-size: 14px; color: #a5b4fc; }
+    .lang a { color: inherit; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="../icons/icon-192.png" alt="">
+    <h1 data-en="Get Quoridor" data-ar="نزّل كوريدور">Get Quoridor</h1>
+    <p data-en="Install or update the app, or play right here in your browser."
+       data-ar="نزّل التطبيق أو حدّثه، أو العب على طول من المتصفح.">
+      Install or update the app, or play right here in your browser.</p>
+    <a class="btn" id="play" href="https://play.google.com/store/apps/details?id=com.MoRe_H.quoridor">
+      ▶ <span data-en="Google Play" data-ar="جوجل بلاي">Google Play</span></a>
+    <a class="btn" id="appstore" href="https://apps.apple.com/app/id6752514464">
+       <span data-en="App Store" data-ar="آب ستور">App Store</span></a>
+    <a class="btn web" href="../" data-en="Play in the browser" data-ar="العب من المتصفح">Play in the browser</a>
+    <div class="lang"><a href="#" id="toggle">العربية</a></div>
+  </main>
+  <script>
+    document.getElementById('play').href = PLAY;
+    document.getElementById('appstore').href = APP_STORE;
+    function setLang(ar) {
+      document.documentElement.lang = ar ? 'ar' : 'en';
+      document.documentElement.dir = ar ? 'rtl' : 'ltr';
+      document.querySelectorAll('[data-en]').forEach(function (el) {
+        el.textContent = ar ? el.dataset.ar : el.dataset.en;
+      });
+      document.getElementById('toggle').textContent = ar ? 'English' : 'العربية';
+    }
+    var arabic = /^ar/i.test(navigator.language || '');
+    setLang(arabic);
+    document.getElementById('toggle').onclick = function (e) {
+      e.preventDefault(); arabic = !arabic; setLang(arabic);
+    };
+  </script>
+</body>
+</html>

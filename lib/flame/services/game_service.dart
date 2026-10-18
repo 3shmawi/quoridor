@@ -10,7 +10,14 @@ class GameService {
   /// A move for any other seat, or after the game has ended, is not: checking
   /// the mover's own pieces was not enough, because [executeMove] always
   /// applies a move to whoever is on turn.
-  static bool isValidMove(GameState gameState, GameMove move) {
+  /// Whether [move] may be played now. A pass is a move only for a player
+  /// with nothing else to play, or, online, for one whose time ran out
+  /// ([timedOut]).
+  static bool isValidMove(
+    GameState gameState,
+    GameMove move, {
+    bool timedOut = false,
+  }) {
     if (gameState.isGameOver) return false;
     if (move.playerId != gameState.currentPlayerId) return false;
 
@@ -22,7 +29,7 @@ class GameService {
       case MoveType.wallPlace:
         return _isValidWallPlacement(gameState, player, move.wall!);
       case MoveType.pass:
-        return mustPass(gameState);
+        return timedOut || mustPass(gameState);
     }
   }
 
@@ -55,8 +62,12 @@ class GameService {
   }
 
   // Execute a validated move
-  static GameState executeMove(GameState gameState, GameMove move) {
-    if (!isValidMove(gameState, move)) {
+  static GameState executeMove(
+    GameState gameState,
+    GameMove move, {
+    bool timedOut = false,
+  }) {
+    if (!isValidMove(gameState, move, timedOut: timedOut)) {
       throw ArgumentError('Invalid move attempted');
     }
 

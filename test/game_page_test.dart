@@ -13,6 +13,7 @@ import 'package:quoridor/flame/services/audio/audio_out.dart';
 import 'package:quoridor/flame/services/audio_service.dart';
 import 'package:quoridor/flame/services/game_service.dart';
 import 'package:quoridor/flame/services/settings_service.dart';
+import 'package:quoridor/flame/services/turn_clock.dart';
 import 'package:quoridor/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -27,8 +28,12 @@ class _SilentAudio implements AudioOut {
   void stopAll() {}
 }
 
+/// The time the page's turn clock reads; [runClock] moves it on.
+DateTime clockNow = DateTime(2026, 1, 1, 12);
+
 void main() {
   setUp(() {
+    clockNow = DateTime(2026, 1, 1, 12);
     SharedPreferences.setMockInitialValues({});
     AIService.search = AIService.searchInline;
     AudioService.instance.debugOut = _SilentAudio();
@@ -61,7 +66,7 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: const GamePage(),
+        home: GamePage(now: () => clockNow),
       ),
     );
     await settle(tester);
@@ -96,6 +101,16 @@ void main() {
 
     expect(find.text('@copyWrite Mohager', findRichText: true), findsOneWidget);
     expect(find.textContaining('ASHMAWY'), findsNothing);
+    await finish(tester);
+  });
+
+  testWidgets('the menu links to the privacy policy', (tester) async {
+    await openPage(tester);
+    await tester.tap(find.byIcon(Icons.menu));
+    await settle(tester, frames: 5);
+
+    expect(find.byKey(const Key('privacyPolicy')), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
     await finish(tester);
   });
 
@@ -194,24 +209,46 @@ void main() {
     await finish(tester);
   });
 
-  testWidgets('a message never moves the board', (tester) async {
-    // Picking a mode puts up a message straight away. It used to sit in the
-    // column under the board, so the board shrank and shifted while it
-    // showed, and a tap in that moment landed on the wrong square.
+  /// Moves the page's clock and the test's time on together.
+  Future<void> runClock(WidgetTester tester, Duration by) async {
+    for (var i = 0; i < by.inMilliseconds ~/ 200; i++) {
+      clockNow = clockNow.add(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+  }
+
+  /// Opens a two-player game on a 15-second clock and lets the first turn
+  /// run out, which puts up a message.
+  Future<void> runOutOfTime(WidgetTester tester) async {
+    SettingsService.instance.turnLimit.value = TurnLimit.fifteenSeconds;
+    addTearDown(() => SettingsService.instance.turnLimit.value = TurnLimit.off);
     await openPage(tester);
-    expect(find.text('Two player mode activated'), findsOneWidget);
+    await runClock(tester, const Duration(seconds: 16));
+  }
+
+  testWidgets('a message never moves the board', (tester) async {
+    // A message used to sit in the column under the board, so the board
+    // shrank and shifted while it showed, and a tap in that moment landed
+    // on the wrong square.
     final board = find.byType(GameWidget<QuoridorGame>);
-    final withMessage = tester.getRect(board);
+    SettingsService.instance.turnLimit.value = TurnLimit.fifteenSeconds;
+    addTearDown(() => SettingsService.instance.turnLimit.value = TurnLimit.off);
+    await openPage(tester);
+    final before = tester.getRect(board);
+
+    await runClock(tester, const Duration(seconds: 16));
+    expect(find.text('Out of time — a move was played for you'), findsOne);
+    expect(tester.getRect(board), before);
 
     await settle(tester, frames: 40);
-    expect(find.text('Two player mode activated'), findsNothing);
-    expect(tester.getRect(board), withMessage);
+    expect(find.text('Out of time — a move was played for you'), findsNothing);
+    expect(tester.getRect(board), before);
 
     await finish(tester);
   });
 
   testWidgets('messages drop in at the top', (tester) async {
-    await openPage(tester);
+    await runOutOfTime(tester);
     final toast = tester.getRect(find.byKey(const Key('toast')));
     final board = tester.getRect(find.byType(GameWidget<QuoridorGame>));
 
@@ -219,6 +256,13 @@ void main() {
     expect(toast.top, lessThan(board.top));
     expect(toast.bottom, lessThan(board.center.dy));
 
+    await finish(tester);
+  });
+
+  testWidgets('starting a game does not announce it', (tester) async {
+    // The title already says what is being played.
+    await openPage(tester);
+    expect(find.byKey(const Key('toast')), findsNothing);
     await finish(tester);
   });
 

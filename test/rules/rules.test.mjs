@@ -1206,3 +1206,97 @@ describe('draws', () => {
     await assertSucceeds(updateDoc(doc(db(BOB), 'games/draw-10'), decline));
   });
 });
+
+describe('reporting a chat message', () => {
+  /** A report of [messageId], as OnlineGameCodec.encodeReport writes it. */
+  const report = (gameId, messageId, overrides = {}) => ({
+    gameId,
+    messageId,
+    reporterUid: ALICE,
+    reporterSeat: 1,
+    reportedUid: BOB,
+    reportedSeat: 2,
+    code: 'text',
+    text: 'you are bad',
+    reportedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  async function arrange(gameId) {
+    await seed(`games/${gameId}`, activeGame());
+    await seed(`games/${gameId}/chat/m1`, {
+      seat: 2, uid: BOB, code: 'text', text: 'you are bad', sentAt: 0,
+    });
+    await seed(`games/${gameId}/chat/m2`, { seat: 2, uid: BOB, code: 'angry', sentAt: 0 });
+    await seed(`games/${gameId}/chat/m3`, { seat: 1, uid: ALICE, code: 'laugh', sentAt: 0 });
+  }
+
+  it('lets a player report what the other player wrote', async () => {
+    await arrange('report-1');
+    await assertSucceeds(setDoc(doc(db(ALICE), 'reports/r1'), report('report-1', 'm1')));
+  });
+
+  it('lets a player report a reaction, which has no text', async () => {
+    await arrange('report-2');
+    const { text, ...face } = report('report-2', 'm2', { code: 'angry' });
+    await assertSucceeds(setDoc(doc(db(ALICE), 'reports/r2'), face));
+  });
+
+  it('refuses a report that misquotes the message', async () => {
+    await arrange('report-3');
+    await assertFails(
+      setDoc(doc(db(ALICE), 'reports/r3'), report('report-3', 'm1', { text: 'something worse' })),
+    );
+    // Nor can a reaction be reported as typed words.
+    await assertFails(setDoc(doc(db(ALICE), 'reports/r3b'), report('report-3', 'm2')));
+  });
+
+  it('refuses a report of a message that does not exist', async () => {
+    await arrange('report-4');
+    await assertFails(setDoc(doc(db(ALICE), 'reports/r4'), report('report-4', 'nope')));
+  });
+
+  it('refuses a report blaming the wrong sender', async () => {
+    await arrange('report-5');
+    await assertFails(
+      setDoc(doc(db(BOB), 'reports/r5'), report('report-5', 'm3', {
+        reporterUid: BOB, reporterSeat: 2, reportedUid: ALICE, reportedSeat: 1, code: 'laugh', text: 'x',
+      })),
+    );
+    await assertFails(
+      setDoc(doc(db(ALICE), 'reports/r5b'), report('report-5', 'm1', { reportedUid: MALLORY })),
+    );
+  });
+
+  it('refuses reporting yourself, or as somebody else', async () => {
+    await arrange('report-6');
+    const { text, ...own } = report('report-6', 'm3', { reportedUid: ALICE, reportedSeat: 1, code: 'laugh' });
+    await assertFails(setDoc(doc(db(ALICE), 'reports/r6'), own));
+    await assertFails(setDoc(doc(db(BOB), 'reports/r6b'), report('report-6', 'm1')));
+  });
+
+  it('refuses a report from outside the game', async () => {
+    await arrange('report-7');
+    await assertFails(
+      setDoc(doc(db(MALLORY), 'reports/r7'), report('report-7', 'm1', { reporterUid: MALLORY })),
+    );
+  });
+
+  it('refuses extra fields and a back-dated report', async () => {
+    await arrange('report-8');
+    await assertFails(
+      setDoc(doc(db(ALICE), 'reports/r8'), { ...report('report-8', 'm1'), note: 'ban him' }),
+    );
+    await assertFails(
+      setDoc(doc(db(ALICE), 'reports/r8b'), report('report-8', 'm1', { reportedAt: Timestamp.fromMillis(0) })),
+    );
+  });
+
+  it('keeps reports write-once and out of the app', async () => {
+    await arrange('report-9');
+    await seed('reports/r9', { gameId: 'report-9', reporterUid: ALICE });
+    await assertFails(getDoc(doc(db(ALICE), 'reports/r9')));
+    await assertFails(updateDoc(doc(db(ALICE), 'reports/r9'), { gameId: 'x' }));
+    await assertFails(deleteDoc(doc(db(ALICE), 'reports/r9')));
+  });
+});
