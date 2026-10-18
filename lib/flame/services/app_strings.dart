@@ -60,7 +60,6 @@ class AppStrings {
   String get threePlayersSubtitle => _get('threePlayersSubtitle');
   String get fourPlayers => _get('fourPlayers');
   String get fourPlayersSubtitle => _get('fourPlayersSubtitle');
-  String localGameStarted(int n) => _fill('localGameStarted', '$n');
 
   // --- Status strip ------------------------------------------------------
   String get you => _get('you');
@@ -96,8 +95,6 @@ class AppStrings {
   String codeAndMoves(String code, int moves) =>
       _fill('codeAndMoves', code).replaceFirst('%m', '$moves');
   String get couldNotStart => _get('couldNotStart');
-  String shareCodeToInvite(String code) => _fill('shareCodeToInvite', code);
-  String get connectedGoodLuck => _get('connectedGoodLuck');
   String get invite => _get('invite');
   String get inviteCopied => _get('inviteCopied');
   String inviteMessage(String link, String code) =>
@@ -134,7 +131,6 @@ class AppStrings {
   String leaveGameGivesWin(String name) => _fill('leaveGameGivesWin', name);
   String get stay => _get('stay');
   String get leaveGame => _get('leaveGame');
-  String get leftOnlineGame => _get('leftOnlineGame');
   String get leaveOnlineFirst => _get('leaveOnlineFirst');
   String get youWin => _get('youWin');
   String get opponentWins => _get('opponentWins');
@@ -218,25 +214,18 @@ class AppStrings {
   String get hardSubtitle => _get('hardSubtitle');
 
   // --- Messages ----------------------------------------------------------
-  String get newGameStarted => _get('newGameStarted');
-  String get validMovesShown => _get('validMovesShown');
-  String get validMovesHidden => _get('validMovesHidden');
-  String get soundOn => _get('soundOn');
-  String get soundOff => _get('soundOff');
-  String difficultySetTo(String name) => _fill('difficultySetTo', name);
-  String get aiModeActivated => _get('aiModeActivated');
   String get playVsAIs => _get('playVsAIs');
   String get playVsAIsSubtitle => _get('playVsAIsSubtitle');
   String get howManyAIs => _get('howManyAIs');
   String aiOpponents(int n) => _fill('aiOpponents', '$n');
   String aiN(int n) => _fill('aiN', '$n');
-  String get twoPlayerModeActivated => _get('twoPlayerModeActivated');
   String get itsNotYourTurn => _get('itsNotYourTurn');
   String get invalidMove => _get('invalidMove');
   String get noWallsRemaining => _get('noWallsRemaining');
   String get invalidWallPlacement => _get('invalidWallPlacement');
   String get aiPlayedTheirMove => _get('aiPlayedTheirMove');
   String turnPassed(String name) => _fill('turnPassed', name);
+  String get yourTurnPassed => _get('yourTurnPassed');
   String get undo => _get('undo');
   String get continueGame => _get('continueGame');
   String get rematch => _get('rematch');
@@ -306,7 +295,6 @@ class AppStrings {
     'threePlayersSubtitle': 'Three on the same device, seven walls each',
     'fourPlayers': 'Four Players',
     'fourPlayersSubtitle': 'Four on the same device, five walls each',
-    'localGameStarted': '%s-player game started',
 
     'you': 'You',
     'ai': 'AI',
@@ -339,8 +327,6 @@ class AppStrings {
     'versName': 'vs %s',
     'codeAndMoves': 'Code %s · %m moves',
     'couldNotStart': 'Could not start the game',
-    'shareCodeToInvite': 'Share code %s to invite a friend',
-    'connectedGoodLuck': 'Connected — good luck',
     'invite': 'Invite',
     'inviteCopied': 'Invite link copied. Send it to a friend!',
     'inviteMessage': 'Play Quoridor with me! %s\n(or enter code %c)',
@@ -376,7 +362,6 @@ class AppStrings {
     'leaveGameGivesWin': 'Leaving now gives the win to %s.',
     'stay': 'Stay',
     'leaveGame': 'Leave',
-    'leftOnlineGame': 'Left the online game',
     'leaveOnlineFirst': 'Leave the online game first',
     'youWin': 'You win!',
     'opponentWins': 'Your opponent wins',
@@ -475,25 +460,18 @@ class AppStrings {
     'hard': 'Hard',
     'hardSubtitle': 'Sets walls up in advance',
 
-    'newGameStarted': 'New game started!',
-    'validMovesShown': 'Valid moves shown',
-    'validMovesHidden': 'Valid moves hidden',
-    'soundOn': 'Sound on',
-    'soundOff': 'Sound off',
-    'difficultySetTo': 'Difficulty: %s',
-    'aiModeActivated': 'Playing against AI',
     'playVsAIs': 'Play vs 2 or 3 AIs',
     'playVsAIsSubtitle': 'A crowded board, every rival the computer',
     'howManyAIs': 'How many computer opponents?',
     'aiOpponents': '%s computer opponents',
     'aiN': 'AI %s',
-    'twoPlayerModeActivated': 'Two player mode activated',
     'itsNotYourTurn': "It's not your turn!",
     'invalidMove': 'Invalid move!',
     'noWallsRemaining': 'No walls remaining!',
     'invalidWallPlacement': 'Invalid wall placement!',
     'aiPlayedTheirMove': 'AI played their move',
-    'turnPassed': '%s: no move possible, the turn passes',
+    'turnPassed': "%s's turn passed",
+    'yourTurnPassed': "Time's up: your turn passed",
     'undo': 'Undo',
     'continueGame': 'Continue game',
     'rematch': 'Rematch',
@@ -559,7 +537,6 @@ class AppStrings {
     'threePlayersSubtitle': 'تلاتة على نفس الجهاز، ٧ جدران لكل واحد',
     'fourPlayers': 'أربع لاعيبة',
     'fourPlayersSubtitle': 'أربعة على نفس الجهاز، ٥ جدران لكل واحد',
-    'localGameStarted': 'بدأت لعبة %s لاعيبة',
 
     'you': 'أنت',
     'ai': 'الكمبيوتر',
@@ -591,8 +568,6 @@ class AppStrings {
     'versName': 'ضد %s',
     'codeAndMoves': 'الكود %s · %m نقلة',
     'couldNotStart': 'تعذّر بدء اللعبة',
-    'shareCodeToInvite': 'ابعت الكود %s لصاحبك',
-    'connectedGoodLuck': 'اتصلنا — حظ موفق',
     'invite': 'ادعُ',
     'inviteCopied': 'اتنسخ لينك الدعوة. ابعته لصاحبك!',
     'inviteMessage': 'تعالى العب كوريدور معايا! %s\n(أو اكتب الكود %c)',
@@ -627,7 +602,6 @@ class AppStrings {
     'leaveGameGivesWin': 'لو سبت دلوقتي، %s هيكسب.',
     'stay': 'خليني',
     'leaveGame': 'اخرج',
-    'leftOnlineGame': 'خرجت من اللعبة الأونلاين',
     'leaveOnlineFirst': 'اخرج من اللعبة الأونلاين الأول',
     'youWin': 'كسبت!',
     'opponentWins': 'خصمك كسب',
@@ -724,25 +698,18 @@ class AppStrings {
     'hard': 'صعب',
     'hardSubtitle': 'بيجهّز الحواجز بدري',
 
-    'newGameStarted': 'بدأت لعبة جديدة',
-    'validMovesShown': 'النقلات المتاحة ظاهرة',
-    'validMovesHidden': 'النقلات المتاحة مخفية',
-    'soundOn': 'الصوت شغال',
-    'soundOff': 'الصوت مقفول',
-    'difficultySetTo': 'المستوى: %s',
-    'aiModeActivated': 'اللعب ضد الكمبيوتر',
     'playVsAIs': 'ضد 2 أو 3 كمبيوتر',
     'playVsAIsSubtitle': 'لوحة زحمة، وكل منافسينك كمبيوتر',
     'howManyAIs': 'كام منافس كمبيوتر؟',
     'aiOpponents': '%s منافسين كمبيوتر',
     'aiN': 'الكمبيوتر %s',
-    'twoPlayerModeActivated': 'وضع اللاعبين اتفعّل',
     'itsNotYourTurn': 'مش دورك!',
     'invalidMove': 'نقلة غير متاحة!',
     'noWallsRemaining': 'مفيش حواجز متبقية!',
     'invalidWallPlacement': 'مكان الحاجز غير متاح!',
     'aiPlayedTheirMove': 'الكمبيوتر لعب',
-    'turnPassed': '%s: مفيش نقلة متاحة، الدور عدّى',
+    'turnPassed': 'دور %s عدّى',
+    'yourTurnPassed': 'الوقت خلص: دورك عدّى',
     'undo': 'تراجع',
     'continueGame': 'كمّل اللعبة',
     'rematch': 'ماتش تاني',

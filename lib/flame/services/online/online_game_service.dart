@@ -308,10 +308,12 @@ class OnlineGameService {
   /// board in a transaction that asserts the turn and the move count are still
   /// what this client saw. That assertion is the whole concurrency story: two
   /// clients cannot both write move N.
+  /// [timedOut] lets a pass through for a player whose time ran out.
   Future<OnlineResult<OnlineGame>> submitMove(
     OnlineSession session,
-    GameMove move,
-  ) async {
+    GameMove move, {
+    bool timedOut = false,
+  }) async {
     final games = _games;
     final identity = IdentityService.instance.current;
     if (games == null || identity == null) {
@@ -360,7 +362,7 @@ class OnlineGameService {
 
         // The rules are the same ones local play uses; nothing about being
         // online relaxes them.
-        if (!GameService.isValidMove(current.board, move)) {
+        if (!GameService.isValidMove(current.board, move, timedOut: timedOut)) {
           failure = OnlineFailure.illegalMove;
           detail = move.type == MoveType.wallPlace
               ? GameService.validateWallPlacement(
@@ -372,7 +374,11 @@ class OnlineGameService {
           return;
         }
 
-        final nextBoard = GameService.executeMove(current.board, move);
+        final nextBoard = GameService.executeMove(
+          current.board,
+          move,
+          timedOut: timedOut,
+        );
         final nextCount = current.moveCount + 1;
 
         transaction.set(

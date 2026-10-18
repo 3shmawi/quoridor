@@ -679,18 +679,24 @@ class OnlineGameController extends ChangeNotifier {
   /// the same rules the server applies, and the write is guarded by the move
   /// counter: if the server refuses, [_rollback] puts the confirmed board back
   /// and the listener delivers the truth either way.
-  Future<bool> submitMove(GameMove move) async {
+  Future<bool> submitMove(GameMove move, {bool timedOut = false}) async {
     final session = _session;
     if (session == null || _submitting) return false;
 
     final confirmed = session.game;
-    if (!GameService.isValidMove(confirmed.board, move)) return false;
+    if (!GameService.isValidMove(confirmed.board, move, timedOut: timedOut)) {
+      return false;
+    }
     _submitting = true;
 
     try {
-      _applyOptimistically(move);
+      _applyOptimistically(move, timedOut: timedOut);
 
-      final result = await _service.submitMove(session, move);
+      final result = await _service.submitMove(
+        session,
+        move,
+        timedOut: timedOut,
+      );
 
       if (!result.isSuccess) {
         _rollback(_serverGame ?? confirmed);
@@ -708,15 +714,28 @@ class OnlineGameController extends ChangeNotifier {
     }
   }
 
+  /// Hands the turn on when this device's time for it has run out. Online,
+  /// a turn that runs out passes to the next player rather than having a
+  /// move played for this one.
+  Future<bool> passTurn() async {
+    final seat = localPlayerId;
+    if (seat == null || !isLocalTurn) return false;
+    return submitMove(GameMove.pass(seat), timedOut: true);
+  }
+
   /// Shows [move] on this device before the server has confirmed it.
-  void _applyOptimistically(GameMove move) {
+  void _applyOptimistically(GameMove move, {bool timedOut = false}) {
     final session = _session;
     if (session == null) return;
 
     // The real rules, not the engine's shortcut: that drops the move history
     // to keep its search cheap, which emptied the move list while a move was
     // in flight and made every earlier move sound again once it landed.
-    final board = GameService.executeMove(session.game.board, move);
+    final board = GameService.executeMove(
+      session.game.board,
+      move,
+      timedOut: timedOut,
+    );
     _pendingLocalMove = true;
     _session = session.copyWith(
       game: _withBoard(session.game, board, session.game.moveCount + 1),

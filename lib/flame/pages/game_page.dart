@@ -28,7 +28,7 @@ import '../../flame/services/saved_game_service.dart';
 import '../../theme.dart';
 
 class GamePage extends StatefulWidget {
-  const GamePage({super.key, this.openLobby, this.inviteCode});
+  const GamePage({super.key, this.openLobby, this.inviteCode, this.now});
 
   /// Opens the online lobby and returns the game it started, if any, joining
   /// the game with the code given straight away. Tests put their own here;
@@ -43,6 +43,11 @@ class GamePage extends StatefulWidget {
   /// The room code of an invite link the app was opened with: the game it
   /// joins instead of showing the mode sheet.
   final String? inviteCode;
+
+  /// The time the turn clock reads. Tests move it on; the app uses the real
+  /// time.
+  @visibleForTesting
+  final DateTime Function()? now;
 
   @override
   State<GamePage> createState() => _GamePageState();
@@ -59,7 +64,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   AIDifficulty _currentDifficulty = SettingsService.instance.difficulty.value;
 
   /// Counts down the turn in front of whoever is to play.
-  final TurnClock _clock = TurnClock();
+  late final TurnClock _clock = TurnClock(now: widget.now);
 
   /// True while a sheet or dialog is covering the board.
   ///
@@ -192,12 +197,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     // can move, so there is no turn to run out.
     final online = _online;
     final waitingForPlayers = online != null && !(online.game?.isFull ?? false);
+    // A draw, a resignation or a claimed win ends an online game with the
+    // board itself still mid-game.
+    final onlineOver = online?.game?.isOver ?? false;
 
     if (state.isGameOver ||
         state.currentPlayer.isAI ||
         _menuOpen ||
         _awaitingStart ||
-        waitingForPlayers) {
+        waitingForPlayers ||
+        onlineOver) {
       _clock.stop();
       return;
     }
@@ -209,14 +218,31 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _handleTurnPassed(int seat) {
     if (!mounted || !_game.isInitialized) return;
+    if (seat == _online?.localPlayerId) {
+      _showGameMessage(context.l10n.yourTurnPassed);
+      return;
+    }
     final player = _game.gameState.playerById(seat);
     _showGameMessage(
       context.l10n.turnPassed(_labelFor(player, _online?.localPlayerId)),
     );
   }
 
+  /// The clock ran out on the player to move.
+  ///
+  /// Online, the turn passes to the next player, and only the device whose
+  /// turn it was sends that; everyone else just watches it happen. On one
+  /// device, a move is played for whoever is to move, so the game goes on.
   void _handleTurnExpired() {
     if (!mounted) return;
+    final online = _online;
+    if (online != null) {
+      if (online.isLocalTurn) {
+        _game.clearInteraction();
+        unawaited(online.passTurn());
+      }
+      return;
+    }
     _showGameMessage(context.l10n.outOfTime);
     _game.playForCurrentPlayer();
   }
@@ -286,11 +312,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     if (board != null) _game.updateGameState(board);
 
     setState(() {});
-    _showGameMessage(
-      controller.connection == OnlineConnectionState.waitingForOpponent
-          ? context.l10n.shareCodeToInvite(controller.roomCode ?? '')
-          : context.l10n.connectedGoodLuck,
-    );
   }
 
   void _handleOnlineChanged() {
@@ -514,7 +535,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _awaitingStart = true;
     _syncClock();
     setState(() {});
-    _showGameMessage(context.l10n.leftOnlineGame);
     // Straight on to picking the next game.
     _showGameModeSelection();
   }
@@ -621,7 +641,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   /// The same kind of game again, from the start.
   void _restartGame() {
     _game.newGame();
-    _showGameMessage(context.l10n.newGameStarted);
   }
 
   /// Brings up the mode sheet, the one way every game starts. Online, the
@@ -639,11 +658,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       _showValidMoves = !_showValidMoves;
     });
     _game.showValidMoves(_showValidMoves);
-    _showGameMessage(
-      _showValidMoves
-          ? context.l10n.validMovesShown
-          : context.l10n.validMovesHidden,
-    );
     closeMenu();
   }
 
@@ -664,9 +678,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       // Silence anything mid-playback so the toggle takes effect immediately.
       audio.stopAll();
     }
-    _showGameMessage(
-      audio.enabled.value ? context.l10n.soundOn : context.l10n.soundOff,
-    );
     closeMenu();
   }
 
@@ -676,9 +687,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     });
     SettingsService.instance.difficulty.value = difficulty;
     _game.setDifficulty(difficulty);
-    _showGameMessage(
-      context.l10n.difficultySetTo(_difficultyLabel(difficulty)),
-    );
   }
 
   void _undo() {
@@ -900,7 +908,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     Navigator.pop(context);
                     _syncClock();
                     setState(() {});
-                    _showGameMessage(context.l10n.aiModeActivated);
                   },
                 ),
                 const SizedBox(height: 16),
@@ -966,7 +973,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     Navigator.pop(context);
     _syncClock();
     setState(() {});
-    _showGameMessage(context.l10n.aiModeActivated);
   }
 
   void _startLocalGame(int playerCount) {
@@ -976,11 +982,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     Navigator.pop(context);
     _syncClock();
     setState(() {});
-    _showGameMessage(
-      playerCount == 2
-          ? context.l10n.twoPlayerModeActivated
-          : context.l10n.localGameStarted(playerCount),
-    );
   }
 
   /// One choice in the mode sheet. The [featured] one is filled in the
@@ -2137,11 +2138,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _syncClock();
     setState(() {});
-    _showGameMessage(
-      online.connection == OnlineConnectionState.waitingForOpponent
-          ? context.l10n.shareCodeToInvite(online.roomCode ?? '')
-          : context.l10n.connectedGoodLuck,
-    );
   }
 
   /// Shows the QR code, the code and the link that bring a friend into this

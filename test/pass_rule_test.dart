@@ -67,6 +67,18 @@ void main() {
   group('playing it', () {
     setUp(() => AIService.search = AIService.searchInline);
 
+    test('a pass is allowed for a turn that ran out, and not otherwise', () {
+      final start = GameStateFactory.createNewGame(player2IsAI: false);
+      const pass = GameMove.pass(1);
+      expect(GameService.isValidMove(start, pass), isFalse);
+      expect(GameService.isValidMove(start, pass, timedOut: true), isTrue);
+      // Only for the player whose turn it is.
+      expect(
+        GameService.isValidMove(start, const GameMove.pass(2), timedOut: true),
+        isFalse,
+      );
+    });
+
     test('the computer passes when it has to', () {
       final move = QuoridorEngine.bestMove(
         boxedIn(seat1IsAI: true),

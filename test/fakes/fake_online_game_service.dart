@@ -107,13 +107,18 @@ class FakeOnlineGameService implements OnlineGameService {
   /// Moves submitted, in order. Each waits on [submitResults] until the test
   /// completes it, so a test can act while a move is still on its way.
   final submitted = <GameMove>[];
+
+  /// Moves sent as passes for a turn that ran out.
+  final timedOutMoves = <GameMove>[];
   final submitResults = <Completer<OnlineResult<OnlineGame>>>[];
 
   @override
   Future<OnlineResult<OnlineGame>> submitMove(
     OnlineSession session,
-    GameMove move,
-  ) {
+    GameMove move, {
+    bool timedOut = false,
+  }) {
+    if (timedOut) timedOutMoves.add(move);
     submitted.add(move);
     final result = Completer<OnlineResult<OnlineGame>>();
     submitResults.add(result);
