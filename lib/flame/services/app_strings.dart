@@ -167,6 +167,12 @@ class AppStrings {
   String get turnTimerOffSubtitle => _get('turnTimerOffSubtitle');
   String turnTimerSeconds(int n) => _fill('turnTimerSeconds', '$n');
   String get turnTimerSecondsSubtitle => _get('turnTimerSecondsSubtitle');
+  String get timePerTurn => _get('timePerTurn');
+  String get timePerTurnHint => _get('timePerTurnHint');
+  String secondsShort(int n) => _fill('secondsShort', '$n');
+  String get turnTimerSetByHost => _get('turnTimerSetByHost');
+  String modeOnlineTimed(int n) => _fill('modeOnlineTimed', '$n');
+  String turnTimeIs(int n) => _fill('turnTimeIs', '$n');
   String get outOfTime => _get('outOfTime');
 
   String get aiDifficulty => _get('aiDifficulty');
@@ -381,6 +387,13 @@ class AppStrings {
     'turnTimer': 'Turn Timer',
     'turnTimerSubtitle': 'How long each turn lasts',
     'turnTimerOff': 'No limit',
+    'timePerTurn': 'Time per turn',
+    'timePerTurnHint':
+        'The same for everyone. When it runs out, a move is played for you.',
+    'secondsShort': '%s s',
+    'turnTimerSetByHost': 'Set by the host for this online game',
+    'modeOnlineTimed': 'Online · %s s a turn',
+    'turnTimeIs': '%s seconds a turn in this game',
     'turnTimerOffSubtitle': 'Take as long as you like',
     'turnTimerSeconds': '%s seconds',
     'turnTimerSecondsSubtitle': 'A move is played for you if time runs out',
@@ -592,6 +605,12 @@ class AppStrings {
     'turnTimer': 'مؤقت الدور',
     'turnTimerSubtitle': 'الدور الواحد بياخد قد إيه',
     'turnTimerOff': 'من غير وقت',
+    'timePerTurn': 'وقت كل دور',
+    'timePerTurnHint': 'نفس الوقت للكل. لو خلص، بتتلعب حركة بدالك.',
+    'secondsShort': '%s ث',
+    'turnTimerSetByHost': 'صاحب اللعبة محدده للعبة الأونلاين دي',
+    'modeOnlineTimed': 'أونلاين · %s ث للدور',
+    'turnTimeIs': '%s ثانية لكل دور في اللعبة دي',
     'turnTimerOffSubtitle': 'خد وقتك زي ما تحب',
     'turnTimerSeconds': '%s ثانية',
     'turnTimerSecondsSubtitle': 'لو الوقت خلص هتتلعبلك نقلة',

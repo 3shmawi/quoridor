@@ -61,6 +61,18 @@ service cloud.firestore {
         return count == 2 ? ['2'] : (count == 3 ? ['2', '3'] : ['2', '3', '4']);
       }
 
+      // The seconds each player gets for a turn, chosen by the host when the
+      // game is made (TurnLimit; 0 is no limit). Games from before it carry
+      // none.
+      function turnSecondsOf(data) {
+        return data.get('turnSeconds', 0);
+      }
+
+      // Nobody changes the host's turn limit once the game exists.
+      function keepsTurnLimit() {
+        return turnSecondsOf(incoming()) == turnSecondsOf(existing());
+      }
+
       // A new game seats its creator as player 1 and starts empty.
       function isWellFormedNewGame() {
         return signedIn()
@@ -69,6 +81,7 @@ service cloud.firestore {
           && incoming().status == 'waiting'
           && incoming().moveCount == 0
           && playerCountOf(incoming()) in [2, 3, 4]
+          && turnSecondsOf(incoming()) in [0, 15, 30, 60]
           && incoming().roomCode is string
           && incoming().roomCode.size() == 6
           && incoming().board is map;
@@ -98,7 +111,8 @@ service cloud.firestore {
           && incoming().status
              == (incoming().players.size() == count ? 'active' : 'waiting')
           && incoming().moveCount == existing().moveCount
-          && incoming().roomCode == existing().roomCode;
+          && incoming().roomCode == existing().roomCode
+          && keepsTurnLimit();
       }
 
       // Playing a move: it must be your turn, and the counter must advance by
@@ -113,6 +127,7 @@ service cloud.firestore {
           && incoming().players == existing().players
           && playerCountOf(incoming()) == playerCountOf(existing())
           && incoming().roomCode == existing().roomCode
+          && keepsTurnLimit()
           && incoming().status in ['active', 'finished']
           && isLegalBoardStep(existing().board, incoming().board,
                existing().currentPlayerId, playerCountOf(existing()));
@@ -277,7 +292,8 @@ service cloud.firestore {
         return isPlayer(existing())
           && incoming().status == 'abandoned'
           && incoming().moveCount == existing().moveCount
-          && incoming().players == existing().players;
+          && incoming().players == existing().players
+          && keepsTurnLimit();
       }
 
       // A game is private to the people playing it. Looking one up by

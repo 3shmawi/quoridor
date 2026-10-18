@@ -144,8 +144,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     SettingsService.instance.turnLimit.addListener(_handleTurnLimitChanged);
   }
 
+  /// The time a turn lasts: the host's choice online, this device's own
+  /// setting otherwise.
+  TurnLimit get _turnLimit =>
+      _online?.turnLimit ?? SettingsService.instance.turnLimit.value;
+
   void _handleTurnLimitChanged() {
-    _clock.limit = SettingsService.instance.turnLimit.value;
+    _clock.limit = _turnLimit;
     _syncClock();
     if (mounted) setState(() {});
   }
@@ -233,6 +238,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _detachOnline(abandon: true);
     _online = controller;
     _awaitingStart = false;
+    _clock.limit = _turnLimit;
 
     // The server's board is the one being rendered from here on.
     _game.localPlayerId = controller.localPlayerId;
@@ -265,6 +271,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       _game.viewTurns = viewTurnsForSeat(online.localPlayerId);
     }
 
+    _clock.limit = _turnLimit;
+
     final message = online == null ? null : context.l10n.onlineNotice(online);
     if (message != null) {
       _showGameMessage(message);
@@ -292,6 +300,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     unawaited(controller.leave(abandon: abandon));
     controller.dispose();
 
+    _clock.limit = _turnLimit;
     _game.localPlayerId = null;
     _game.turnGate = null;
     _game.viewTurns = 0;
@@ -1051,6 +1060,40 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                           const SizedBox(height: 24),
 
                           _buildMenuSection(context.l10n.turnTimer, [
+                            // Online, everyone plays to the host's clock.
+                            if (_isOnline)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: 8,
+                                  left: 4,
+                                  right: 4,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.lock_outline_rounded,
+                                      size: 14,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.6),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        context.l10n.turnTimerSetByHost,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.6),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             for (final limit in TurnLimit.values)
                               _buildTurnLimitItem(limit),
                           ]),
@@ -1326,7 +1369,12 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   /// What is being played, in a few words, or null before anything is.
   String? get _modeLabel {
-    if (_isOnline) return context.l10n.modeOnline;
+    if (_online case final online?) {
+      final limit = online.turnLimit;
+      return limit == TurnLimit.off
+          ? context.l10n.modeOnline
+          : context.l10n.modeOnlineTimed(limit.seconds);
+    }
     if (_awaitingStart || !_game.isInitialized) return null;
     final state = _game.gameState;
     final computers = state.players.where((p) => p.isAI).length;
@@ -1583,7 +1631,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   Widget _buildTurnLimitItem(TurnLimit limit) {
-    final isSelected = SettingsService.instance.turnLimit.value == limit;
+    final isSelected = _turnLimit == limit;
+    final locked = _isOnline;
     final scheme = Theme.of(context).colorScheme;
 
     return Card(
@@ -1601,7 +1650,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         ),
       ),
       child: ListTile(
-        onTap: () => SettingsService.instance.turnLimit.value = limit,
+        enabled: !locked || isSelected,
+        onTap: locked
+            ? null
+            : () => SettingsService.instance.turnLimit.value = limit,
         leading: Icon(
           limit == TurnLimit.off ? Icons.all_inclusive : Icons.timer_outlined,
           color: isSelected

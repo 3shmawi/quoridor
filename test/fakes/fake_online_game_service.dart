@@ -4,6 +4,7 @@ import 'package:quoridor/flame/constants.dart';
 import 'package:quoridor/flame/models/online_chat.dart';
 import 'package:quoridor/flame/models/online_session.dart';
 import 'package:quoridor/flame/services/online/online_game_service.dart';
+import 'package:quoridor/flame/services/turn_clock.dart';
 
 /// Stands in for Firestore: games are whatever the test seeds, and the
 /// first rematch link offered on a game is the one that stands.
@@ -13,6 +14,9 @@ class FakeOnlineGameService implements OnlineGameService {
   final links = <String, RematchLink>{};
   final abandoned = <String>[];
   final created = <OnlineSession>[];
+
+  /// The turn limit each created game was asked for.
+  final createdTurnLimits = <TurnLimit>[];
   OnlineSession? nextCreated;
   final _streams = <String, StreamController<OnlineGame>>{};
 
@@ -25,7 +29,9 @@ class FakeOnlineGameService implements OnlineGameService {
   @override
   Future<OnlineResult<OnlineSession>> createPrivateGame({
     int playerCount = 2,
+    TurnLimit turnLimit = TurnLimit.off,
   }) async {
+    createdTurnLimits.add(turnLimit);
     created.add(nextCreated!);
     return OnlineResult.success(nextCreated);
   }

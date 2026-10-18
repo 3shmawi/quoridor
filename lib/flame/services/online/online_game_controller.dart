@@ -8,6 +8,7 @@ import '../../models/game_state.dart';
 import '../../models/online_chat.dart';
 import '../../models/online_session.dart';
 import '../game_service.dart';
+import '../turn_clock.dart';
 import '../identity_service.dart';
 import 'online_game_service.dart';
 
@@ -168,8 +169,10 @@ class OnlineGameController extends ChangeNotifier {
       final offered = session.game.rematch;
       if (offered != null) return await _joinRematch(offered);
 
+      // The rematch keeps the time the table was playing with.
       final created = await _service.createPrivateGame(
         playerCount: session.game.playerCount,
+        turnLimit: session.game.turnLimit,
       );
       final mine = created.value;
       if (!created.isSuccess || mine == null) {
@@ -353,10 +356,20 @@ class OnlineGameController extends ChangeNotifier {
     return game?.players[game.currentPlayerId];
   }
 
-  /// Creates a game for [playerCount] people and starts watching it.
-  Future<bool> createGame({int playerCount = 2}) async {
+  /// The time each player has for a turn in this game, as its host set it.
+  TurnLimit get turnLimit => _session?.game.turnLimit ?? TurnLimit.off;
+
+  /// Creates a game for [playerCount] people, with [turnLimit] for every
+  /// turn, and starts watching it.
+  Future<bool> createGame({
+    int playerCount = 2,
+    TurnLimit turnLimit = TurnLimit.off,
+  }) async {
     _setConnection(OnlineConnectionState.connecting);
-    final result = await _service.createPrivateGame(playerCount: playerCount);
+    final result = await _service.createPrivateGame(
+      playerCount: playerCount,
+      turnLimit: turnLimit,
+    );
     return _adopt(result);
   }
 
@@ -559,6 +572,7 @@ class OnlineGameController extends ChangeNotifier {
   static OnlineGame _withBoard(OnlineGame game, GameState board, int count) =>
       OnlineGame(
         rematch: game.rematch,
+        turnLimit: game.turnLimit,
         gameId: game.gameId,
         roomCode: game.roomCode,
         status: game.status,

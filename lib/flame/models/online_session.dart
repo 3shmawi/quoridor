@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../services/turn_clock.dart';
 import 'game_state.dart';
 
 /// Lifecycle of an online game.
@@ -117,6 +118,10 @@ class OnlineGame {
   /// The rematch somebody offered once this game ended, if any.
   final RematchLink? rematch;
 
+  /// The time each player has for a turn, chosen by whoever created the
+  /// game. It holds for everyone at the table, whatever their own setting.
+  final TurnLimit turnLimit;
+
   const OnlineGame({
     required this.gameId,
     required this.roomCode,
@@ -130,6 +135,7 @@ class OnlineGame {
     this.outcomeReason,
     this.updatedAt,
     this.rematch,
+    this.turnLimit = TurnLimit.off,
   });
 
   bool get isOver =>

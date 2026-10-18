@@ -2,6 +2,7 @@ import '../../constants.dart';
 import '../../models/game_state.dart';
 import '../../models/online_chat.dart';
 import '../../models/online_session.dart';
+import '../turn_clock.dart';
 
 /// Translates between the game's own types and the documents stored for an
 /// online game.
@@ -47,8 +48,10 @@ class OnlineGameCodec {
     required OnlinePlayer creator,
     required GameState board,
     required Object timestamp,
+    TurnLimit turnLimit = TurnLimit.off,
   }) => {
     'roomCode': roomCode,
+    'turnSeconds': turnLimit.seconds,
     'status': OnlineGameStatus.waiting.name,
     'players': {'1': encodePlayer(creator)},
     'playerCount': board.playerCount,
@@ -172,6 +175,8 @@ class OnlineGameCodec {
       outcomeReason: _decodeReason(outcome?['reason'] as String?),
       updatedAt: _decodeTime(data['updatedAt']),
       rematch: decodeRematch(data['rematch']),
+      // Games from before the host chose a limit have none.
+      turnLimit: TurnLimit.fromSeconds(data['turnSeconds']),
     );
   }
 
