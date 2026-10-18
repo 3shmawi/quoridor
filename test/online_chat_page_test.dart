@@ -205,6 +205,8 @@ void main() {
 
     expect(find.byKey(const Key('chatButton')), findsNothing);
     expect(find.byType(ChatBubbleLayer), findsNothing);
+    // Straight on to picking the next game.
+    expect(find.text('Choose Game Mode'), findsOneWidget);
     await finish(tester);
   });
 

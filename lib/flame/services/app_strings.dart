@@ -143,14 +143,14 @@ class AppStrings {
   String get gameControls => _get('gameControls');
   String get leaveOnlineGame => _get('leaveOnlineGame');
   String get leaveOnlineGameSubtitle => _get('leaveOnlineGameSubtitle');
-  String get playOnlineSubtitleShort => _get('playOnlineSubtitleShort');
   String get newGame => _get('newGame');
   String get newGameSubtitle => _get('newGameSubtitle');
-  String get saveGame => _get('saveGame');
-  String get saveGameSubtitle => _get('saveGameSubtitle');
-  String get togglePlayerMode => _get('togglePlayerMode');
-  String get switchToTwoPlayers => _get('switchToTwoPlayers');
-  String get switchToAI => _get('switchToAI');
+  String get readyToPlay => _get('readyToPlay');
+  String get readyToPlaySubtitle => _get('readyToPlaySubtitle');
+  String get modeOnline => _get('modeOnline');
+  String modeVsAI(String difficulty) => _fill('modeVsAI', difficulty);
+  String modeVsAIs(int n) => _fill('modeVsAIs', '$n');
+  String modeLocal(int n) => _fill('modeLocal', '$n');
   String get displayOptions => _get('displayOptions');
   String get showValidMoves => _get('showValidMoves');
   String get showValidMovesSubtitle => _get('showValidMovesSubtitle');
@@ -184,8 +184,6 @@ class AppStrings {
   String get soundOn => _get('soundOn');
   String get soundOff => _get('soundOff');
   String difficultySetTo(String name) => _fill('difficultySetTo', name);
-  String get switchedToAI => _get('switchedToAI');
-  String get switchedToTwoPlayers => _get('switchedToTwoPlayers');
   String get aiModeActivated => _get('aiModeActivated');
   String get playVsAIs => _get('playVsAIs');
   String get playVsAIsSubtitle => _get('playVsAIsSubtitle');
@@ -193,9 +191,6 @@ class AppStrings {
   String aiOpponents(int n) => _fill('aiOpponents', '$n');
   String aiN(int n) => _fill('aiN', '$n');
   String get twoPlayerModeActivated => _get('twoPlayerModeActivated');
-  String get signInToSave => _get('signInToSave');
-  String get gameSaved => _get('gameSaved');
-  String get gameSaveFailed => _get('gameSaveFailed');
   String get itsNotYourTurn => _get('itsNotYourTurn');
   String get invalidMove => _get('invalidMove');
   String get noWallsRemaining => _get('noWallsRemaining');
@@ -366,14 +361,15 @@ class AppStrings {
     'gameControls': 'Game Controls',
     'leaveOnlineGame': 'Leave Online Game',
     'leaveOnlineGameSubtitle': 'Return to playing on this device',
-    'playOnlineSubtitleShort': 'Invite a friend with a code',
     'newGame': 'New Game',
-    'newGameSubtitle': 'Start a fresh game',
-    'saveGame': 'Save Game',
-    'saveGameSubtitle': 'Save current progress',
-    'togglePlayerMode': 'Toggle Player Mode',
-    'switchToTwoPlayers': 'Switch to human players',
-    'switchToAI': 'Switch to AI',
+    'newGameSubtitle': 'Online, against the computer, or with friends',
+    'readyToPlay': 'Ready to play?',
+    'readyToPlaySubtitle':
+        'Online with a friend, against the computer, or on this device',
+    'modeOnline': 'Online',
+    'modeVsAI': 'vs AI · %s',
+    'modeVsAIs': 'vs %s AIs',
+    'modeLocal': '%s players · this device',
     'displayOptions': 'Display Options',
     'showValidMoves': 'Show Valid Moves',
     'showValidMovesSubtitle': 'Highlight possible moves',
@@ -405,8 +401,6 @@ class AppStrings {
     'soundOn': 'Sound on',
     'soundOff': 'Sound off',
     'difficultySetTo': 'Difficulty: %s',
-    'switchedToAI': 'Switched to AI opponent',
-    'switchedToTwoPlayers': 'Switched to human players',
     'aiModeActivated': 'Playing against AI',
     'playVsAIs': 'Play vs 2 or 3 AIs',
     'playVsAIsSubtitle': 'A crowded board, every rival the computer',
@@ -414,9 +408,6 @@ class AppStrings {
     'aiOpponents': '%s computer opponents',
     'aiN': 'AI %s',
     'twoPlayerModeActivated': 'Two player mode activated',
-    'signInToSave': 'Please sign in to save game',
-    'gameSaved': 'Game saved successfully!',
-    'gameSaveFailed': 'Failed to save game',
     'itsNotYourTurn': "It's not your turn!",
     'invalidMove': 'Invalid move!',
     'noWallsRemaining': 'No walls remaining!',
@@ -582,14 +573,14 @@ class AppStrings {
     'gameControls': 'التحكم في اللعبة',
     'leaveOnlineGame': 'خروج من اللعبة الأونلاين',
     'leaveOnlineGameSubtitle': 'الرجوع للعب على الجهاز',
-    'playOnlineSubtitleShort': 'ادعُ صديقك بكود',
     'newGame': 'لعبة جديدة',
-    'newGameSubtitle': 'ابدأ من الأول',
-    'saveGame': 'حفظ اللعبة',
-    'saveGameSubtitle': 'احفظ التقدم الحالي',
-    'togglePlayerMode': 'تبديل وضع اللاعب',
-    'switchToTwoPlayers': 'التبديل للاعيبة',
-    'switchToAI': 'التبديل للكمبيوتر',
+    'newGameSubtitle': 'أونلاين، ضد الكمبيوتر، أو مع صحابك',
+    'readyToPlay': 'جاهز تلعب؟',
+    'readyToPlaySubtitle': 'أونلاين مع صاحبك، ضد الكمبيوتر، أو على نفس الجهاز',
+    'modeOnline': 'أونلاين',
+    'modeVsAI': 'ضد الكمبيوتر · %s',
+    'modeVsAIs': 'ضد %s كمبيوتر',
+    'modeLocal': '%s لاعبين · نفس الجهاز',
     'displayOptions': 'خيارات العرض',
     'showValidMoves': 'إظهار النقلات المتاحة',
     'showValidMovesSubtitle': 'تمييز المربعات اللي تقدر تروحها',
@@ -621,8 +612,6 @@ class AppStrings {
     'soundOn': 'الصوت شغال',
     'soundOff': 'الصوت مقفول',
     'difficultySetTo': 'المستوى: %s',
-    'switchedToAI': 'اتحولت للعب ضد الكمبيوتر',
-    'switchedToTwoPlayers': 'اتحولت للعب مع أصحابك',
     'aiModeActivated': 'اللعب ضد الكمبيوتر',
     'playVsAIs': 'ضد 2 أو 3 كمبيوتر',
     'playVsAIsSubtitle': 'لوحة زحمة، وكل منافسينك كمبيوتر',
@@ -630,9 +619,6 @@ class AppStrings {
     'aiOpponents': '%s منافسين كمبيوتر',
     'aiN': 'الكمبيوتر %s',
     'twoPlayerModeActivated': 'وضع اللاعبين اتفعّل',
-    'signInToSave': 'سجّل الدخول عشان تحفظ اللعبة',
-    'gameSaved': 'تم حفظ اللعبة',
-    'gameSaveFailed': 'فشل حفظ اللعبة',
     'itsNotYourTurn': 'مش دورك!',
     'invalidMove': 'نقلة غير متاحة!',
     'noWallsRemaining': 'مفيش حواجز متبقية!',

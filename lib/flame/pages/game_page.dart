@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:async';
 import 'dart:math' show pi;
+import 'dart:ui' show ImageFilter;
 
 import '../constants.dart';
 import '../../flame/game/quoridor_game.dart';
@@ -20,7 +21,6 @@ import '../../flame/models/game_state.dart';
 import '../../flame/models/move_notation.dart';
 import '../../flame/models/player.dart';
 import '../../flame/services/ai_service.dart';
-import '../../flame/services/firebase_service.dart';
 import '../../flame/services/saved_game_service.dart';
 import '../../theme.dart';
 
@@ -58,6 +58,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   /// Non-null while an online game is in progress.
   OnlineGameController? _online;
+
+  /// True until a game is picked from the mode sheet. The board behind it is
+  /// only a backdrop until then, with a button to bring the sheet back, so
+  /// closing the sheet never leaves the player stuck.
+  bool _awaitingStart = true;
 
   bool get _isOnline => _online != null;
 
@@ -165,6 +170,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     if (state.isGameOver ||
         state.currentPlayer.isAI ||
         _menuOpen ||
+        _awaitingStart ||
         waitingForPlayers) {
       _clock.stop();
       return;
@@ -226,6 +232,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
     _detachOnline(abandon: true);
     _online = controller;
+    _awaitingStart = false;
 
     // The server's board is the one being rendered from here on.
     _game.localPlayerId = controller.localPlayerId;
@@ -318,16 +325,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     closeMenu();
     _detachOnline(abandon: true);
     _game.newGame();
+    _awaitingStart = true;
+    _syncClock();
     setState(() {});
     _showGameMessage(context.l10n.leftOnlineGame);
+    // Straight on to picking the next game.
+    _showGameModeSelection();
   }
 
   void _handleGameStateChanged(GameState gameState) {
-    // Auto-save game state to Firebase
-    if (FirebaseService.currentUser != null) {
-      FirebaseService.updateGame(gameState);
-    }
-
     // Local games are kept so closing the app does not lose them; an online
     // game is the server's to keep.
     if (!_isOnline) unawaited(SavedGameService.instance.save(gameState));
@@ -416,7 +422,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           FilledButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
-              _newGame();
+              _restartGame();
             },
             icon: const Icon(Icons.refresh),
             label: Text(context.l10n.playAgain),
@@ -426,15 +432,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
   }
 
-  void _newGame() {
-    if (_isOnline) {
-      _showGameMessage(context.l10n.leaveOnlineFirst);
-      closeMenu();
-      return;
-    }
+  /// The same kind of game again, from the start.
+  void _restartGame() {
     _game.newGame();
     _showGameMessage(context.l10n.newGameStarted);
-    closeMenu();
+  }
+
+  /// Brings up the mode sheet, the one way every game starts. Online, the
+  /// game has to be left first, so it is not given up by accident.
+  void _openNewGame() {
+    if (_isOnline) {
+      _showGameMessage(context.l10n.leaveOnlineFirst);
+      return;
+    }
+    _showGameModeSelection();
   }
 
   void _toggleValidMoves() {
@@ -482,36 +493,6 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     _showGameMessage(
       context.l10n.difficultySetTo(_difficultyLabel(difficulty)),
     );
-  }
-
-  void _togglePlayerMode() {
-    _game.togglePlayerMode();
-    _showGameMessage(
-      _game.gameState.player2.isAI
-          ? context.l10n.switchedToAI
-          : context.l10n.switchedToTwoPlayers,
-    );
-    closeMenu();
-  }
-
-  Future<void> _saveGame() async {
-    final user = FirebaseService.currentUser;
-    if (user == null) {
-      _showGameMessage(context.l10n.signInToSave);
-      closeMenu();
-      return;
-    }
-
-    // Read the strings before awaiting: the screen may be gone by the time
-    // the save returns.
-    final saved = context.l10n.gameSaved;
-    final failed = context.l10n.gameSaveFailed;
-
-    final gameId = await FirebaseService.saveGame(_game.gameState);
-    if (!mounted) return;
-
-    _showGameMessage(gameId != null ? saved : failed);
-    closeMenu();
   }
 
   void _undo() {
@@ -634,131 +615,140 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         context: context,
         backgroundColor: Colors.transparent,
         isScrollControlled: true,
-        builder: (context) => Container(
-          height: MediaQuery.of(context).size.height * 0.55,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
-              ),
-            ],
+        builder: _buildModeSheet,
+      ).whenComplete(() {
+        // Closing the sheet over a game in progress carries on with it.
+        if (_awaitingStart && _canContinue) _awaitingStart = false;
+      }),
+    );
+  }
+
+  Widget _buildModeSheet(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.55,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
           ),
-          child: Column(
-            children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outline.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Title
-              Text(
-                context.l10n.chooseGameMode,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 32),
-              // Mode selection cards
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  shrinkWrap: true,
-                  children: [
-                    _buildModeCard(
-                      key: const Key('mode_online'),
-                      icon: Icons.public,
-                      title: context.l10n.playOnline,
-                      subtitle: context.l10n.playOnlineSubtitle,
-                      featured: true,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _startOnlineGame();
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    if (_canContinue) ...[
-                      _buildModeCard(
-                        icon: Icons.play_arrow_rounded,
-                        title: context.l10n.continueGame,
-                        subtitle: context.l10n.movesPlayed(
-                          _game.gameState.moveHistory.length,
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _syncClock();
-                          setState(() {});
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    _buildModeCard(
-                      icon: Icons.computer,
-                      title: context.l10n.playVsAI,
-                      subtitle: context.l10n.playVsAISubtitle,
-                      onTap: () {
-                        _detachOnline(abandon: true);
-                        // Coming back from a four-player game has to put the
-                        // board back to two, not just swap in the computer.
-                        // A game under way is left through "Continue", so
-                        // this always means a fresh one.
-                        if (_game.gameState.playerCount != 2 ||
-                            !_game.gameState.player2.isAI ||
-                            _game.gameState.moveHistory.isNotEmpty) {
-                          _game.startGame(playerCount: 2, againstAI: true);
-                        }
-                        Navigator.pop(context);
-                        _syncClock();
-                        setState(() {});
-                        _showGameMessage(context.l10n.aiModeActivated);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildModeCard(
-                      icon: Icons.smart_toy_outlined,
-                      title: context.l10n.playVsAIs,
-                      subtitle: context.l10n.playVsAIsSubtitle,
-                      onTap: _startGameAgainstSeveralAIs,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildModeCard(
-                      icon: Icons.people,
-                      title: context.l10n.twoPlayers,
-                      subtitle: context.l10n.twoPlayersSubtitle,
-                      onTap: () => _startLocalGame(2),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildModeCard(
-                      icon: Icons.groups,
-                      title: context.l10n.threePlayers,
-                      subtitle: context.l10n.threePlayersSubtitle,
-                      onTap: () => _startLocalGame(3),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildModeCard(
-                      icon: Icons.groups_3,
-                      title: context.l10n.fourPlayers,
-                      subtitle: context.l10n.fourPlayersSubtitle,
-                      onTap: () => _startLocalGame(4),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        ],
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-        ),
+          const SizedBox(height: 24),
+          // Title
+          Text(
+            context.l10n.chooseGameMode,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 32),
+          // Mode selection cards
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              shrinkWrap: true,
+              children: [
+                _buildModeCard(
+                  key: const Key('mode_online'),
+                  icon: Icons.public,
+                  title: context.l10n.playOnline,
+                  subtitle: context.l10n.playOnlineSubtitle,
+                  featured: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _startOnlineGame();
+                  },
+                ),
+                const SizedBox(height: 16),
+                if (_canContinue) ...[
+                  _buildModeCard(
+                    icon: Icons.play_arrow_rounded,
+                    title: context.l10n.continueGame,
+                    subtitle: context.l10n.movesPlayed(
+                      _game.gameState.moveHistory.length,
+                    ),
+                    onTap: () {
+                      _awaitingStart = false;
+                      Navigator.pop(context);
+                      _syncClock();
+                      setState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                _buildModeCard(
+                  icon: Icons.computer,
+                  title: context.l10n.playVsAI,
+                  subtitle: context.l10n.playVsAISubtitle,
+                  onTap: () {
+                    _detachOnline(abandon: true);
+                    _awaitingStart = false;
+                    // Coming back from a four-player game has to put the
+                    // board back to two, not just swap in the computer.
+                    // A game under way is left through "Continue", so
+                    // this always means a fresh one.
+                    if (_game.gameState.playerCount != 2 ||
+                        !_game.gameState.player2.isAI ||
+                        _game.gameState.moveHistory.isNotEmpty) {
+                      _game.startGame(playerCount: 2, againstAI: true);
+                    }
+                    Navigator.pop(context);
+                    _syncClock();
+                    setState(() {});
+                    _showGameMessage(context.l10n.aiModeActivated);
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildModeCard(
+                  icon: Icons.smart_toy_outlined,
+                  title: context.l10n.playVsAIs,
+                  subtitle: context.l10n.playVsAIsSubtitle,
+                  onTap: _startGameAgainstSeveralAIs,
+                ),
+                const SizedBox(height: 16),
+                _buildModeCard(
+                  icon: Icons.people,
+                  title: context.l10n.twoPlayers,
+                  subtitle: context.l10n.twoPlayersSubtitle,
+                  onTap: () => _startLocalGame(2),
+                ),
+                const SizedBox(height: 16),
+                _buildModeCard(
+                  icon: Icons.groups,
+                  title: context.l10n.threePlayers,
+                  subtitle: context.l10n.threePlayersSubtitle,
+                  onTap: () => _startLocalGame(3),
+                ),
+                const SizedBox(height: 16),
+                _buildModeCard(
+                  icon: Icons.groups_3,
+                  title: context.l10n.fourPlayers,
+                  subtitle: context.l10n.fourPlayersSubtitle,
+                  onTap: () => _startLocalGame(4),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -785,6 +775,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     if (opponents == null || !mounted) return;
 
     _detachOnline(abandon: true);
+    _awaitingStart = false;
     _game.startGame(playerCount: opponents + 1, againstAI: true);
     Navigator.pop(context);
     _syncClock();
@@ -794,6 +785,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   void _startLocalGame(int playerCount) {
     _detachOnline(abandon: true);
+    _awaitingStart = false;
     _game.startGame(playerCount: playerCount, againstAI: false);
     Navigator.pop(context);
     _syncClock();
@@ -999,6 +991,9 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                                   unawaited(UpdateService.instance.update());
                                 },
                               ),
+                            // Every game starts from the mode sheet, so
+                            // this is the one way to a new one. Online, the
+                            // game is left first, on purpose.
                             if (_isOnline)
                               _buildMenuItem(
                                 Icons.logout_rounded,
@@ -1008,31 +1003,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                               )
                             else
                               _buildMenuItem(
-                                Icons.public,
-                                context.l10n.playOnline,
-                                context.l10n.playOnlineSubtitleShort,
-                                _startOnlineGame,
-                              ),
-                            _buildMenuItem(
-                              Icons.refresh,
-                              context.l10n.newGame,
-                              context.l10n.newGameSubtitle,
-                              _newGame,
-                            ),
-                            _buildMenuItem(
-                              Icons.save,
-                              context.l10n.saveGame,
-                              context.l10n.saveGameSubtitle,
-                              _saveGame,
-                            ),
-                            if (_game.canTogglePlayerMode)
-                              _buildMenuItem(
-                                Icons.people,
-                                context.l10n.togglePlayerMode,
-                                _game.gameState.player2.isAI
-                                    ? context.l10n.switchToTwoPlayers
-                                    : context.l10n.switchToAI,
-                                _togglePlayerMode,
+                                Icons.add_circle_outline_rounded,
+                                context.l10n.newGame,
+                                context.l10n.newGameSubtitle,
+                                () {
+                                  closeMenu();
+                                  _openNewGame();
+                                },
                               ),
                           ]),
 
@@ -1144,6 +1121,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                           ),
                         ),
                       ),
+                      // Until a game is picked, the board is a backdrop
+                      // for the way back to the mode sheet.
+                      if (_awaitingStart && !_isOnline)
+                        Positioned.fill(child: _buildStartPrompt()),
                       // Messages pop up in the board's corners.
                       if (_online case final online?)
                         Positioned.fill(
@@ -1162,7 +1143,15 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                   valueListenable: isInitializedProvider,
                   builder: (context, value, child) {
                     if (!value) return const SizedBox.shrink();
-                    return _buildStatusLine();
+                    // Kept in place while hidden, so the board does not
+                    // jump when the game starts.
+                    return Visibility(
+                      visible: !_awaitingStart,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: _buildStatusLine(),
+                    );
                   },
                 ),
               ],
@@ -1295,18 +1284,11 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
         const SizedBox(width: 16),
 
-        // Game Title
-        Expanded(
-          child: Text(
-            context.l10n.appTitle,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
+        // The title, and under it the game being played. Tapping it is a
+        // shortcut to the mode sheet.
+        Expanded(child: _buildTitle()),
 
-        if (_game.isInitialized && !_isOnline)
+        if (_game.isInitialized && !_isOnline && !_awaitingStart)
           IconButton(
             key: const Key('undo'),
             tooltip: context.l10n.undo,
@@ -1314,7 +1296,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             icon: const Icon(Icons.undo_rounded),
           ),
 
-        if (_game.isInitialized)
+        if (_game.isInitialized && !_awaitingStart)
           IconButton(
             key: const Key('moveHistory'),
             tooltip: context.l10n.moveHistory,
@@ -1339,6 +1321,161 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           ),
         ),
       ],
+    );
+  }
+
+  /// What is being played, in a few words, or null before anything is.
+  String? get _modeLabel {
+    if (_isOnline) return context.l10n.modeOnline;
+    if (_awaitingStart || !_game.isInitialized) return null;
+    final state = _game.gameState;
+    final computers = state.players.where((p) => p.isAI).length;
+    if (computers == 1) {
+      return context.l10n.modeVsAI(_difficultyLabel(_currentDifficulty));
+    }
+    if (computers > 1) return context.l10n.modeVsAIs(computers);
+    return context.l10n.modeLocal(state.playerCount);
+  }
+
+  Widget _buildTitle() {
+    final scheme = Theme.of(context).colorScheme;
+    final label = _modeLabel;
+    return Tooltip(
+      message: _isOnline ? '' : context.l10n.newGame,
+      child: InkWell(
+        key: const Key('modeLabel'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: _isOnline ? null : _openNewGame,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.appTitle,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                  height: 1.1,
+                ),
+              ),
+              if (label != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ),
+                    if (!_isOnline)
+                      Icon(
+                        Icons.expand_more_rounded,
+                        size: 16,
+                        color: scheme.primary,
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Shown over the board until a game is picked: closing the mode sheet
+  /// leads here rather than to a board nobody chose.
+  Widget _buildStartPrompt() {
+    final scheme = Theme.of(context).colorScheme;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 300),
+      builder: (context, t, child) => Opacity(opacity: t, child: child),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+          child: ColoredBox(
+            color: scheme.surface.withValues(alpha: 0.6),
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 76,
+                      height: 76,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: scheme.primary.withValues(alpha: 0.4),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.videogame_asset_rounded,
+                        color: Colors.white,
+                        size: 38,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      context.l10n.readyToPlay,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      context.l10n.readyToPlaySubtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: scheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _Breathing(
+                      child: FilledButton.icon(
+                        key: const Key('startGame'),
+                        onPressed: _openNewGame,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 16,
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: Text(context.l10n.startAGame),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -2072,5 +2209,51 @@ int viewTurnsForSeat(int? seat) {
       return 1;
     default:
       return 0;
+  }
+}
+
+/// Grows and shrinks a little, over and over, to draw the eye to [child].
+/// Still when the platform asks for less motion.
+class _Breathing extends StatefulWidget {
+  const _Breathing({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Breathing> createState() => _BreathingState();
+}
+
+class _BreathingState extends State<_Breathing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: Tween<double>(
+        begin: 1,
+        end: 1.05,
+      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)),
+      child: widget.child,
+    );
   }
 }
