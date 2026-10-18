@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:quoridor/flame/models/game_state.dart';
 import 'package:quoridor/flame/models/online_session.dart';
 import 'package:quoridor/flame/pages/game_page.dart';
+import 'package:quoridor/flame/pages/scan_invite_page.dart';
 import 'package:quoridor/flame/services/ai_service.dart';
 import 'package:quoridor/flame/services/audio/audio_out.dart';
 import 'package:quoridor/flame/services/audio_service.dart';
@@ -62,19 +64,30 @@ OnlineGame table(
 
 void main() {
   group('invite links', () {
-    test('point at the site they were made on, with the code', () {
-      final link = InviteLink.forCode(
-        'ABC123',
-        page: Uri.parse('https://3shmawi.github.io/quoridor/?x=1#/'),
-      );
-      expect('$link', 'https://3shmawi.github.io/quoridor/?join=ABC123');
-    });
-
-    test('from an installed app, point at the web build', () {
+    test('always lead to the Cloudflare site, with the code', () {
       expect(
         '${InviteLink.forCode('ABC123')}',
         'https://quoridor-mohager.pages.dev/?join=ABC123',
       );
+    });
+
+    test('a scanned QR code gives its room code, from a link or bare', () {
+      expect(
+        InviteLink.codeFromScan(
+          'https://quoridor-mohager.pages.dev/?join=ABC123',
+        ),
+        'ABC123',
+      );
+      // An older link from the GitHub Pages copy still works.
+      expect(
+        InviteLink.codeFromScan(
+          'https://3shmawi.github.io/quoridor/?join=abc123',
+        ),
+        'ABC123',
+      );
+      expect(InviteLink.codeFromScan(' abc123 '), 'ABC123');
+      expect(InviteLink.codeFromScan('https://example.com/'), isNull);
+      expect(InviteLink.codeFromScan('hello world'), isNull);
     });
 
     test('are read back, forgiving how the code was typed', () {
@@ -85,6 +98,18 @@ void main() {
       expect(InviteLink.codeIn(Uri.parse('https://x.dev/?join=nope')), isNull);
       expect(InviteLink.codeIn(Uri.parse('https://x.dev/')), isNull);
     });
+  });
+
+  test('only phones scan invites themselves', () {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    for (final platform in TargetPlatform.values) {
+      debugDefaultTargetPlatformOverride = platform;
+      expect(
+        canScanInvites,
+        platform == TargetPlatform.android || platform == TargetPlatform.iOS,
+        reason: '$platform',
+      );
+    }
   });
 
   group('the controller', () {
@@ -260,7 +285,7 @@ void main() {
       await finish(tester);
     });
 
-    testWidgets('while waiting, Invite copies a link to the game', (
+    testWidgets('while waiting, Invite shows a QR code and copies the link', (
       tester,
     ) async {
       await open(
@@ -273,9 +298,19 @@ void main() {
         ),
       );
       await tester.tap(find.byKey(const Key('invite')));
-      await settle(tester, frames: 3);
-      expect(copied, contains('?join=ROOM11'));
-      expect(copied, contains('ROOM11'));
+      await settle(tester, frames: 6);
+
+      // A QR code to scan, and the code to type, split for reading.
+      expect(find.byKey(const Key('inviteQr')), findsOneWidget);
+      expect(find.text('ROO M11'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('copyInvite')));
+      await settle(tester, frames: 6);
+      expect(
+        copied,
+        contains('https://quoridor-mohager.pages.dev/?join=ROOM11'),
+      );
+      expect(find.byKey(const Key('inviteQr')), findsNothing);
       expect(find.text('Invite link copied. Send it to a friend!'), findsOne);
       await finish(tester);
     });
