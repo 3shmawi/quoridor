@@ -18,13 +18,9 @@ build is deployed to GitHub Pages from `main` on every push.
 [![Flutter](https://img.shields.io/badge/Flutter-3.32-02569B?logo=flutter)](https://flutter.dev)
 [![Engine](https://img.shields.io/badge/Flame-1.29-orange)](https://flame-engine.org)
 
-> **Store links — please fill these in.** The Google Play URL below is derived
-> from the app's `applicationId` and should be correct, but it has not been
-> verified. The App Store URL needs the numeric app ID from App Store Connect,
-> which is not derivable from this repository.
->
-> - Google Play: https://play.google.com/store/apps/details?id=com.MoRe_H.quoridor
-> - App Store: `https://apps.apple.com/app/id<APP_ID>` ← replace `<APP_ID>`
+- Google Play: https://play.google.com/store/apps/details?id=com.MoRe_H.quoridor
+- App Store: https://apps.apple.com/app/id6752514464
+- Get the app (sends a phone to its store): https://quoridor-mohager.pages.dev/get/
 
 ## Screenshots
 
