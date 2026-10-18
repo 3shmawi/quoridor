@@ -7,6 +7,7 @@ import '../services/identity_service.dart';
 import '../services/online/online_game_controller.dart';
 import '../services/online/online_game_service.dart';
 import '../services/online/room_code.dart';
+import 'scan_invite_page.dart';
 import '../services/settings_service.dart';
 import '../services/turn_clock.dart';
 
@@ -64,6 +65,15 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
     await IdentityService.instance.ensureSignedIn();
     final games = await OnlineGameService.instance.myActiveGames();
     if (mounted) setState(() => _resumable = games);
+  }
+
+  Future<void> _scanInvite() async {
+    final code = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const ScanInvitePage()));
+    if (code == null || !mounted) return;
+    _codeController.text = code;
+    await _run((c) => c.joinGame(code));
   }
 
   /// Runs [action] with the busy state held, and reports any failure.
@@ -421,6 +431,19 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
                 minimumSize: const Size.fromHeight(48),
               ),
             ),
+            // On a phone, the friend's QR code joins without typing.
+            if (canScanInvites) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('scanInvite'),
+                onPressed: _busy ? null : _scanInvite,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: Text(context.l10n.scanQr),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+            ],
           ],
         ),
       ),

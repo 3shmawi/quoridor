@@ -40,4 +40,16 @@ void main() {
     expect(ios, contains("iosBundleId: '$appId'"));
     expect(ios, contains("appId: '${plistValue('GOOGLE_APP_ID')}'"));
   });
+
+  test('the app says why it asks for the camera', () {
+    // iOS ends an app that opens the camera without saying why, and App
+    // Review refuses one. The camera scans invite QR codes.
+    final plist = File('ios/Runner/Info.plist').readAsStringSync();
+    expect(
+      RegExp(
+        r'<key>NSCameraUsageDescription</key>\s*<string>[^<]+</string>',
+      ).hasMatch(plist),
+      isTrue,
+    );
+  });
 }

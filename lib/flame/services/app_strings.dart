@@ -103,6 +103,14 @@ class AppStrings {
   String inviteMessage(String link, String code) =>
       _fill('inviteMessage', link).replaceFirst('%c', code);
   String get claimWin => _get('claimWin');
+  String get inviteTitle => _get('inviteTitle');
+  String get inviteScanHint => _get('inviteScanHint');
+  String get copyInviteLink => _get('copyInviteLink');
+  String get scanQr => _get('scanQr');
+  String get scanQrHint => _get('scanQrHint');
+  String get scanNotInvite => _get('scanNotInvite');
+  String get cameraUnavailable => _get('cameraUnavailable');
+  String get torch => _get('torch');
   String claimWinIn(int seconds) => _fill('claimWinIn', '$seconds');
   String opponentLeftYouWin(String name) => _fill('opponentLeftYouWin', name);
   String get leaveGameTitle => _get('leaveGameTitle');
@@ -320,6 +328,15 @@ class AppStrings {
     'inviteCopied': 'Invite link copied. Send it to a friend!',
     'inviteMessage': 'Play Quoridor with me! %s\n(or enter code %c)',
     'claimWin': 'Claim win',
+    'inviteTitle': 'Invite a friend',
+    'inviteScanHint':
+        'Scan with a phone camera to join, or send the link instead',
+    'copyInviteLink': 'Copy invite link',
+    'scanQr': 'Scan QR code',
+    'scanQrHint': "Point the camera at the QR code on your friend's screen",
+    'scanNotInvite': 'That is not a Quoridor invite',
+    'cameraUnavailable': 'The camera is not available. Type the code instead.',
+    'torch': 'Torch',
     'claimWinIn': 'Win in %s',
     'opponentLeftYouWin': '%s left the game. You win!',
     'leaveGameTitle': 'Leave the game?',
@@ -547,6 +564,14 @@ class AppStrings {
     'inviteCopied': 'اتنسخ لينك الدعوة. ابعته لصاحبك!',
     'inviteMessage': 'تعالى العب كوريدور معايا! %s\n(أو اكتب الكود %c)',
     'claimWin': 'خد المكسب',
+    'inviteTitle': 'ادعُ صاحبك',
+    'inviteScanHint': 'يمسح الكود بكاميرا الموبايل ويدخل، أو ابعتله اللينك',
+    'copyInviteLink': 'انسخ لينك الدعوة',
+    'scanQr': 'امسح كود QR',
+    'scanQrHint': 'وجّه الكاميرا على كود QR اللي على شاشة صاحبك',
+    'scanNotInvite': 'ده مش كود دعوة كوريدور',
+    'cameraUnavailable': 'الكاميرا مش متاحة. اكتب الكود بدالها.',
+    'torch': 'الكشاف',
     'claimWinIn': 'المكسب بعد %s',
     'opponentLeftYouWin': '%s ساب اللعبة. إنت كسبت!',
     'leaveGameTitle': 'تسيب اللعبة؟',

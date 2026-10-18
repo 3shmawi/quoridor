@@ -17,6 +17,7 @@ import '../services/update/update_service.dart';
 import '../models/online_chat.dart';
 import '../models/online_session.dart';
 import '../widgets/online_chat.dart';
+import '../widgets/invite_sheet.dart';
 import 'online_lobby_page.dart';
 import '../services/online/invite/invite_link.dart';
 import '../../flame/models/game_state.dart';
@@ -1868,8 +1869,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         text = context.l10n.waitingForOpponentWithCode(online.roomCode ?? '');
         action = TextButton.icon(
           key: const Key('invite'),
-          onPressed: () => _copyInvite(online.roomCode),
-          icon: const Icon(Icons.link_rounded, size: 16),
+          onPressed: () => _invite(online.roomCode),
+          icon: const Icon(Icons.qr_code_2_rounded, size: 16),
           label: Text(context.l10n.invite),
         );
 
@@ -1994,15 +1995,12 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
   }
 
-  /// Copies a message with a link that joins this game, ready to paste
-  /// into a chat. The code is in it too, for typing by hand.
-  Future<void> _copyInvite(String? code) async {
+  /// Shows the QR code, the code and the link that bring a friend into this
+  /// game.
+  Future<void> _invite(String? code) async {
     if (code == null) return;
-    final link = InviteLink.forCode(code);
-    await Clipboard.setData(
-      ClipboardData(text: context.l10n.inviteMessage('$link', code)),
-    );
-    if (mounted) _showGameMessage(context.l10n.inviteCopied);
+    final copied = await showInviteSheet(context, code);
+    if (copied && mounted) _showGameMessage(context.l10n.inviteCopied);
   }
 
   Future<void> _claimWin() async {
