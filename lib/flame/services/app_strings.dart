@@ -103,6 +103,23 @@ class AppStrings {
   String inviteMessage(String link, String code) =>
       _fill('inviteMessage', link).replaceFirst('%c', code);
   String get claimWin => _get('claimWin');
+  String get gameActions => _get('gameActions');
+  String get offerDraw => _get('offerDraw');
+  String drawOfferedTo(String name) => _fill('drawOfferedTo', name);
+  String get drawPending => _get('drawPending');
+  String get drawOncePerMove => _get('drawOncePerMove');
+  String opponentOffersDraw(String name) => _fill('opponentOffersDraw', name);
+  String get acceptDraw => _get('acceptDraw');
+  String get declineDraw => _get('declineDraw');
+  String drawDeclined(String name) => _fill('drawDeclined', name);
+  String get drawAgreed => _get('drawAgreed');
+  String get resign => _get('resign');
+  String get resignTitle => _get('resignTitle');
+  String resignGivesWin(String name) => _fill('resignGivesWin', name);
+  String get keepPlaying => _get('keepPlaying');
+  String get youResigned => _get('youResigned');
+  String opponentResignedYouWin(String name) =>
+      _fill('opponentResignedYouWin', name);
   String get inviteTitle => _get('inviteTitle');
   String get inviteScanHint => _get('inviteScanHint');
   String get copyInviteLink => _get('copyInviteLink');
@@ -328,6 +345,22 @@ class AppStrings {
     'inviteCopied': 'Invite link copied. Send it to a friend!',
     'inviteMessage': 'Play Quoridor with me! %s\n(or enter code %c)',
     'claimWin': 'Claim win',
+    'gameActions': 'Draw or resign',
+    'offerDraw': 'Offer a draw',
+    'drawOfferedTo': 'Draw offered to %s',
+    'drawPending': 'draw offered',
+    'drawOncePerMove': 'Once per move',
+    'opponentOffersDraw': '%s offers a draw',
+    'acceptDraw': 'Accept',
+    'declineDraw': 'Decline',
+    'drawDeclined': '%s declined the draw',
+    'drawAgreed': "It's a draw 🤝",
+    'resign': 'Resign',
+    'resignTitle': 'Resign this game?',
+    'resignGivesWin': '%s will win.',
+    'keepPlaying': 'Keep playing',
+    'youResigned': 'You resigned',
+    'opponentResignedYouWin': '%s resigned. You win!',
     'inviteTitle': 'Invite a friend',
     'inviteScanHint':
         'Scan with a phone camera to join, or send the link instead',
@@ -564,6 +597,22 @@ class AppStrings {
     'inviteCopied': 'اتنسخ لينك الدعوة. ابعته لصاحبك!',
     'inviteMessage': 'تعالى العب كوريدور معايا! %s\n(أو اكتب الكود %c)',
     'claimWin': 'خد المكسب',
+    'gameActions': 'تعادل أو استسلام',
+    'offerDraw': 'اعرض تعادل',
+    'drawOfferedTo': 'عرضت تعادل على %s',
+    'drawPending': 'عارض تعادل',
+    'drawOncePerMove': 'مرة واحدة كل حركة',
+    'opponentOffersDraw': '%s بيعرض تعادل',
+    'acceptDraw': 'موافق',
+    'declineDraw': 'لأ',
+    'drawDeclined': '%s رفض التعادل',
+    'drawAgreed': 'تعادل 🤝',
+    'resign': 'استسلم',
+    'resignTitle': 'تستسلم في اللعبة دي؟',
+    'resignGivesWin': '%s هيكسب.',
+    'keepPlaying': 'كمّل لعب',
+    'youResigned': 'استسلمت',
+    'opponentResignedYouWin': '%s استسلم. إنت كسبت!',
     'inviteTitle': 'ادعُ صاحبك',
     'inviteScanHint': 'يمسح الكود بكاميرا الموبايل ويدخل، أو ابعتله اللينك',
     'copyInviteLink': 'انسخ لينك الدعوة',

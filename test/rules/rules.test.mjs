@@ -1127,3 +1127,82 @@ describe('leaving a two-player game', () => {
     );
   });
 });
+
+describe('draws', () => {
+  const offer = (by, atMove = 0) => ({
+    drawOffer: { by, atMove },
+    updatedAt: serverTimestamp(),
+  });
+  const accept = {
+    status: 'finished',
+    outcome: { reason: 'draw' },
+    updatedAt: serverTimestamp(),
+  };
+  const decline = { 'drawOffer.declined': true, updatedAt: serverTimestamp() };
+
+  it('lets a player offer a draw, as themselves, at the current move', async () => {
+    await seed('games/draw-1', activeGame());
+    await assertSucceeds(updateDoc(doc(db(ALICE), 'games/draw-1'), offer(1)));
+  });
+
+  it('refuses an offer made for the other player, or at another move', async () => {
+    await seed('games/draw-2', activeGame());
+    await assertFails(updateDoc(doc(db(ALICE), 'games/draw-2'), offer(2)));
+    await assertFails(updateDoc(doc(db(ALICE), 'games/draw-2'), offer(1, 3)));
+    await assertFails(updateDoc(doc(db(MALLORY), 'games/draw-2'), offer(1)));
+  });
+
+  it('allows one offer per move', async () => {
+    await seed('games/draw-3', {
+      ...activeGame(),
+      drawOffer: { by: 1, atMove: 0, declined: true },
+    });
+    await assertFails(updateDoc(doc(db(ALICE), 'games/draw-3'), offer(1)));
+    await assertFails(updateDoc(doc(db(BOB), 'games/draw-3'), offer(2)));
+    await seed('games/draw-4', {
+      ...activeGame({ moveCount: 1, currentPlayerId: 2 }),
+      drawOffer: { by: 1, atMove: 0, declined: true },
+    });
+    await assertSucceeds(updateDoc(doc(db(ALICE), 'games/draw-4'), offer(1, 1)));
+  });
+
+  it('lets the other player accept, ending the game with no winner', async () => {
+    await seed('games/draw-5', { ...activeGame(), drawOffer: { by: 1, atMove: 0 } });
+    await assertFails(updateDoc(doc(db(ALICE), 'games/draw-5'), accept));
+    await assertSucceeds(updateDoc(doc(db(BOB), 'games/draw-5'), accept));
+  });
+
+  it('refuses accepting an offer that lapsed or was declined', async () => {
+    await seed('games/draw-6', {
+      ...activeGame({ moveCount: 1, currentPlayerId: 2 }),
+      drawOffer: { by: 1, atMove: 0 },
+    });
+    await assertFails(updateDoc(doc(db(BOB), 'games/draw-6'), accept));
+    await seed('games/draw-7', {
+      ...activeGame(),
+      drawOffer: { by: 1, atMove: 0, declined: true },
+    });
+    await assertFails(updateDoc(doc(db(BOB), 'games/draw-7'), accept));
+  });
+
+  it('refuses a "draw" that names a winner, or with no offer at all', async () => {
+    await seed('games/draw-8', { ...activeGame(), drawOffer: { by: 1, atMove: 0 } });
+    await assertFails(
+      updateDoc(doc(db(BOB), 'games/draw-8'), {
+        ...accept,
+        outcome: { reason: 'draw', winner: 2 },
+      }),
+    );
+    await seed('games/draw-9', activeGame());
+    await assertFails(updateDoc(doc(db(BOB), 'games/draw-9'), accept));
+  });
+
+  it('lets only the other player decline, and only that', async () => {
+    await seed('games/draw-10', { ...activeGame(), drawOffer: { by: 1, atMove: 0 } });
+    await assertFails(updateDoc(doc(db(ALICE), 'games/draw-10'), decline));
+    await assertFails(
+      updateDoc(doc(db(BOB), 'games/draw-10'), { ...decline, 'drawOffer.by': 2 }),
+    );
+    await assertSucceeds(updateDoc(doc(db(BOB), 'games/draw-10'), decline));
+  });
+});

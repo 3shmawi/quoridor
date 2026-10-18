@@ -103,16 +103,39 @@ class OnlineGameCodec {
   }
 
   /// The fields written when a game ends other than on the board: a player
-  /// resigning, or claiming the win from one who has gone.
+  /// resigning, claiming the win from one who has gone, or a draw agreed,
+  /// which has no [winner].
   static Map<String, dynamic> encodeEnding({
-    required int winner,
+    required int? winner,
     required OnlineOutcomeReason reason,
     required Object timestamp,
   }) => {
     'status': OnlineGameStatus.finished.name,
-    'outcome': {'winner': winner, 'reason': reason.name},
+    'outcome': {'winner': ?winner, 'reason': reason.name},
     'updatedAt': timestamp,
   };
+
+  /// The fields written when [seat] offers a draw at move [atMove].
+  static Map<String, dynamic> encodeDrawOffer({
+    required int seat,
+    required int atMove,
+    required Object timestamp,
+  }) => {
+    'drawOffer': {'by': seat, 'atMove': atMove},
+    'updatedAt': timestamp,
+  };
+
+  static DrawOffer? decodeDrawOffer(Object? data) {
+    if (data is! Map) return null;
+    final by = data['by'];
+    final atMove = data['atMove'];
+    if (by is! int || atMove is! int) return null;
+    return DrawOffer(
+      by: by,
+      atMove: atMove,
+      declined: data['declined'] == true,
+    );
+  }
 
   /// The fields written when [link] is offered on a finished game.
   static Map<String, dynamic> encodeRematch({
@@ -189,6 +212,7 @@ class OnlineGameCodec {
       rematch: decodeRematch(data['rematch']),
       // Games from before the host chose a limit have none.
       turnLimit: TurnLimit.fromSeconds(data['turnSeconds']),
+      drawOffer: decodeDrawOffer(data['drawOffer']),
     );
   }
 

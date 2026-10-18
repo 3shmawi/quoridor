@@ -90,8 +90,15 @@ class OnlineGameController extends ChangeNotifier {
   /// apply it and play its sound.
   void Function(GameState board)? onRemoteUpdate;
 
-  /// Fires when the game ends, with true if this device won.
-  void Function(bool didWin)? onGameOver;
+  /// Fires when the game ends, with true if this device won, false if it
+  /// lost, and null for a draw.
+  void Function(bool? didWin)? onGameOver;
+
+  /// Fires when the other player offers this device a draw.
+  void Function()? onDrawOffered;
+
+  /// Fires when the other player turns down this device's draw offer.
+  void Function()? onDrawDeclined;
 
   OnlineSession? get session => _session;
   OnlineGame? get game => _session?.game;
@@ -174,6 +181,88 @@ class OnlineGameController extends ChangeNotifier {
       return false;
     }
     return true;
+  }
+
+  // --- Resigning and draws -------------------------------------------------
+
+  /// Whether this device may resign or offer a draw: a two-player game under
+  /// way that it plays in.
+  bool get canResign => leavingResigns;
+
+  /// The draw the other player is waiting on this device to answer.
+  DrawOffer? get drawOfferToAnswer {
+    final offer = _session?.game.openDrawOffer;
+    if (offer == null || offer.by == localPlayerId) return null;
+    return offer;
+  }
+
+  /// Whether this device has a draw offer out that is still standing.
+  bool get drawOffered {
+    final offer = _session?.game.openDrawOffer;
+    return offer != null && offer.by == localPlayerId;
+  }
+
+  /// Whether a draw can be offered now: once per move, and not while
+  /// answering one.
+  bool get canOfferDraw {
+    final game = _session?.game;
+    if (game == null || !canResign) return false;
+    final last = game.drawOffer;
+    return last == null || last.atMove != game.moveCount;
+  }
+
+  /// Gives this game to the other player.
+  Future<bool> resign() async {
+    final session = _session;
+    final seat = session?.localPlayerId;
+    if (session == null || seat == null || !canResign) return false;
+    return _report(
+      await _service.endGame(
+        session.game.gameId,
+        winner: 3 - seat,
+        reason: OnlineOutcomeReason.resign,
+      ),
+    );
+  }
+
+  Future<bool> offerDraw() async {
+    final session = _session;
+    final seat = session?.localPlayerId;
+    if (session == null || seat == null || !canOfferDraw) return false;
+    return _report(
+      await _service.offerDraw(
+        session.game.gameId,
+        seat: seat,
+        atMove: session.game.moveCount,
+      ),
+    );
+  }
+
+  /// Agrees the draw the other player offered, ending the game.
+  Future<bool> acceptDraw() async {
+    final session = _session;
+    if (session == null || drawOfferToAnswer == null) return false;
+    return _report(
+      await _service.endGame(
+        session.game.gameId,
+        winner: null,
+        reason: OnlineOutcomeReason.draw,
+      ),
+    );
+  }
+
+  Future<bool> declineDraw() async {
+    final session = _session;
+    if (session == null || drawOfferToAnswer == null) return false;
+    return _report(await _service.declineDraw(session.game.gameId));
+  }
+
+  /// True for [result] succeeding; otherwise records why, for the screen.
+  bool _report(OnlineResult<void> result) {
+    if (result.isSuccess) return true;
+    _fail(result);
+    if (!_disposed) notifyListeners();
+    return false;
   }
 
   /// Whether leaving now hands the game to the other player: a two-player
@@ -543,10 +632,28 @@ class OnlineGameController extends ChangeNotifier {
     // below would tell the screen about it.
     if (game.rematch != previous?.game.rematch) notifyListeners();
 
+    // A draw offered, or an answer to one: neither moves a piece, so nothing
+    // below would tell the screen about it.
+    if (game.drawOffer != previous?.game.drawOffer) {
+      final offer = game.drawOffer;
+      final seat = _session?.localPlayerId;
+      if (offer != null && seat != null) {
+        if (offer.by != seat && game.openDrawOffer != null) {
+          onDrawOffered?.call();
+        } else if (offer.by == seat &&
+            offer.declined &&
+            !(previous?.game.drawOffer?.declined ?? false)) {
+          onDrawDeclined?.call();
+        }
+      }
+      notifyListeners();
+    }
+
     if (game.isOver && (previous == null || !previous.game.isOver)) {
       final didWin = _session?.didWin;
       _setConnection(OnlineConnectionState.ended);
-      if (didWin != null) onGameOver?.call(didWin);
+      final drawn = game.outcomeReason == OnlineOutcomeReason.draw;
+      if (didWin != null || drawn) onGameOver?.call(didWin);
       notifyListeners();
       return;
     }
@@ -630,6 +737,7 @@ class OnlineGameController extends ChangeNotifier {
       OnlineGame(
         rematch: game.rematch,
         turnLimit: game.turnLimit,
+        drawOffer: game.drawOffer,
         gameId: game.gameId,
         roomCode: game.roomCode,
         status: game.status,

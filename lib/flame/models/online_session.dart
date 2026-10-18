@@ -59,6 +59,39 @@ class OnlinePlayer {
   int get hashCode => Object.hash(uid, displayName, connected, lastSeen);
 }
 
+/// A draw one player of a two-player game has offered the other.
+///
+/// It stands only until the next move: [atMove] is the move count it was
+/// made at, so once a move is played it has lapsed without anyone having to
+/// take it back. That also limits each player to one offer per move.
+@immutable
+class DrawOffer {
+  /// The seat that offered it.
+  final int by;
+
+  /// The game's move count when it was offered.
+  final int atMove;
+
+  /// Whether the other player turned it down.
+  final bool declined;
+
+  const DrawOffer({
+    required this.by,
+    required this.atMove,
+    this.declined = false,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is DrawOffer &&
+      other.by == by &&
+      other.atMove == atMove &&
+      other.declined == declined;
+
+  @override
+  int get hashCode => Object.hash(by, atMove, declined);
+}
+
 /// A new game offered to the same table once a game has ended.
 @immutable
 class RematchLink {
@@ -118,6 +151,9 @@ class OnlineGame {
   /// The rematch somebody offered once this game ended, if any.
   final RematchLink? rematch;
 
+  /// The last draw offered in this game, if any. See [openDrawOffer].
+  final DrawOffer? drawOffer;
+
   /// The time each player has for a turn, chosen by whoever created the
   /// game. It holds for everyone at the table, whatever their own setting.
   final TurnLimit turnLimit;
@@ -136,7 +172,18 @@ class OnlineGame {
     this.updatedAt,
     this.rematch,
     this.turnLimit = TurnLimit.off,
+    this.drawOffer,
   });
+
+  /// The draw offer still waiting for an answer: made at this very move,
+  /// and not turned down.
+  DrawOffer? get openDrawOffer {
+    final offer = drawOffer;
+    if (offer == null || offer.declined || offer.atMove != moveCount) {
+      return null;
+    }
+    return offer;
+  }
 
   bool get isOver =>
       status == OnlineGameStatus.finished ||
