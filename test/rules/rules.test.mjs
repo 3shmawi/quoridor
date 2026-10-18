@@ -20,6 +20,7 @@ import {
   deleteDoc,
   serverTimestamp,
   writeBatch,
+  Timestamp,
 } from 'firebase/firestore';
 
 /**
@@ -1045,6 +1046,84 @@ describe('the host\u2019s turn limit', () => {
     );
     await assertSucceeds(
       updateDoc(doc(db(ALICE), 'games/limit-move'), moveWrite(next, 1)),
+    );
+  });
+});
+
+describe('leaving a two-player game', () => {
+  /** An active game where Bob last reported in [agoSeconds] ago. */
+  const withBobLastSeen = (agoSeconds) => {
+    const game = activeGame();
+    game.players[2] = {
+      ...game.players[2],
+      lastSeen: Timestamp.fromMillis(Date.now() - agoSeconds * 1000),
+    };
+    return game;
+  };
+  const ending = (winner, reason) => ({
+    status: 'finished',
+    outcome: { winner, reason },
+    updatedAt: serverTimestamp(),
+  });
+
+  it('lets a player resign, handing the win to the other', async () => {
+    await seed('games/resign-1', activeGame());
+    await assertSucceeds(
+      updateDoc(doc(db(ALICE), 'games/resign-1'), ending(2, 'resign')),
+    );
+  });
+
+  it('refuses resigning in one\u2019s own favour, or from outside', async () => {
+    await seed('games/resign-2', activeGame());
+    await assertFails(
+      updateDoc(doc(db(ALICE), 'games/resign-2'), ending(1, 'resign')),
+    );
+    await assertFails(
+      updateDoc(doc(db(MALLORY), 'games/resign-2'), ending(1, 'resign')),
+    );
+  });
+
+  it('refuses smuggling a board change into a resignation', async () => {
+    await seed('games/resign-3', activeGame());
+    await assertFails(
+      updateDoc(doc(db(ALICE), 'games/resign-3'), {
+        ...ending(2, 'resign'),
+        moveCount: 5,
+      }),
+    );
+  });
+
+  it('lets the win be claimed from a player gone for over a minute', async () => {
+    await seed('games/claim-1', withBobLastSeen(120));
+    await assertSucceeds(
+      updateDoc(doc(db(ALICE), 'games/claim-1'), ending(1, 'timeout')),
+    );
+  });
+
+  it('refuses claiming from a player who reported in recently', async () => {
+    await seed('games/claim-2', withBobLastSeen(10));
+    await assertFails(
+      updateDoc(doc(db(ALICE), 'games/claim-2'), ending(1, 'timeout')),
+    );
+  });
+
+  it('refuses claiming when there is no server time to go by', async () => {
+    // A seat written at join carries the client's own number, not a
+    // server timestamp.
+    await seed('games/claim-3', activeGame());
+    await assertFails(
+      updateDoc(doc(db(ALICE), 'games/claim-3'), ending(1, 'timeout')),
+    );
+  });
+
+  it('refuses claiming for the other player, or from a finished game', async () => {
+    await seed('games/claim-4', withBobLastSeen(120));
+    await assertFails(
+      updateDoc(doc(db(ALICE), 'games/claim-4'), ending(2, 'timeout')),
+    );
+    await seed('games/claim-5', { ...withBobLastSeen(120), status: 'finished' });
+    await assertFails(
+      updateDoc(doc(db(ALICE), 'games/claim-5'), ending(1, 'timeout')),
     );
   });
 });

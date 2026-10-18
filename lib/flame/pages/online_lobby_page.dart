@@ -16,7 +16,11 @@ import '../services/turn_clock.dart';
 /// thing two people need to exchange. There are no accounts to create and
 /// nothing to configure.
 class OnlineLobbyPage extends StatefulWidget {
-  const OnlineLobbyPage({super.key});
+  const OnlineLobbyPage({super.key, this.joinCode});
+
+  /// A code from an invite link: the lobby joins its game as soon as it
+  /// opens.
+  final String? joinCode;
 
   @override
   State<OnlineLobbyPage> createState() => _OnlineLobbyPageState();
@@ -40,6 +44,13 @@ class _OnlineLobbyPageState extends State<OnlineLobbyPage> {
   void initState() {
     super.initState();
     _loadResumableGames();
+    final code = widget.joinCode;
+    if (code != null) {
+      _codeController.text = code;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _run((c) => c.joinGame(code));
+      });
+    }
   }
 
   @override

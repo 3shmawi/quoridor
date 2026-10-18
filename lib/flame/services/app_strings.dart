@@ -46,7 +46,6 @@ class AppStrings {
   // --- App ---------------------------------------------------------------
   String get appTitle => _get('appTitle');
   String get gotIt => _get('gotIt');
-  String get copy => _get('copy');
   String get cancel => _get('cancel');
 
   // --- Game modes --------------------------------------------------------
@@ -99,7 +98,17 @@ class AppStrings {
   String get couldNotStart => _get('couldNotStart');
   String shareCodeToInvite(String code) => _fill('shareCodeToInvite', code);
   String get connectedGoodLuck => _get('connectedGoodLuck');
-  String codeCopied(String code) => _fill('codeCopied', code);
+  String get invite => _get('invite');
+  String get inviteCopied => _get('inviteCopied');
+  String inviteMessage(String link, String code) =>
+      _fill('inviteMessage', link).replaceFirst('%c', code);
+  String get claimWin => _get('claimWin');
+  String claimWinIn(int seconds) => _fill('claimWinIn', '$seconds');
+  String opponentLeftYouWin(String name) => _fill('opponentLeftYouWin', name);
+  String get leaveGameTitle => _get('leaveGameTitle');
+  String leaveGameGivesWin(String name) => _fill('leaveGameGivesWin', name);
+  String get stay => _get('stay');
+  String get leaveGame => _get('leaveGame');
   String get leftOnlineGame => _get('leftOnlineGame');
   String get leaveOnlineFirst => _get('leaveOnlineFirst');
   String get youWin => _get('youWin');
@@ -259,7 +268,6 @@ class AppStrings {
     'updateWaiting': 'Update to %s',
     'updateWaitingSubtitle': 'A new version is ready',
     'gotIt': 'Got it!',
-    'copy': 'Copy',
     'cancel': 'Cancel',
 
     'chooseGameMode': 'Choose Game Mode',
@@ -308,7 +316,16 @@ class AppStrings {
     'couldNotStart': 'Could not start the game',
     'shareCodeToInvite': 'Share code %s to invite a friend',
     'connectedGoodLuck': 'Connected — good luck',
-    'codeCopied': 'Code %s copied',
+    'invite': 'Invite',
+    'inviteCopied': 'Invite link copied. Send it to a friend!',
+    'inviteMessage': 'Play Quoridor with me! %s\n(or enter code %c)',
+    'claimWin': 'Claim win',
+    'claimWinIn': 'Win in %s',
+    'opponentLeftYouWin': '%s left the game. You win!',
+    'leaveGameTitle': 'Leave the game?',
+    'leaveGameGivesWin': 'Leaving now gives the win to %s.',
+    'stay': 'Stay',
+    'leaveGame': 'Leave',
     'leftOnlineGame': 'Left the online game',
     'leaveOnlineFirst': 'Leave the online game first',
     'youWin': 'You win!',
@@ -479,7 +496,6 @@ class AppStrings {
     'updateWaiting': 'حدّث لـ %s',
     'updateWaitingSubtitle': 'فيه إصدار جديد جاهز',
     'gotIt': 'تمام',
-    'copy': 'نسخ',
     'cancel': 'إلغاء',
 
     'chooseGameMode': 'اختر وضع اللعب',
@@ -527,7 +543,16 @@ class AppStrings {
     'couldNotStart': 'تعذّر بدء اللعبة',
     'shareCodeToInvite': 'ابعت الكود %s لصاحبك',
     'connectedGoodLuck': 'اتصلنا — حظ موفق',
-    'codeCopied': 'تم نسخ الكود %s',
+    'invite': 'ادعُ',
+    'inviteCopied': 'اتنسخ لينك الدعوة. ابعته لصاحبك!',
+    'inviteMessage': 'تعالى العب كوريدور معايا! %s\n(أو اكتب الكود %c)',
+    'claimWin': 'خد المكسب',
+    'claimWinIn': 'المكسب بعد %s',
+    'opponentLeftYouWin': '%s ساب اللعبة. إنت كسبت!',
+    'leaveGameTitle': 'تسيب اللعبة؟',
+    'leaveGameGivesWin': 'لو سبت دلوقتي، %s هيكسب.',
+    'stay': 'خليني',
+    'leaveGame': 'اخرج',
     'leftOnlineGame': 'خرجت من اللعبة الأونلاين',
     'leaveOnlineFirst': 'اخرج من اللعبة الأونلاين الأول',
     'youWin': 'كسبت!',
