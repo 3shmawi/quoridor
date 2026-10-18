@@ -186,7 +186,7 @@ void main() {
             GlobalCupertinoLocalizations.delegate,
           ],
           home: GamePage(
-            openLobby: (_) async {
+            openLobby: (_, _) async {
               final controller = OnlineGameController(service: service);
               await controller.resumeGame('g');
               return controller;
@@ -244,6 +244,9 @@ void main() {
       await tester.tap(find.byIcon(Icons.menu));
       await settle(tester, frames: 5);
       await tester.tap(find.text('Leave Online Game'));
+      await settle(tester, frames: 5);
+      // Leaving a two-player game under way asks first.
+      await tester.tap(find.byKey(const Key('confirmLeave')));
       await settle(tester);
       // Straight to the mode sheet; pick a local game.
       await tester.tap(find.text('Play vs AI'));

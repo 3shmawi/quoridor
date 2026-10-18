@@ -61,6 +61,23 @@ class FakeOnlineGameService implements OnlineGameService {
   @override
   Future<void> abandon(String gameId) async => abandoned.add(gameId);
 
+  /// Games ended other than on the board, as (game, winner, reason).
+  final endings = <(String, int, OnlineOutcomeReason)>[];
+  bool endingFails = false;
+
+  @override
+  Future<OnlineResult<void>> endGame(
+    String gameId, {
+    required int winner,
+    required OnlineOutcomeReason reason,
+  }) async {
+    if (endingFails) {
+      return const OnlineResult.failed(OnlineFailure.backendError);
+    }
+    endings.add((gameId, winner, reason));
+    return const OnlineResult.success(null);
+  }
+
   @override
   Stream<OnlineGame> watchGame(String gameId) =>
       (_streams[gameId] ??= StreamController<OnlineGame>.broadcast()).stream;

@@ -15,8 +15,10 @@ import '../../flame/services/online/online_game_controller.dart';
 import '../../flame/services/turn_clock.dart';
 import '../services/update/update_service.dart';
 import '../models/online_chat.dart';
+import '../models/online_session.dart';
 import '../widgets/online_chat.dart';
 import 'online_lobby_page.dart';
+import '../services/online/invite/invite_link.dart';
 import '../../flame/models/game_state.dart';
 import '../../flame/models/move_notation.dart';
 import '../../flame/models/player.dart';
@@ -25,12 +27,21 @@ import '../../flame/services/saved_game_service.dart';
 import '../../theme.dart';
 
 class GamePage extends StatefulWidget {
-  const GamePage({super.key, this.openLobby});
+  const GamePage({super.key, this.openLobby, this.inviteCode});
 
-  /// Opens the online lobby and returns the game it started, if any. Tests
-  /// put their own here; the app uses [OnlineLobbyPage].
+  /// Opens the online lobby and returns the game it started, if any, joining
+  /// the game with the code given straight away. Tests put their own here;
+  /// the app uses [OnlineLobbyPage].
   @visibleForTesting
-  final Future<OnlineGameController?> Function(BuildContext context)? openLobby;
+  final Future<OnlineGameController?> Function(
+    BuildContext context,
+    String? joinCode,
+  )?
+  openLobby;
+
+  /// The room code of an invite link the app was opened with: the game it
+  /// joins instead of showing the mode sheet.
+  final String? inviteCode;
 
   @override
   State<GamePage> createState() => _GamePageState();
@@ -88,7 +99,16 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _whenBoardLoaded();
       await _restoreSavedGame();
-      if (mounted) _showGameModeSelection();
+      if (!mounted) return;
+      final invite = widget.inviteCode;
+      if (invite != null) {
+        // Opened from an invite: straight into joining that game. Coming
+        // back without joining lands on the start screen.
+        forgetInviteInPage();
+        unawaited(_startOnlineGame(joinCode: invite));
+      } else {
+        _showGameModeSelection();
+      }
     });
   }
 
@@ -220,15 +240,17 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   /// Opens the lobby and, if the player starts or joins a game, hands the
   /// board over to it.
-  Future<void> _startOnlineGame() async {
-    closeMenu();
+  Future<void> _startOnlineGame({String? joinCode}) async {
+    if (joinCode == null) closeMenu();
 
     final openLobby =
         widget.openLobby ??
-        (context) => Navigator.of(context).push<OnlineGameController>(
-          MaterialPageRoute(builder: (_) => const OnlineLobbyPage()),
+        (context, joinCode) => Navigator.of(context).push<OnlineGameController>(
+          MaterialPageRoute(
+            builder: (_) => OnlineLobbyPage(joinCode: joinCode),
+          ),
         );
-    final controller = await openLobby(context);
+    final controller = await openLobby(context, joinCode);
 
     if (controller == null || !mounted) {
       controller?.dispose();
@@ -285,7 +307,24 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   void _handleOnlineGameOver(bool didWin) {
     if (!mounted) return;
     if (didWin) _showConfetti(offerReplay: false);
-    _showGameMessage(didWin ? context.l10n.youWin : context.l10n.opponentWins);
+    final online = _online;
+    final reason = online?.game?.outcomeReason;
+    // Won because the other player left, rather than on the board.
+    final left =
+        didWin &&
+        (reason == OnlineOutcomeReason.resign ||
+            reason == OnlineOutcomeReason.timeout);
+    _showGameMessage(
+      left
+          ? context.l10n.opponentLeftYouWin(
+              online
+                      ?.game
+                      ?.players[3 - (online.localPlayerId ?? 1)]
+                      ?.displayName ??
+                  context.l10n.opponent,
+            )
+          : (didWin ? context.l10n.youWin : context.l10n.opponentWins),
+    );
   }
 
   /// Tears down any online session and returns the board to local play.
@@ -332,6 +371,36 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   Future<void> _leaveOnlineGame() async {
     closeMenu();
+    // Leaving a two-player game under way gives it to the other player, so
+    // that is said before it happens.
+    final online = _online;
+    if (online != null && online.leavingResigns) {
+      final opponent =
+          online.session?.opponent?.displayName ?? context.l10n.opponent;
+      final leave = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(context.l10n.leaveGameTitle),
+          content: Text(context.l10n.leaveGameGivesWin(opponent)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(context.l10n.stay),
+            ),
+            FilledButton(
+              key: const Key('confirmLeave'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(context.l10n.leaveGame),
+            ),
+          ],
+        ),
+      );
+      if (leave != true || !mounted) return;
+    }
     _detachOnline(abandon: true);
     _game.newGame();
     _awaitingStart = true;
@@ -1798,9 +1867,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         icon = Icons.hourglass_top_rounded;
         text = context.l10n.waitingForOpponentWithCode(online.roomCode ?? '');
         action = TextButton.icon(
-          onPressed: () => _copyRoomCode(online.roomCode),
-          icon: const Icon(Icons.copy_rounded, size: 16),
-          label: Text(context.l10n.copy),
+          key: const Key('invite'),
+          onPressed: () => _copyInvite(online.roomCode),
+          icon: const Icon(Icons.link_rounded, size: 16),
+          label: Text(context.l10n.invite),
         );
 
       case OnlineConnectionState.opponentAway:
@@ -1809,6 +1879,26 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
         text = context.l10n.nameGoneQuiet(
           online.awayPlayer?.displayName ?? context.l10n.opponent,
         );
+        // In a two-player game, the win can be taken from a player who has
+        // gone for good; until then, how long is left is counted down.
+        final claimIn = online.claimWinIn;
+        if (claimIn != null) {
+          action = FilledButton.tonal(
+            key: const Key('claimWin'),
+            onPressed: claimIn == Duration.zero ? _claimWin : null,
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: Text(
+              claimIn == Duration.zero
+                  ? context.l10n.claimWin
+                  : context.l10n.claimWinIn(
+                      (claimIn.inMilliseconds / 1000).ceil(),
+                    ),
+            ),
+          );
+        }
 
       case OnlineConnectionState.offline:
         color = const Color(0xFFDC2626);
@@ -1904,10 +1994,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _copyRoomCode(String? code) async {
+  /// Copies a message with a link that joins this game, ready to paste
+  /// into a chat. The code is in it too, for typing by hand.
+  Future<void> _copyInvite(String? code) async {
     if (code == null) return;
-    await Clipboard.setData(ClipboardData(text: code));
-    if (mounted) _showGameMessage(context.l10n.codeCopied(code));
+    final link = InviteLink.forCode(code);
+    await Clipboard.setData(
+      ClipboardData(text: context.l10n.inviteMessage('$link', code)),
+    );
+    if (mounted) _showGameMessage(context.l10n.inviteCopied);
+  }
+
+  Future<void> _claimWin() async {
+    final claimed = await _online?.claimWin() ?? false;
+    if (!claimed && mounted) _showGameMessage(context.l10n.backendError);
   }
 
   // --- Status line ---------------------------------------------------------

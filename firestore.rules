@@ -287,6 +287,41 @@ service cloud.firestore {
           && sitsIn(created, '1', request.auth.uid);
       }
 
+      // The seat across the table in a two-player game.
+      function otherSeat(me) {
+        return me == 1 ? 2 : 1;
+      }
+
+      // A two-player game under way ending off the board: only the status,
+      // the outcome and the time change.
+      function isEnding(winner, reason) {
+        return isPlayer(existing())
+          && existing().status == 'active'
+          && playerCountOf(existing()) == 2
+          && incoming().diff(existing()).affectedKeys()
+             .hasOnly(['status', 'outcome', 'updatedAt'])
+          && incoming().status == 'finished'
+          && incoming().outcome.keys().hasOnly(['winner', 'reason'])
+          && incoming().outcome.winner == winner
+          && incoming().outcome.reason == reason;
+      }
+
+      // Resigning hands the game to the other player.
+      function isValidResign() {
+        return isEnding(otherSeat(seatOf(existing(), request.auth.uid)),
+                        'resign');
+      }
+
+      // A player may take the win from one who has not reported in for over
+      // a minute, by the server's clock rather than their own.
+      function isValidClaim() {
+        let me = seatOf(existing(), request.auth.uid);
+        let them = existing().players[string(otherSeat(me))];
+        return isEnding(me, 'timeout')
+          && them.lastSeen is timestamp
+          && request.time > them.lastSeen + duration.value(60, 's');
+      }
+
       // Any player may abandon a game they are in.
       function isValidAbandon() {
         return isPlayer(existing())
@@ -309,6 +344,8 @@ service cloud.firestore {
                     || isValidMove()
                     || isValidPresenceUpdate()
                     || isValidAbandon()
+                    || isValidResign()
+                    || isValidClaim()
                     || isValidRematchLink();
 
       // Games are never deleted by clients; cleanup is a scheduled job.

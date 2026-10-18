@@ -102,6 +102,18 @@ class OnlineGameCodec {
     return data;
   }
 
+  /// The fields written when a game ends other than on the board: a player
+  /// resigning, or claiming the win from one who has gone.
+  static Map<String, dynamic> encodeEnding({
+    required int winner,
+    required OnlineOutcomeReason reason,
+    required Object timestamp,
+  }) => {
+    'status': OnlineGameStatus.finished.name,
+    'outcome': {'winner': winner, 'reason': reason.name},
+    'updatedAt': timestamp,
+  };
+
   /// The fields written when [link] is offered on a finished game.
   static Map<String, dynamic> encodeRematch({
     required RematchLink link,

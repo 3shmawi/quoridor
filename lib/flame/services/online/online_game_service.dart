@@ -639,6 +639,35 @@ class OnlineGameService {
     }
   }
 
+  /// Ends [gameId] with [winner] winning, for [reason]: the other player
+  /// resigning, or having gone for long enough that the win can be claimed.
+  /// The Security Rules decide which of those this caller may write.
+  Future<OnlineResult<void>> endGame(
+    String gameId, {
+    required int winner,
+    required OnlineOutcomeReason reason,
+  }) async {
+    final games = _games;
+    if (games == null) {
+      return const OnlineResult.failed(OnlineFailure.unavailable);
+    }
+    try {
+      await games
+          .doc(gameId)
+          .update(
+            OnlineGameCodec.encodeEnding(
+              winner: winner,
+              reason: reason,
+              timestamp: FieldValue.serverTimestamp(),
+            ),
+          );
+      return const OnlineResult.success(null);
+    } catch (error) {
+      debugPrint('OnlineGameService: endGame failed: $error');
+      return OnlineResult.failed(OnlineFailure.backendError, '$error');
+    }
+  }
+
   /// Marks a game as abandoned. Best effort: a player who simply vanishes is
   /// handled by presence in a later phase.
   Future<void> abandon(String gameId) async {

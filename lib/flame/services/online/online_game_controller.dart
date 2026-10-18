@@ -58,6 +58,12 @@ class OnlineGameController extends ChangeNotifier {
   /// Three missed beats, so one slow round trip does not raise a false alarm.
   static const Duration presenceTimeout = Duration(seconds: 35);
 
+  /// How long the other player of a two-player game must have been gone
+  /// before the win can be claimed from them. The Security Rules hold out
+  /// for a minute by the server's clock; a few seconds more here allows for
+  /// this device's clock being ahead of it.
+  static const Duration claimAfter = Duration(seconds: 65);
+
   OnlineSession? _session;
   OnlineConnectionState _connection = OnlineConnectionState.connecting;
   String? _message;
@@ -120,7 +126,7 @@ class OnlineGameController extends ChangeNotifier {
   OnlinePlayer? get awayPlayer {
     final session = _session;
     if (session == null) return null;
-    final now = DateTime.now();
+    final now = _now();
     for (final player in session.opponents) {
       final lastSeen = player.lastSeen;
       if (lastSeen == null || now.difference(lastSeen) > presenceTimeout) {
@@ -128,6 +134,56 @@ class OnlineGameController extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  /// How long until the win can be claimed from the other player of a
+  /// two-player game, who has gone quiet; zero once it can be, and null while
+  /// there is nothing to claim.
+  Duration? get claimWinIn {
+    final session = _session;
+    if (session == null ||
+        !session.isParticipant ||
+        session.game.playerCount != 2 ||
+        session.game.status != OnlineGameStatus.active) {
+      return null;
+    }
+    final lastSeen = session.opponent?.lastSeen;
+    if (lastSeen == null) return null;
+    final gone = _now().difference(lastSeen);
+    if (gone <= presenceTimeout) return null;
+    final left = claimAfter - gone;
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  bool get canClaimWin => claimWinIn == Duration.zero;
+
+  /// Takes the win from the other player, who has gone. False when it was
+  /// refused, for one because they have come back.
+  Future<bool> claimWin() async {
+    final session = _session;
+    final seat = session?.localPlayerId;
+    if (session == null || seat == null || !canClaimWin) return false;
+    final result = await _service.endGame(
+      session.game.gameId,
+      winner: seat,
+      reason: OnlineOutcomeReason.timeout,
+    );
+    if (!result.isSuccess) {
+      _fail(result);
+      if (!_disposed) notifyListeners();
+      return false;
+    }
+    return true;
+  }
+
+  /// Whether leaving now hands the game to the other player: a two-player
+  /// game that is under way.
+  bool get leavingResigns {
+    final game = _session?.game;
+    return game != null &&
+        _session!.isParticipant &&
+        game.playerCount == 2 &&
+        game.status == OnlineGameStatus.active;
   }
 
   /// A rematch somebody else offered on the finished game, waiting to be
@@ -440,10 +496,11 @@ class OnlineGameController extends ChangeNotifier {
     // The opponent going quiet is not an event, it is the absence of one, so
     // it has to be noticed on a timer rather than from the stream.
     _presenceTicker?.cancel();
-    _presenceTicker = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _refreshConnection(),
-    );
+    // Every second, so the time left to claim a win counts down smoothly.
+    _presenceTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      _refreshConnection();
+      if (claimWinIn != null && !_disposed) notifyListeners();
+    });
   }
 
   void _onGameChanged(OnlineGame game) {
@@ -592,8 +649,18 @@ class OnlineGameController extends ChangeNotifier {
     if (session != null) {
       final gameId = session.game.gameId;
       final seat = session.localPlayerId;
+      final resigns = abandon && leavingResigns;
       if (seat != null) await _service.markAway(gameId, seat);
-      if (abandon && !session.game.isOver) await _service.abandon(gameId);
+      if (resigns && seat != null) {
+        // Leaving a two-player game gives it to the one who stays.
+        await _service.endGame(
+          gameId,
+          winner: 3 - seat,
+          reason: OnlineOutcomeReason.resign,
+        );
+      } else if (abandon && !session.game.isOver) {
+        await _service.abandon(gameId);
+      }
     }
     _teardown();
     _session = null;

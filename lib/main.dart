@@ -12,6 +12,7 @@ import 'flame/services/audio_service.dart';
 import 'flame/services/firebase_service.dart';
 import 'flame/services/app_strings.dart';
 import 'flame/services/identity_service.dart';
+import 'flame/services/online/invite/invite_link.dart';
 import 'flame/services/settings_service.dart';
 import 'flame/services/update/update_service.dart';
 import 'flame/widgets/update_overlay.dart';
@@ -129,7 +130,8 @@ class _QuoridorAppState extends State<QuoridorApp> with WidgetsBindingObserver {
                 GlobalWidgetsLocalizations.delegate,
                 GlobalCupertinoLocalizations.delegate,
               ],
-              home: const GamePage(),
+              // Opened from an invite link, the game joins it at once.
+              home: GamePage(inviteCode: InviteLink.fromPage()),
               debugShowCheckedModeBanner: false,
             );
           },
