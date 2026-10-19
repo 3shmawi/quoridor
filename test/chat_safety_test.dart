@@ -451,7 +451,7 @@ void main() {
     test('is on the site the app links to', () {
       expect(
         Legal.privacyPolicy.toString(),
-        'https://quoridor-mohager.pages.dev/privacy/',
+        'https://playquoridor.pages.dev/privacy/',
       );
     });
 

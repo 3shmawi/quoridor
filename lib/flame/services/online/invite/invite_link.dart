@@ -12,7 +12,15 @@ class InviteLink {
   InviteLink._();
 
   /// Where every invite leads.
-  static final Uri webHome = Uri.parse('https://quoridor-mohager.pages.dev/');
+  static final Uri webHome = Uri.parse('https://playquoridor.pages.dev/');
+
+  /// Every address the site is served at. An invite link on any of them
+  /// opens the installed app; the second is where invites from 1.1.5 and
+  /// earlier, and the promo video's QR code, lead.
+  static const List<String> hosts = [
+    'playquoridor.pages.dev',
+    'quoridor-mohager.pages.dev',
+  ];
 
   static const String parameter = 'join';
 

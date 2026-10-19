@@ -160,6 +160,10 @@ class AppStrings {
   String chatBlocked(String name) => _fill('chatBlocked', name);
   String get chatUnblock => _get('chatUnblock');
   String get privacyPolicy => _get('privacyPolicy');
+  String get getTheApp => _get('getTheApp');
+  String get appBannerText => _get('appBannerText');
+  String get appBannerGet => _get('appBannerGet');
+  String get close => _get('close');
 
   /// What [item] says: the words of a line, or what a face means.
   String chatLabel(QuickChat item) => _get('chat_${item.name}');
@@ -403,6 +407,10 @@ class AppStrings {
     'chatBlocked': 'You blocked %s',
     'chatUnblock': 'Unblock',
     'privacyPolicy': 'Privacy policy',
+    'getTheApp': 'Get the app',
+    'appBannerText': 'Quoridor plays best in the app',
+    'appBannerGet': 'Get',
+    'close': 'Close',
     'chat_laugh': 'Ha ha!',
     'chat_cool': 'Too cool',
     'chat_thinking': 'Hmm…',
@@ -655,6 +663,10 @@ class AppStrings {
     'chatBlocked': 'إنت حاظر %s',
     'chatUnblock': 'إلغاء الحظر',
     'privacyPolicy': 'سياسة الخصوصية',
+    'getTheApp': 'نزّل التطبيق',
+    'appBannerText': 'كوريدور أحلى على التطبيق',
+    'appBannerGet': 'نزّله',
+    'close': 'إغلاق',
     'chat_laugh': 'هههههه!',
     'chat_cool': 'روقان',
     'chat_thinking': 'امممم…',

@@ -98,11 +98,12 @@ jobs:
       # Not a secret: it names the account, it does not grant access to it.
       CLOUDFLARE_ACCOUNT_ID: 59e2f1308a0af66321e49dc4cb473736
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      # The site is served at <project>.pages.dev. Cloudflare adds a random
-      # suffix (quoridor-5q7) when the name is taken by another account, so
-      # the name can be changed with the CLOUDFLARE_PAGES_PROJECT repository
-      # variable; the next deploy creates the new project.
-      PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'quoridor' }}
+      # The site is served at <project>.pages.dev, from each project here.
+      # playquoridor is the address invites lead to (InviteLink.webHome);
+      # quoridor-mohager is the old one, kept for invites from 1.1.5 and
+      # earlier and the promo video's QR code. The installed app opens
+      # invite links on both (AndroidManifest.xml, Runner.entitlements).
+      PROJECTS: playquoridor quoridor-mohager
     steps:
       - name: Say why nothing was deployed
         if: env.HAS_TOKEN != 'true'
@@ -141,21 +142,42 @@ jobs:
             --dart-define=APP_COMMIT=${{ github.sha }}
           python3 tool/write_latest_json.py build/web/latest.json
 
-      # The first deploy creates the project; after that it already exists.
-      - name: Create the Pages project if it is missing
+      # The first deploy creates a project; after that it already exists.
+      - name: Create the Pages projects that are missing
         if: env.HAS_TOKEN == 'true'
         run: |
-          if ! out=$(npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=main 2>&1); then
-            echo "$out" | grep -qi "already exists" || { echo "$out"; exit 1; }
-          fi
+          for project in $PROJECTS; do
+            if ! out=$(npx --yes wrangler@4 pages project create "$project" --production-branch=main 2>&1); then
+              echo "$out" | grep -qi "already exists" || { echo "$out"; exit 1; }
+            fi
+          done
+
+      # Cloudflare adds a random suffix (quoridor-5q7) when another account
+      # holds the name, and then the app's links would point nowhere. Say so
+      # loudly rather than deploy to an address nobody links to.
+      - name: Check each project got its own address
+        if: env.HAS_TOKEN == 'true'
+        run: |
+          for project in $PROJECTS; do
+            subdomain=$(curl -fsS \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$project" \
+              | jq -r '.result.subdomain')
+            if [ "$subdomain" != "$project.pages.dev" ]; then
+              echo "::error::The Pages project $project is served at $subdomain, not $project.pages.dev. Pick a free name and change it in this file, InviteLink, AndroidManifest.xml and Runner.entitlements."
+              exit 1
+            fi
+          done
 
       - name: Deploy
         if: env.HAS_TOKEN == 'true'
-        run: >
-          npx --yes wrangler@4 pages deploy build/web
-          --project-name="$PROJECT"
-          --branch=main
-          --commit-hash="$GITHUB_SHA"
+        run: |
+          for project in $PROJECTS; do
+            npx --yes wrangler@4 pages deploy build/web \
+              --project-name="$project" \
+              --branch=main \
+              --commit-hash="$GITHUB_SHA"
+          done
 
   deploy:
     name: Deploy

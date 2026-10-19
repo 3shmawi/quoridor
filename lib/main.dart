@@ -12,7 +12,8 @@ import 'flame/services/audio_service.dart';
 import 'flame/services/firebase_service.dart';
 import 'flame/services/app_strings.dart';
 import 'flame/services/identity_service.dart';
-import 'flame/services/online/invite/invite_link.dart';
+import 'flame/services/get_app/get_app.dart';
+import 'flame/services/online/invite/app_link_invites.dart';
 import 'flame/services/settings_service.dart';
 import 'flame/services/update/update_service.dart';
 import 'flame/widgets/update_overlay.dart';
@@ -41,7 +42,11 @@ void main() async {
   // foreground. Never blocks start-up and stays quiet on any failure.
   UpdateService.instance.start();
 
-  runApp(const QuoridorApp());
+  // An invite link opens the installed app (or this page, on the web); the
+  // game it names is joined instead of showing the mode sheet.
+  final invites = await AppLinkInvites.start();
+
+  runApp(QuoridorApp(invites: invites));
 }
 
 Future<void> _connectFirebase() async {
@@ -62,7 +67,10 @@ Future<void> _connectFirebase() async {
 }
 
 class QuoridorApp extends StatefulWidget {
-  const QuoridorApp({super.key});
+  const QuoridorApp({super.key, this.invites = const AppLinkInvites()});
+
+  /// The invite the app was opened with, and any opened later.
+  final AppLinkInvites invites;
 
   @override
   State<QuoridorApp> createState() => _QuoridorAppState();
@@ -131,7 +139,11 @@ class _QuoridorAppState extends State<QuoridorApp> with WidgetsBindingObserver {
                 GlobalCupertinoLocalizations.delegate,
               ],
               // Opened from an invite link, the game joins it at once.
-              home: GamePage(inviteCode: InviteLink.fromPage()),
+              home: GamePage(
+                inviteCode: widget.invites.first,
+                inviteLinks: widget.invites.later,
+                webDevice: currentWebDevice(),
+              ),
               debugShowCheckedModeBanner: false,
             );
           },

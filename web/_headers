@@ -1,0 +1,8 @@
+# Cloudflare Pages response headers. Apple and Android read these two files
+# to confirm the site belongs to the app; both expect JSON, and Apple's has
+# no extension to tell it so.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+
+/.well-known/assetlinks.json
+  Content-Type: application/json

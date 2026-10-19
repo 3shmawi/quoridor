@@ -16,6 +16,7 @@ import '../../flame/services/online/online_game_controller.dart';
 import '../../flame/services/turn_clock.dart';
 import '../services/update/update_service.dart';
 import '../services/legal.dart';
+import '../services/get_app/get_app.dart';
 import '../models/online_chat.dart';
 import '../models/online_session.dart';
 import '../widgets/online_chat.dart';
@@ -30,7 +31,15 @@ import '../../flame/services/saved_game_service.dart';
 import '../../theme.dart';
 
 class GamePage extends StatefulWidget {
-  const GamePage({super.key, this.openLobby, this.inviteCode, this.now});
+  const GamePage({
+    super.key,
+    this.openLobby,
+    this.inviteCode,
+    this.inviteLinks,
+    this.webDevice,
+    this.openLink,
+    this.now,
+  });
 
   /// Opens the online lobby and returns the game it started, if any, joining
   /// the game with the code given straight away. Tests put their own here;
@@ -45,6 +54,19 @@ class GamePage extends StatefulWidget {
   /// The room code of an invite link the app was opened with: the game it
   /// joins instead of showing the mode sheet.
   final String? inviteCode;
+
+  /// Room codes from invite links opened while the app is already running
+  /// (Android App Links, iOS Universal Links).
+  final Stream<String>? inviteLinks;
+
+  /// The device a browser copy of the game runs on, which decides where
+  /// "Get the app" leads; null in the installed app, which offers nothing.
+  final WebDevice? webDevice;
+
+  /// Opens [link] outside the game: a store, or a web page. Tests record it;
+  /// the app hands it to the browser or the store app.
+  @visibleForTesting
+  final Future<void> Function(Uri link)? openLink;
 
   /// The time the turn clock reads. Tests move it on; the app uses the real
   /// time.
@@ -88,10 +110,20 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   /// Plays the sound for each message the others send.
   StreamSubscription<ChatMessage>? _chatSound;
 
+  /// Invite links opened while the app is running.
+  StreamSubscription<String>? _inviteLinks;
+
+  /// Whether the "Play in the app" bar shows above the board: in a phone's
+  /// browser, until it is closed.
+  bool get _showAppBanner =>
+      GetApp.offersBanner(widget.webDevice) &&
+      !SettingsService.instance.appBannerClosed.value;
+
   @override
   void initState() {
     _initializeGame();
     super.initState();
+    SettingsService.instance.appBannerClosed.addListener(_appBannerChanged);
 
     _messageController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -108,6 +140,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       await _whenBoardLoaded();
       await _restoreSavedGame();
       if (!mounted) return;
+      _inviteLinks = widget.inviteLinks?.listen(_handleInviteLink);
       final invite = widget.inviteCode;
       if (invite != null) {
         // Opened from an invite: straight into joining that game. Coming
@@ -257,12 +290,106 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _inviteLinks?.cancel();
+    SettingsService.instance.appBannerClosed.removeListener(_appBannerChanged);
     _detachOnline(abandon: false);
     SettingsService.instance.turnLimit.removeListener(_handleTurnLimitChanged);
     _clock.dispose();
     _messageController.dispose();
     _confettiController.dispose();
     super.dispose();
+  }
+
+  // --- Links in and out ----------------------------------------------------
+
+  /// Joins the game an invite link names, if this device is free to.
+  ///
+  /// Whatever is open over the board (the mode sheet, a dialog) is closed
+  /// first, as if the player had picked Online. A link to the game already
+  /// on the board changes nothing, and one that arrives in the middle of
+  /// another online game asks for that game to be left first, rather than
+  /// giving it up on a tap.
+  void _handleInviteLink(String code) {
+    if (!mounted) return;
+    final game = _online?.game;
+    if (game != null) {
+      if (game.roomCode == code) return;
+      if (!game.isOver) {
+        _showGameMessage(context.l10n.leaveOnlineFirst);
+        return;
+      }
+    }
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    unawaited(_startOnlineGame(joinCode: code));
+  }
+
+  /// Opens [link] in the browser or the store app.
+  Future<void> _open(Uri link) =>
+      widget.openLink?.call(link) ??
+      launchUrl(link, mode: LaunchMode.externalApplication);
+
+  void _appBannerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Where this browser gets the app, or null in the app itself.
+  Uri? get _getAppLink {
+    final device = widget.webDevice;
+    return device == null ? null : GetApp.linkFor(device);
+  }
+
+  /// The "Get the app" button for the end of a game, in a browser only.
+  Widget? _getAppButton() {
+    final link = _getAppLink;
+    if (link == null) return null;
+    return TextButton.icon(
+      key: const Key('getAppAfterGame'),
+      onPressed: () => _open(link),
+      icon: const Icon(Icons.install_mobile_rounded, size: 18),
+      label: Text(context.l10n.getTheApp),
+    );
+  }
+
+  /// The bar above the board in a phone's browser: the app, one tap away.
+  Widget _buildAppBanner() {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('appBanner'),
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 4, 6),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.install_mobile_rounded, color: scheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              context.l10n.appBannerText,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          FilledButton(
+            key: const Key('appBannerGet'),
+            onPressed: () => _open(_getAppLink!),
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+            ),
+            child: Text(context.l10n.appBannerGet),
+          ),
+          IconButton(
+            key: const Key('appBannerClose'),
+            tooltip: context.l10n.close,
+            visualDensity: VisualDensity.compact,
+            onPressed: () =>
+                SettingsService.instance.appBannerClosed.value = true,
+            icon: const Icon(Icons.close_rounded, size: 18),
+          ),
+        ],
+      ),
+    );
   }
 
   // --- Online play ---------------------------------------------------------
@@ -621,6 +748,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           ],
         ),
         actions: [
+          ?_getAppButton(),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
@@ -1293,10 +1421,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
               ),
               TextButton.icon(
                 key: const Key('privacyPolicy'),
-                onPressed: () => launchUrl(
-                  Legal.privacyPolicy,
-                  mode: LaunchMode.externalApplication,
-                ),
+                onPressed: () => _open(Legal.privacyPolicy),
                 icon: const Icon(Icons.privacy_tip_outlined, size: 18),
                 label: Text(context.l10n.privacyPolicy),
               ),
@@ -1328,6 +1453,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             child: Column(
               spacing: 20,
               children: [
+                if (_showAppBanner) _buildAppBanner(),
                 Expanded(
                   // A tap anywhere off the game area -- the status strip, the
                   // padding, the banner -- puts down whatever was lined up.
@@ -2051,6 +2177,13 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
             label: Text(
               offer != null ? context.l10n.joinRematch : context.l10n.rematch,
             ),
+          );
+        }
+        // Played in a browser: the app is the next step.
+        if (_getAppButton() case final getApp?) {
+          actionBelow = Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [getApp],
           );
         }
 

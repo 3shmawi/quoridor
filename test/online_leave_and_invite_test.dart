@@ -67,15 +67,13 @@ void main() {
     test('always lead to the Cloudflare site, with the code', () {
       expect(
         '${InviteLink.forCode('ABC123')}',
-        'https://quoridor-mohager.pages.dev/?join=ABC123',
+        'https://playquoridor.pages.dev/?join=ABC123',
       );
     });
 
     test('a scanned QR code gives its room code, from a link or bare', () {
       expect(
-        InviteLink.codeFromScan(
-          'https://quoridor-mohager.pages.dev/?join=ABC123',
-        ),
+        InviteLink.codeFromScan('https://playquoridor.pages.dev/?join=ABC123'),
         'ABC123',
       );
       // An older link from the GitHub Pages copy still works.
@@ -306,10 +304,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('copyInvite')));
       await settle(tester, frames: 6);
-      expect(
-        copied,
-        contains('https://quoridor-mohager.pages.dev/?join=ROOM11'),
-      );
+      expect(copied, contains('https://playquoridor.pages.dev/?join=ROOM11'));
       expect(find.byKey(const Key('inviteQr')), findsNothing);
       expect(find.text('Invite link copied. Send it to a friend!'), findsOne);
       await finish(tester);
