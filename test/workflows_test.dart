@@ -115,4 +115,23 @@ void main() {
     expect(release, contains('<base href="./">'));
     expect(release, contains('--pwa-strategy=none'));
   });
+
+  test('a release can be rebuilt as the same version, from main only', () {
+    // Before the stores accept a version, it can go out again with new code:
+    // the tag moves, the version stays, and Release numbers the new build.
+    final bump = File('.github/workflows/bump.yml').readAsStringSync();
+    expect(bump, contains('options: [patch, minor, major, rebuild]'));
+    expect(bump, contains("if: inputs.part != 'rebuild'"));
+    expect(bump, contains('if [ "\$GITHUB_REF" != "refs/heads/main" ]'));
+    expect(bump, contains('git tag -f "v\$VERSION"'));
+    expect(bump, contains('git push -f origin "v\$VERSION"'));
+    // The tag push starts Release only when made with RELEASE_TOKEN.
+    expect(
+      bump,
+      contains('token: \${{ secrets.RELEASE_TOKEN || github.token }}'),
+    );
+    final release = File('.github/workflows/release.yml').readAsStringSync();
+    expect(release, contains("tags: ['v*']"));
+    expect(release, contains('build_number: \${{ github.run_number }}'));
+  });
 }

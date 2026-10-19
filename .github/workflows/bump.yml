@@ -2,13 +2,17 @@ name: Bump version
 
 # Run from the Actions tab. Commits "Version X.Y.Z", tags vX.Y.Z and pushes
 # both; the tag starts release.yml.
+#
+# "rebuild" keeps the version and moves its tag to the latest main instead,
+# for a release the stores have not accepted yet: the same version goes out
+# again with the new code and a higher build number.
 on:
   workflow_dispatch:
     inputs:
       part:
         description: Which part of the version to raise
         type: choice
-        options: [patch, minor, major]
+        options: [patch, minor, major, rebuild]
         default: patch
 
 permissions:
@@ -32,11 +36,13 @@ jobs:
 
       - name: Raise the version
         id: bump
+        if: inputs.part != 'rebuild'
         run: |
           VERSION=$(python3 tool/bump_version.py "${{ inputs.part }}")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Commit, tag and push
+        if: inputs.part != 'rebuild'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -44,10 +50,26 @@ jobs:
           git tag "v${{ steps.bump.outputs.version }}"
           git push origin HEAD "v${{ steps.bump.outputs.version }}"
 
+      # Moves the existing tag rather than raising the version. Only from
+      # main, and only to the version pubspec.yaml already names.
+      - name: Move the tag to this commit
+        id: rebuild
+        if: inputs.part == 'rebuild'
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Rebuild runs from main only."
+            exit 1
+          fi
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          git tag -f "v$VERSION"
+          git push -f origin "v$VERSION"
+
       - name: Say what happens next
         env:
           HAS_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
+          VERSION: ${{ steps.bump.outputs.version || steps.rebuild.outputs.version }}
         run: |
           if [ "$HAS_TOKEN" != "true" ]; then
-            echo "::warning::RELEASE_TOKEN is not set, so the tag will not start release.yml by itself. Start 'Release' from the Actions tab and pick tag v${{ steps.bump.outputs.version }}."
+            echo "::warning::RELEASE_TOKEN is not set, so the tag will not start release.yml by itself. Start 'Release' from the Actions tab and pick tag v$VERSION."
           fi
