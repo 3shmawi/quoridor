@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "9RA43G2P63.com.moreh.quoridor",
+          "X7QLXZQ5CC.com.moreh.quoridor"
+        ],
+        "components": [
+          {
+            "/": "/",
+            "?": { "join": "?*" },
+            "comment": "Invite links: the site's root with a room code"
+          }
+        ]
+      }
+    ]
+  }
+}

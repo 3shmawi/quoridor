@@ -23,6 +23,7 @@ class SettingsService {
   static const String _difficultyKey = 'settings.difficulty';
   static const String _turnLimitKey = 'settings.turnLimit';
   static const String _blockedKey = 'settings.blockedPlayers';
+  static const String _appBannerKey = 'settings.appBannerClosed';
 
   /// Languages the game is translated into.
   static const List<Locale> supportedLocales = [Locale('en'), Locale('ar')];
@@ -52,6 +53,10 @@ class SettingsService {
     const {},
   );
 
+  /// Whether the "Play in the app" bar was closed in this browser. Once is
+  /// enough: it stays closed.
+  final ValueNotifier<bool> appBannerClosed = ValueNotifier<bool>(false);
+
   SharedPreferences? _prefs;
   bool _loaded = false;
 
@@ -73,6 +78,7 @@ class SettingsService {
       difficulty.value = _difficultyFor(prefs.getString(_difficultyKey));
       turnLimit.value = _turnLimitFor(prefs.getString(_turnLimitKey));
       blockedPlayers.value = {...?prefs.getStringList(_blockedKey)};
+      appBannerClosed.value = prefs.getBool(_appBannerKey) ?? false;
     } catch (error) {
       debugPrint('SettingsService: using defaults, load failed: $error');
     } finally {
@@ -94,6 +100,9 @@ class SettingsService {
     locale.addListener(() => _write(_languageKey, locale.value.languageCode));
     difficulty.addListener(() => _write(_difficultyKey, difficulty.value.name));
     turnLimit.addListener(() => _write(_turnLimitKey, turnLimit.value.name));
+    appBannerClosed.addListener(
+      () => _write(_appBannerKey, appBannerClosed.value),
+    );
     blockedPlayers.addListener(
       () => _write(_blockedKey, blockedPlayers.value.toList()..sort()),
     );

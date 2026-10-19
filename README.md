@@ -20,7 +20,8 @@ build is deployed to GitHub Pages from `main` on every push.
 
 - Google Play: https://play.google.com/store/apps/details?id=com.MoRe_H.quoridor
 - App Store: https://apps.apple.com/app/id6752514464
-- Get the app (sends a phone to its store): https://quoridor-mohager.pages.dev/get/
+- Get the app (sends a phone to its store): https://playquoridor.pages.dev/get/
+- Play online and invite links: https://playquoridor.pages.dev (the old https://quoridor-mohager.pages.dev still works)
 
 ## Screenshots
 
