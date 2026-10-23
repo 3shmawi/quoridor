@@ -153,6 +153,16 @@ void main() {
       for (final print in prints) {
         expect(print, matches(RegExp(r'^([0-9A-F]{2}:){31}[0-9A-F]{2}$')));
       }
+      // Google Play re-signs the store build with its app signing key, so
+      // Android verifies the links against that certificate, not the upload
+      // key (which still signs the APKs on GitHub Releases).
+      expect(
+        prints,
+        contains(
+          '98:28:6E:8B:65:D1:69:F0:15:F9:BC:60:58:5D:FC:0D:'
+          'B4:ED:7D:2C:EF:71:C4:E8:79:35:D2:CD:4E:A0:33:79',
+        ),
+      );
     });
 
     test('the site vouches for the iOS app, for invite links only', () {
