@@ -12,7 +12,7 @@ class AppVersion {
   });
 
   static const AppVersion current = AppVersion(
-    version: String.fromEnvironment('APP_VERSION', defaultValue: '1.1.5'),
+    version: String.fromEnvironment('APP_VERSION', defaultValue: '1.1.6'),
     buildNumber: int.fromEnvironment('BUILD_NUMBER'),
     commit: String.fromEnvironment('APP_COMMIT'),
   );
