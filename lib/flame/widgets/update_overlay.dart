@@ -163,9 +163,11 @@ class UpdateCard extends StatelessWidget {
                 FilledButton(
                   onPressed: onUpdate,
                   child: Text(
-                    info.route == UpdateRoute.reload
-                        ? l10n.updateReload
-                        : l10n.updateDownload,
+                    // Only a build from GitHub Releases is downloaded; a
+                    // store or the site updates in place.
+                    info.route == UpdateRoute.download
+                        ? l10n.updateDownload
+                        : l10n.updateReload,
                   ),
                 ),
               ],

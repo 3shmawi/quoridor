@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,7 +11,7 @@ import 'update_checker.dart';
 /// Keeps track of whether a newer build is out, for the update card.
 ///
 /// Checks once at start and again whenever the app comes back to the
-/// foreground. iOS has no checker: the App Store updates it.
+/// foreground, on every platform. Store builds ask their store.
 class UpdateService with WidgetsBindingObserver {
   UpdateService._();
 
@@ -33,17 +32,15 @@ class UpdateService with WidgetsBindingObserver {
   late final UpdateChecker _checker = UpdateChecker(
     source: latestJsonUrl,
     route: platformRoute,
+    store: storeLookup,
     fetch: _fetch,
   );
 
   bool _started = false;
   bool _checking = false;
 
-  static bool get isSupported =>
-      kIsWeb || defaultTargetPlatform != TargetPlatform.iOS;
-
   void start() {
-    if (_started || !isSupported) return;
+    if (_started) return;
     _started = true;
     WidgetsBinding.instance.addObserver(this);
     unawaited(_firstCheck());
@@ -56,7 +53,7 @@ class UpdateService with WidgetsBindingObserver {
 
   Future<void> _firstCheck() async {
     final latest = await _checker.fetchLatest();
-    _apply(_checker.evaluate(latest));
+    _apply(await _checker.decide(latest));
     await _noteWhatsNew(latest);
   }
 
@@ -113,7 +110,7 @@ class UpdateService with WidgetsBindingObserver {
 
   void later() => postponed.value = true;
 
-  Future<void> update() => applyUpdate();
+  Future<void> update() => applyUpdate(available.value?.route ?? platformRoute);
 
   static Future<String> _fetch(Uri url) async {
     final response = await http.get(url);

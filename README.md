@@ -315,9 +315,14 @@ before running the script. The key can change your production rules, so
 give it no other roles.
 
 Installed apps and open browser tabs check for a newer build at start and
-when they come back to the foreground, and offer it in a card at the top. To
-force an update, because old builds would actually break, put the oldest
-working version in `release/min_version.txt`.
+when they come back to the foreground, and offer it in a card at the top.
+Phones ask their store: the card appears only once Google Play or the App
+Store actually offers the new build, and its button opens the store page. A
+copy installed from GitHub Releases, and the desktop builds, read
+`latest.json` and open the release page instead. To force an update, because
+old builds would actually break, put the oldest working version in
+`release/min_version.txt`; it applies on every platform, phones included,
+once their store offers a newer build.
 
 ## Roadmap
 

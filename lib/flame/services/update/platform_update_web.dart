@@ -5,8 +5,11 @@ import 'update_checker.dart';
 /// Deployed next to the site itself.
 final Uri latestJsonUrl = Uri.base.resolve('latest.json');
 
-const UpdateRoute platformRoute = UpdateRoute.reload;
+UpdateRoute get platformRoute => UpdateRoute.reload;
 
-Future<void> applyUpdate() async {
+/// The site is its own store.
+StoreLookup? get storeLookup => null;
+
+Future<void> applyUpdate(UpdateRoute route) async {
   web.window.location.reload();
 }

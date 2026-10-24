@@ -1,7 +1,8 @@
 # Release metadata
 
 - `min_version.txt` — the oldest version that still works, as `x.y.z`, or
-  empty. Builds older than this see a forced update they cannot dismiss. Set
+  empty. Builds older than this see a forced update they cannot dismiss (on
+  Android and iPhone, once the store offers a newer build). Set
   it only when old builds would actually break (a server or data change they
   cannot read), never just because there is a new release.
 - `notes.json` — optional `{"en": "...", "ar": "..."}` for the next release.

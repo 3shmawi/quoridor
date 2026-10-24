@@ -25,8 +25,11 @@ class AppStrings {
 
   Map<String, String> get _table => isArabic ? _ar : _en;
 
-  String updateAvailableTitle(String version) =>
-      _fill('updateAvailableTitle', version);
+  /// Google Play does not name the version it offers; [version] is then
+  /// empty and the title says only that there is one.
+  String updateAvailableTitle(String version) => version.isEmpty
+      ? _get('updateAvailableAny')
+      : _fill('updateAvailableTitle', version);
   String get updateLater => _get('updateLater');
   String get yourName => _get('yourName');
   String get save => _get('save');
@@ -35,7 +38,9 @@ class AppStrings {
   String get updateDownload => _get('updateDownload');
   String get updateForced => _get('updateForced');
   String whatsNewIn(String version) => _fill('whatsNewIn', version);
-  String updateWaiting(String version) => _fill('updateWaiting', version);
+  String updateWaiting(String version) => version.isEmpty
+      ? _get('updateWaitingAny')
+      : _fill('updateWaiting', version);
   String get updateWaitingSubtitle => _get('updateWaitingSubtitle');
 
   String _get(String key) => _table[key] ?? _en[key] ?? key;
@@ -287,6 +292,7 @@ class AppStrings {
   static const Map<String, String> _en = {
     'appTitle': 'Quoridor',
     'updateAvailableTitle': 'Version %s is available',
+    'updateAvailableAny': 'A new version is available',
     'updateLater': 'Later',
     'yourName': 'Your name',
     'save': 'Save',
@@ -296,6 +302,7 @@ class AppStrings {
     'updateForced': 'This version no longer works. Update to keep playing.',
     'whatsNewIn': "What's new in %s",
     'updateWaiting': 'Update to %s',
+    'updateWaitingAny': 'Update the game',
     'updateWaitingSubtitle': 'A new version is ready',
     'gotIt': 'Got it!',
     'cancel': 'Cancel',
@@ -546,6 +553,7 @@ class AppStrings {
   static const Map<String, String> _ar = {
     'appTitle': 'كوريدور',
     'updateAvailableTitle': 'إصدار %s متاح',
+    'updateAvailableAny': 'فيه إصدار جديد متاح',
     'updateLater': 'بعدين',
     'yourName': 'اسمك',
     'save': 'حفظ',
@@ -555,6 +563,7 @@ class AppStrings {
     'updateForced': 'الإصدار ده مبقاش شغال. حدّث علشان تكمّل لعب.',
     'whatsNewIn': 'الجديد في %s',
     'updateWaiting': 'حدّث لـ %s',
+    'updateWaitingAny': 'حدّث اللعبة',
     'updateWaitingSubtitle': 'فيه إصدار جديد جاهز',
     'gotIt': 'تمام',
     'cancel': 'إلغاء',
