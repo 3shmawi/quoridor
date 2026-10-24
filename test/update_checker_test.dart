@@ -13,12 +13,17 @@ const running = AppVersion(version: '1.4.0', buildNumber: 100, commit: 'aaa');
 UpdateChecker checker({
   UpdateRoute route = UpdateRoute.download,
   Fetch? fetch,
+  StoreLookup? store,
 }) => UpdateChecker(
   source: Uri.parse('https://example.com/latest.json'),
   route: route,
   fetch: fetch ?? (_) async => '{}',
+  store: store,
   running: running,
 );
+
+UpdateChecker storeChecker(StoreLookup store) =>
+    checker(route: UpdateRoute.store, store: store);
 
 Map<String, Object?> published({
   String version = '1.4.0',
@@ -136,6 +141,101 @@ void main() {
     });
   });
 
+  group('store builds ask their store', () {
+    test('the App Store offering a newer version is an update', () async {
+      final info = await storeChecker(
+        () async => const StoreRelease(version: '1.5.0'),
+      ).decide(published(version: '1.5.0'));
+      expect(info?.version, '1.5.0');
+      expect(info?.route, UpdateRoute.store);
+      expect(info?.notesFor('ar'), 'أسرع');
+    });
+
+    test('a release the store is not offering yet is not', () async {
+      final info = await storeChecker(
+        () async => const StoreRelease(version: '1.4.0'),
+      ).decide(published(version: '1.5.0'));
+      expect(info, isNull);
+    });
+
+    test('a store with nothing newer is not, whatever GitHub says', () async {
+      final info = await storeChecker(
+        () async => null,
+      ).decide(published(version: '9.0.0'));
+      expect(info, isNull);
+    });
+
+    test('Google Play names only the build; latest.json names it', () async {
+      final info = await storeChecker(
+        () async => const StoreRelease(buildNumber: 120),
+      ).decide(published(version: '1.5.0', buildNumber: 120));
+      expect(info?.version, '1.5.0');
+      expect(info?.buildNumber, 120);
+      expect(info?.notesFor('en'), 'Faster');
+    });
+
+    test(
+      'a Play build latest.json does not describe has no name or notes',
+      () async {
+        final info = await storeChecker(
+          () async => const StoreRelease(buildNumber: 130),
+        ).decide(published(version: '1.5.0', buildNumber: 120));
+        expect(info?.version, '');
+        expect(info?.notes, isEmpty);
+        expect(info?.route, UpdateRoute.store);
+      },
+    );
+
+    test('Google Play offering this very build is not an update', () async {
+      final info = await storeChecker(
+        () async => StoreRelease(buildNumber: running.buildNumber),
+      ).decide(published());
+      expect(info, isNull);
+    });
+
+    test('latest.json still forces an update the store offers', () async {
+      final info = await storeChecker(
+        () async => const StoreRelease(version: '1.5.0'),
+      ).decide(published(version: '1.5.0', minVersion: '1.5.0'));
+      expect(info?.forced, isTrue);
+    });
+
+    test('the store is enough when GitHub cannot be reached', () async {
+      final info = await storeChecker(
+        () async => const StoreRelease(version: '1.5.0'),
+      ).decide(null);
+      expect(info?.version, '1.5.0');
+      expect(info?.forced, isFalse);
+    });
+
+    test('a copy not installed from the store updates from GitHub', () async {
+      final info = await storeChecker(
+        () async => throw const NotFromStore(),
+      ).decide(published(version: '1.5.0'));
+      expect(info?.version, '1.5.0');
+      expect(info?.route, UpdateRoute.download);
+    });
+
+    test('a store that cannot be asked is no update', () async {
+      final info = await storeChecker(
+        () async => throw StateError('offline'),
+      ).decide(published(version: '1.5.0'));
+      expect(info, isNull);
+    });
+
+    test("Apple's lookup answer is read", () {
+      expect(
+        parseAppStoreLookup(
+          '{"resultCount":1,"results":[{"version":"1.5.0","bundleId":"x"}]}',
+        )?.version,
+        '1.5.0',
+      );
+      expect(parseAppStoreLookup('{"resultCount":0,"results":[]}'), isNull);
+      expect(parseAppStoreLookup('<html>'), isNull);
+      expect(parseAppStoreLookup('{"results":[{"version":"soon"}]}'), isNull);
+    });
+  });
+
   group('the card', () {
     Future<void> pump(WidgetTester tester, UpdateInfo info) =>
         tester.pumpWidget(
@@ -168,6 +268,27 @@ void main() {
       await pump(tester, info(forced: true));
       expect(find.text('Later'), findsNothing);
       expect(find.textContaining('no longer works'), findsOneWidget);
+    });
+
+    testWidgets('a GitHub build downloads; a store build updates', (
+      tester,
+    ) async {
+      await pump(tester, info(forced: false));
+      expect(find.text('Download'), findsOneWidget);
+      await pump(
+        tester,
+        const UpdateInfo(
+          version: '',
+          buildNumber: 130,
+          notes: {},
+          forced: false,
+          route: UpdateRoute.store,
+        ),
+      );
+      expect(find.text('Update'), findsOneWidget);
+      expect(find.text('Download'), findsNothing);
+      // Google Play did not name the version.
+      expect(find.text('A new version is available'), findsOneWidget);
     });
   });
 
